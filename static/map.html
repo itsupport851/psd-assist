@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSD Farm Map</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f1923; color: #e8edf2; height: 100vh; display: flex; flex-direction: column; }
+    #header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: #0d1520; border-bottom: 1px solid #1e2d3d; }
+    #header-left { display: flex; align-items: center; gap: 12px; }
+    #logo { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, #1a6b3c, #25a35a); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; }
+    #title { font-weight: 600; font-size: 15px; }
+    #subtitle { font-size: 11px; color: #4a9a6b; margin-top: 1px; }
+    #back-btn { padding: 7px 16px; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; color: #8ab4cc; font-size: 13px; cursor: pointer; text-decoration: none; }
+    #back-btn:hover { background: #1e2d3d; }
+    #map-container { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+    #sidebar { position: absolute; top: 16px; right: 16px; width: 300px; background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; overflow: hidden; max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    #sidebar-header { padding: 12px 16px; background: #162130; border-bottom: 1px solid #1e2d3d; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+    #deals-list { overflow-y: auto; flex: 1; }
+    .deal-card { padding: 12px 16px; border-bottom: 1px solid #1e2d3d; cursor: pointer; transition: background 0.15s; }
+    .deal-card:hover { background: #162130; }
+    .deal-card.active { background: #0d3320; border-left: 3px solid #25a35a; }
+    .deal-card-name { font-size: 13px; font-weight: 600; color: #e8edf2; margin-bottom: 4px; }
+    .deal-card-address { font-size: 11px; color: #6b8fa8; margin-bottom: 4px; }
+    .deal-card-meta { display: flex; gap: 8px; font-size: 11px; }
+    .meta-tag { background: #1e2d3d; padding: 2px 7px; border-radius: 10px; color: #8ab4cc; }
+    #detail-panel { position: absolute; bottom: 16px; left: 16px; width: 320px; background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; display: none; }
+    #detail-panel.visible { display: block; }
+    .detail-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: #e8edf2; }
+    .detail-address { font-size: 12px; color: #6b8fa8; margin-bottom: 12px; }
+    .detail-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #1a2535; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: #6b8fa8; }
+    .detail-value { color: #e8edf2; font-weight: 500; }
+    #close-detail { position: absolute; top: 12px; right: 12px; background: none; border: none; color: #6b8fa8; cursor: pointer; font-size: 16px; }
+    #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+    #loading-text { color: #6b8fa8; font-size: 14px; margin-top: 12px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #1e2d3d; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #assign-btn { width: 100%; margin-top: 12px; padding: 8px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+    #assign-btn:hover { opacity: 0.9; }
+    #stats-bar { padding: 8px 16px; background: #162130; border-top: 1px solid #1e2d3d; font-size: 11px; color: #6b8fa8; display: flex; gap: 16px; }
+    .stat { display: flex; gap: 5px; }
+    .stat-value { color: #25a35a; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div id="header-left">
+      <div id="logo">P</div>
+      <div>
+        <div id="title">PSD Farm Map</div>
+        <div id="subtitle">● Active Deals — Georgia Power CEEP</div>
+      </div>
+    </div>
+    <a href="/" id="back-btn">← Back to Assistant</a>
+  </div>
+
+  <div id="map-container">
+    <div id="map"></div>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <div id="loading-text">Loading farm locations...</div>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <span>Open Deals</span>
+        <span id="deal-count" style="color:#25a35a">—</span>
+      </div>
+      <div id="deals-list"></div>
+      <div id="stats-bar">
+        <div class="stat">Total Fans: <span class="stat-value" id="total-fans">—</span></div>
+        <div class="stat">Total Barns: <span class="stat-value" id="total-barns">—</span></div>
+      </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div id="detail-panel">
+      <button id="close-detail" onclick="closeDetail()">×</button>
+      <div class="detail-title" id="detail-name"></div>
+      <div class="detail-address" id="detail-address"></div>
+      <div class="detail-row"><span class="detail-label">Owner</span><span class="detail-value" id="detail-owner"></span></div>
+      <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value" id="detail-phone"></span></div>
+      <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value" id="detail-email"></span></div>
+      <div class="detail-row"><span class="detail-label">Total Fans</span><span class="detail-value" id="detail-fans"></span></div>
+      <div class="detail-row"><span class="detail-label">Total Barns</span><span class="detail-value" id="detail-barns"></span></div>
+      <div class="detail-row"><span class="detail-label">Deal Amount</span><span class="detail-value" id="detail-amount"></span></div>
+      <button id="assign-btn" onclick="assignInstaller()">Assign Andy Nguyen as Installer</button>
+    </div>
+  </div>
+
+  <script>
+    let map, deals = [], markers = [], activeMarker = null;
+    let currentDeal = null;
+
+    async function loadDeals() {
+      try {
+        const res = await fetch('/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: 'https://hook.us2.make.com/fbf052s9udk8xv3apxgct1xiptjqfi7s',
+            payload: { action: 'get_deals_with_addresses' }
+          })
+        });
+        const data = await res.json();
+        deals = data.deals_with_addresses || [];
+        document.getElementById('loading').style.display = 'none';
+        renderSidebar();
+        geocodeAndPlot();
+      } catch (err) {
+        document.getElementById('loading-text').textContent = 'Failed to load deals: ' + err.message;
+      }
+    }
+
+    function renderSidebar() {
+      const list = document.getElementById('deals-list');
+      document.getElementById('deal-count').textContent = deals.length + ' deals';
+      
+      let totalFans = 0, totalBarns = 0;
+      deals.forEach(d => {
+        totalFans += Number(d.total_fans || 0);
+        totalBarns += Number(d.total_barns || 0);
+      });
+      document.getElementById('total-fans').textContent = totalFans;
+      document.getElementById('total-barns').textContent = totalBarns;
+
+      list.innerHTML = deals.map((d, i) => `
+        <div class="deal-card" id="card-${i}" onclick="focusDeal(${i})">
+          <div class="deal-card-name">${d.company || d.deal_name}</div>
+          <div class="deal-card-address">${d.address}, ${d.city}, ${d.state}</div>
+          <div class="deal-card-meta">
+            <span class="meta-tag">${d.total_fans || 0} fans</span>
+            <span class="meta-tag">${d.total_barns || 0} barns</span>
+            ${d.amount ? `<span class="meta-tag">$${Number(d.amount).toLocaleString()}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function geocodeAndPlot() {
+      const apiKey = await getMapKey();
+      for (let i = 0; i < deals.length; i++) {
+        const d = deals[i];
+        const address = `${d.address}, ${d.city}, ${d.state} ${d.zip}`;
+        try {
+          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`);
+          const data = await res.json();
+          if (data.results && data.results[0]) {
+            const loc = data.results[0].geometry.location;
+            deals[i].lat = loc.lat;
+            deals[i].lng = loc.lng;
+            addMarker(i);
+          }
+        } catch (err) {
+          console.error('Geocoding error for', address, err);
+        }
+      }
+      fitMapToBounds();
+    }
+
+    async function getMapKey() {
+      const res = await fetch('/maps-key');
+      const data = await res.json();
+      return data.key;
+    }
+
+    function addMarker(i) {
+      const d = deals[i];
+      if (!d.lat || !d.lng) return;
+
+      const marker = new google.maps.Marker({
+        position: { lat: d.lat, lng: d.lng },
+        map: map,
+        title: d.company || d.deal_name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#25a35a',
+          fillOpacity: 1,
+          strokeColor: '#0d3320',
+          strokeWeight: 2
+        }
+      });
+
+      const infoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="font-family:Inter,sans-serif;padding:4px;min-width:180px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:4px">${d.company || d.deal_name}</div>
+            <div style="font-size:11px;color:#555">${d.address}, ${d.city}</div>
+            <div style="font-size:11px;color:#555;margin-top:4px">${d.total_fans || 0} fans · ${d.total_barns || 0} barns</div>
+          </div>
+        `
+      });
+
+      marker.addListener('click', () => {
+        if (activeMarker) activeMarker.infoWindow.close();
+        infoWindow.open(map, marker);
+        activeMarker = { marker, infoWindow };
+        focusDeal(i);
+      });
+
+      markers[i] = { marker, infoWindow };
+    }
+
+    function focusDeal(i) {
+      const d = deals[i];
+      
+      // Update sidebar active state
+      document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
+      document.getElementById(`card-${i}`)?.classList.add('active');
+
+      // Show detail panel
+      currentDeal = d;
+      document.getElementById('detail-name').textContent = d.company || d.deal_name;
+      document.getElementById('detail-address').textContent = `${d.address}, ${d.city}, ${d.state} ${d.zip}`;
+      document.getElementById('detail-owner').textContent = d.owner || '—';
+      document.getElementById('detail-phone').textContent = d.phone || '—';
+      document.getElementById('detail-email').textContent = d.email || '—';
+      document.getElementById('detail-fans').textContent = d.total_fans || '—';
+      document.getElementById('detail-barns').textContent = d.total_barns || '—';
+      document.getElementById('detail-amount').textContent = d.amount ? '$' + Number(d.amount).toLocaleString() : '—';
+      document.getElementById('detail-panel').classList.add('visible');
+
+      // Pan map to marker
+      if (d.lat && d.lng) {
+        map.panTo({ lat: d.lat, lng: d.lng });
+        map.setZoom(12);
+        if (markers[i]) {
+          if (activeMarker) activeMarker.infoWindow.close();
+          markers[i].infoWindow.open(map, markers[i].marker);
+          activeMarker = markers[i];
+        }
+      }
+    }
+
+    function closeDetail() {
+      document.getElementById('detail-panel').classList.remove('visible');
+      if (activeMarker) activeMarker.infoWindow.close();
+      document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
+    }
+
+    function assignInstaller() {
+      if (!currentDeal) return;
+      alert(`Andy Nguyen assigned to ${currentDeal.company || currentDeal.deal_name}!\n\nThis will update HubSpot in a future update.`);
+    }
+
+    function fitMapToBounds() {
+      const bounds = new google.maps.LatLngBounds();
+      let hasPoints = false;
+      deals.forEach(d => {
+        if (d.lat && d.lng) {
+          bounds.extend({ lat: d.lat, lng: d.lng });
+          hasPoints = true;
+        }
+      });
+      if (hasPoints) map.fitBounds(bounds);
+    }
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 7,
+        center: { lat: 32.1656, lng: -82.9001 }, // Georgia center
+        styles: [
+          { elementType: "geometry", stylers: [{ color: "#0f1923" }] },
+          { elementType: "labels.text.fill", stylers: [{ color: "#8ab4cc" }] },
+          { elementType: "labels.text.stroke", stylers: [{ color: "#0d1520" }] },
+          { featureType: "road", elementType: "geometry", stylers: [{ color: "#1e2d3d" }] },
+          { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1520" }] },
+          { featureType: "poi", stylers: [{ visibility: "off" }] },
+          { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#1e2d3d" }] },
+          { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#1e2d3d" }] },
+        ]
+      });
+      loadDeals();
+    }
+
+    // Load Google Maps script dynamically
+    fetch('/maps-key')
+      .then(r => r.json())
+      .then(data => {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.key}&callback=initMap`;
+        script.async = true;
+        document.head.appendChild(script);
+      });
+  </script>
+</body>
+</html>
