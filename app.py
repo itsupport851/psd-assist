@@ -75,6 +75,14 @@ def fill_workbook(template_bytes, data):
 def index():
     return app.send_static_file('index.html')
 
+@app.route('/map', methods=['GET'])
+def map_page():
+    return app.send_static_file('map.html')
+
+@app.route('/maps-key', methods=['GET'])
+def maps_key():
+    return jsonify({'key': os.environ.get('GOOGLE_MAPS_API_KEY', '')})
+
 # ── Health check ────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
