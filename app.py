@@ -6,16 +6,16 @@ import os
 import io
 import tempfile
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 
 DROPBOX_REFRESH_TOKEN = os.environ.get('DROPBOX_REFRESH_TOKEN', '')
 DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
 DROPBOX_APP_SECRET = os.environ.get('DROPBOX_APP_SECRET', '')
 TEMPLATE_PATH = os.environ.get('TEMPLATE_PATH', '/PSD Customers/GPC_Commercial_Workbook_template.xlsm')
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
 def get_dropbox_access_token():
-    """Exchange refresh token for a fresh access token"""
     response = requests.post(
         'https://api.dropbox.com/oauth2/token',
         data={
@@ -30,7 +30,6 @@ def get_dropbox_access_token():
     return response.json()['access_token']
 
 def download_template_from_dropbox():
-    """Download template xlsm from Dropbox"""
     access_token = get_dropbox_access_token()
     url = 'https://content.dropboxapi.com/2/files/download'
     headers = {
@@ -43,7 +42,6 @@ def download_template_from_dropbox():
     return response.content
 
 def fill_workbook(template_bytes, data):
-    """Fill customer fields in workbook and return as bytes"""
     with tempfile.NamedTemporaryFile(suffix='.xlsm', delete=False) as tmp:
         tmp.write(template_bytes)
         tmp_path = tmp.name
@@ -72,10 +70,17 @@ def fill_workbook(template_bytes, data):
     os.unlink(tmp_path)
     return output
 
+# ── Serve frontend ──────────────────────────────────────────
+@app.route('/', methods=['GET'])
+def index():
+    return app.send_static_file('index.html')
+
+# ── Health check ────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok'})
 
+# ── Fill workbook ────────────────────────────────────────────
 @app.route('/fill-workbook', methods=['POST'])
 def fill_workbook_endpoint():
     try:
@@ -103,6 +108,7 @@ def fill_workbook_endpoint():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── Proxy to Make webhooks ───────────────────────────────────
 @app.route('/proxy', methods=['POST'])
 def proxy():
     try:
@@ -128,11 +134,25 @@ def proxy():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── Proxy to Anthropic API ───────────────────────────────────
+@app.route('/claude', methods=['POST'])
+def claude_proxy():
+    try:
+        data = request.get_json()
+        response = requests.post(
+            'https://api.anthropic.com/v1/messages',
+            json=data,
+            headers={
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01'
+            },
+            timeout=60
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
-
-
-@app.route('/', methods=['GET'])
-def index():
-    return app.send_static_file('index.html')
