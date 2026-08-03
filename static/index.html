@@ -25,7 +25,6 @@
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
 
-    const RAILWAY_URL = "";  // empty = same origin (served from Railway itself)
     const MAKE_READ_WEBHOOK = "https://hook.us2.make.com/fbf052s9udk8xv3apxgct1xiptjqfi7s";
     const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
     const MAKE_INTAKE_WEBHOOK = "https://hook.us2.make.com/tl8ovivxtbwxq3rwrifg6lhgyn5f6es6";
@@ -67,7 +66,7 @@ Available tool formats:
 After a tool call result is provided to you, respond naturally in plain English summarizing what you found or did.`;
 
     async function callMakeViaProxy(makeUrl, payload) {
-      const res = await fetch(`${RAILWAY_URL}/proxy`, {
+      const res = await fetch('/proxy', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: makeUrl, payload }),
@@ -91,7 +90,7 @@ After a tool call result is provided to you, respond naturally in plain English 
     }
 
     async function callClaude(messages) {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch('/claude', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
