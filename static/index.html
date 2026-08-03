@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSD Sales Assistant</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f1923; font-family: 'Inter', system-ui, sans-serif; color: #e8edf2; height: 100vh; overflow: hidden; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 3px; }
+    textarea::placeholder { color: #3a5a70; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40% { transform: translateY(-6px); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    const RAILWAY_URL = "";  // empty = same origin (served from Railway itself)
+    const MAKE_READ_WEBHOOK = "https://hook.us2.make.com/fbf052s9udk8xv3apxgct1xiptjqfi7s";
+    const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
+    const MAKE_INTAKE_WEBHOOK = "https://hook.us2.make.com/tl8ovivxtbwxq3rwrifg6lhgyn5f6es6";
+
+    const SYSTEM_PROMPT = `You are PSD Sales Assistant, an AI agent for Precision Systems Development (PSD) — a contractor that installs exhaust fan motors on poultry farms under Georgia Power's Commercial Energy Efficiency Program (CEEP).
+
+You help the sales team with two main jobs:
+1. Submit customer intake forms (PDF or screenshot) to kick off the processing pipeline
+2. View and update HubSpot deals and line items (fan motor pricing)
+
+You have access to these tools:
+- get_open_deals: fetch all open deals from HubSpot
+- get_line_items: fetch line items for a specific deal (requires deal_id)
+- update_line_item: update unit price on a line item (requires line_item_id, unit_price)
+- update_deal_amount: update the total amount on a deal (requires deal_id, amount)
+- submit_form: submit a customer PDF form to trigger the intake pipeline (requires file_data as base64, file_name, customer_name, email)
+
+When the sales person wants to update prices, always:
+1. First fetch the line items to show current prices
+2. After updating all line items, calculate the total (sum of quantity * unit_price for all line items)
+3. Update the deal amount with the new total
+4. Confirm the update to the sales person
+
+When displaying deals, show them in a clean numbered list with deal name, amount, and stage.
+When displaying line items, show fan brand, size, quantity, current unit price, and line total (qty x price).
+
+Always be concise and professional. Speak like a helpful colleague, not a robot.
+
+IMPORTANT: When you need to call a tool, respond with ONLY a JSON object in this exact format (no other text):
+{"tool": "tool_name", "params": {...}}
+
+Available tool formats:
+{"tool": "get_open_deals", "params": {}}
+{"tool": "get_line_items", "params": {"deal_id": "123"}}
+{"tool": "update_line_item", "params": {"line_item_id": "123", "unit_price": 450}}
+{"tool": "update_deal_amount", "params": {"deal_id": "123", "amount": 9000}}
+{"tool": "submit_form", "params": {"file_data": "base64...", "file_name": "form.pdf", "customer_name": "Farm Name", "email": "email@farm.com"}}
+
+After a tool call result is provided to you, respond naturally in plain English summarizing what you found or did.`;
+
+    async function callMakeViaProxy(makeUrl, payload) {
+      const res = await fetch(`${RAILWAY_URL}/proxy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: makeUrl, payload }),
+      });
+      if (!res.ok) throw new Error(`Proxy error: ${res.status}`);
+      try { return await res.json(); } catch { return { success: true }; }
+    }
+
+    async function executeTool(tool, params) {
+      if (tool === "get_open_deals")
+        return await callMakeViaProxy(MAKE_READ_WEBHOOK, { action: "get_open_deals" });
+      if (tool === "get_line_items")
+        return await callMakeViaProxy(MAKE_READ_WEBHOOK, { action: "get_line_items", deal_id: params.deal_id });
+      if (tool === "update_line_item")
+        return await callMakeViaProxy(MAKE_UPDATE_WEBHOOK, { action: "update_line_item", line_item_id: params.line_item_id, unit_price: params.unit_price });
+      if (tool === "update_deal_amount")
+        return await callMakeViaProxy(MAKE_UPDATE_WEBHOOK, { action: "update_deal_amount", deal_id: params.deal_id, amount: params.amount });
+      if (tool === "submit_form")
+        return await callMakeViaProxy(MAKE_INTAKE_WEBHOOK, params);
+      throw new Error(`Unknown tool: ${tool}`);
+    }
+
+    async function callClaude(messages) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: SYSTEM_PROMPT,
+          messages,
+        }),
+      });
+      const data = await res.json();
+      return data.content?.[0]?.text || "";
+    }
+
+    function App() {
+      const [messages, setMessages] = useState([
+        {
+          role: "assistant",
+          content: "Hey! I'm your PSD Sales Assistant. I can help you submit customer forms, check open deals, view line items, and update pricing. What do you need?",
+          display: true,
+        },
+      ]);
+      const [input, setInput] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [uploadedFile, setUploadedFile] = useState(null);
+      const fileRef = useRef();
+      const bottomRef = useRef();
+
+      useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages, loading]);
+
+      const handleFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result.split(",")[1];
+          setUploadedFile({ name: file.name, base64, type: file.type });
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const sendMessage = async () => {
+        const text = input.trim();
+        if (!text && !uploadedFile) return;
+
+        let userContent = text;
+        if (uploadedFile) {
+          userContent = text
+            ? `${text} [Attached: ${uploadedFile.name}]`
+            : `I have a customer form to submit: ${uploadedFile.name}`;
+        }
+
+        const newUserMsg = { role: "user", content: userContent, display: true };
+        const updatedMessages = [...messages, newUserMsg];
+        setMessages(updatedMessages);
+        setInput("");
+        setLoading(true);
+
+        let apiMessages = updatedMessages
+          .filter((m) => m.display)
+          .map((m) => ({ role: m.role, content: m.content }));
+
+        if (uploadedFile) {
+          apiMessages = apiMessages.map((m, i) =>
+            i === apiMessages.length - 1
+              ? { ...m, content: `${m.content}\n\n[FILE_DATA: base64=${uploadedFile.base64} file_name=${uploadedFile.name}]` }
+              : m
+          );
+        }
+
+        try {
+          let iterMessages = [...apiMessages];
+          let finalResponse = "";
+
+          for (let i = 0; i < 10; i++) {
+            const response = await callClaude(iterMessages);
+
+            let toolCall = null;
+            try {
+              const trimmed = response.trim();
+              if (trimmed.startsWith("{") && trimmed.includes('"tool"')) {
+                toolCall = JSON.parse(trimmed);
+              }
+            } catch {}
+
+            if (toolCall) {
+              setMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: `Calling ${toolCall.tool.replace(/_/g, " ")}...`, display: true, isThinking: true },
+              ]);
+
+              let toolResult;
+              try {
+                toolResult = await executeTool(toolCall.tool, toolCall.params);
+              } catch (err) {
+                toolResult = { error: err.message };
+              }
+
+              setMessages((prev) => prev.filter((m) => !m.isThinking));
+
+              iterMessages = [
+                ...iterMessages,
+                { role: "assistant", content: response },
+                { role: "user", content: `Tool result for ${toolCall.tool}: ${JSON.stringify(toolResult)}` },
+              ];
+            } else {
+              finalResponse = response;
+              break;
+            }
+          }
+
+          if (finalResponse) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: finalResponse, display: true },
+            ]);
+          }
+        } catch (err) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `Something went wrong: ${err.message}`, display: true },
+          ]);
+        }
+
+        setUploadedFile(null);
+        if (fileRef.current) fileRef.current.value = "";
+        setLoading(false);
+      };
+
+      const handleKey = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      };
+
+      const displayMessages = messages.filter((m) => m.display);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 }}>P</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15, letterSpacing: 0.2 }}>PSD Sales Assistant</div>
+              <div style={{ fontSize: 11, color: "#4a9a6b", marginTop: 1 }}>● Online — Precision Systems Development</div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
+            {displayMessages.map((msg, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                {msg.role === "assistant" && (
+                  <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", marginRight: 10, marginTop: 2 }}>
+                    {msg.isThinking ? "⚙" : "P"}
+                  </div>
+                )}
+                <div style={{ maxWidth: "72%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", whiteSpace: "pre-wrap", wordBreak: "break-word", fontStyle: msg.isThinking ? "italic" : "normal" }}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+
+            {loading && !messages.some((m) => m.isThinking) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>P</div>
+                <div style={{ display: "flex", gap: 5, padding: "10px 14px", background: "#162130", borderRadius: "16px 16px 16px 4px", border: "1px solid #1e2d3d" }}>
+                  {[0, 1, 2].map((j) => (
+                    <div key={j} style={{ width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: `${j * 0.2}s` }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* File preview */}
+          {uploadedFile && (
+            <div style={{ margin: "0 16px 8px", padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
+              <span>📎 {uploadedFile.name}</span>
+              <button onClick={() => setUploadedFile(null)} style={{ background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+            </div>
+          )}
+
+          {/* Input */}
+          <div style={{ padding: "12px 16px 20px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 10, alignItems: "flex-end" }}>
+            <button onClick={() => fileRef.current?.click()} title="Attach customer form" style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>📎</button>
+            <input ref={fileRef} type="file" accept=".pdf,image/*" onChange={handleFile} style={{ display: "none" }} />
+
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Ask me anything — show deals, update prices, submit a form..."
+              rows={1}
+              style={{ flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 12, padding: "10px 14px", color: "#e8edf2", fontSize: 14, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }}
+            />
+
+            <button
+              onClick={sendMessage}
+              disabled={loading || (!input.trim() && !uploadedFile)}
+              style={{ width: 40, height: 40, borderRadius: 10, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+            >➤</button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
