@@ -18,6 +18,19 @@
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
       40% { transform: translateY(-6px); opacity: 1; }
     }
+    .deal-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .deal-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
+    .deal-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
+    .deal-table tr:last-child td { border-bottom: none; }
+    .deal-table tr:hover td { background: #1a2535; cursor: pointer; }
+    .line-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .line-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
+    .line-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
+    .line-table tr:last-child td { border-bottom: none; }
+    .line-table .total-row td { border-top: 2px solid #25a35a; font-weight: 700; color: #25a35a; background: #0d1f15; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .tag-scheduled { background: #1a3a5c; color: #5ab4f0; }
+    .tag-won { background: #0d3320; color: #25a35a; }
   </style>
 </head>
 <body>
@@ -42,28 +55,38 @@ You have access to these tools:
 - update_deal_amount: update the total amount on a deal (requires deal_id, amount)
 - submit_form: submit a customer PDF form to trigger the intake pipeline (requires file_data as base64, file_name, customer_name, email)
 
-When the sales person wants to update prices, always:
+CRITICAL RULES:
+- Always use the actual HubSpot ID from the data (the numeric id or hs_object_id field) — NEVER use the list position number
+- When showing deals, always keep track of the real deal IDs internally
+- When showing line items, always keep track of real line item IDs internally
+
+When the sales person wants to update prices:
 1. First fetch the line items to show current prices
-2. After updating all line items, calculate the total (sum of quantity * unit_price for all line items)
-3. Update the deal amount with the new total
-4. Confirm the update to the sales person
+2. Update each line item price as requested
+3. Calculate the new total: sum of (quantity * unit_price) for ALL line items
+4. Update the deal amount with the new total
+5. Confirm everything to the sales person
 
-When displaying deals, show them in a clean numbered list with deal name, amount, and stage.
-When displaying line items, show fan brand, size, quantity, current unit price, and line total (qty x price).
+When displaying deals, respond with a special JSON block for rendering:
+DEALS_TABLE:{"deals":[{"id":"123","name":"Farm Name","amount":8000,"stage":"appointmentscheduled"},...]}
 
-Always be concise and professional. Speak like a helpful colleague, not a robot.
+When displaying line items, respond with a special JSON block for rendering:
+LINE_ITEMS_TABLE:{"deal_name":"Farm Name","deal_id":"123","items":[{"id":"456","name":"Fan Motor","brand":"Chore-Time","size":48,"qty":24,"unit_price":0,"line_total":0},...]}
 
-IMPORTANT: When you need to call a tool, respond with ONLY a JSON object in this exact format (no other text):
+For everything else, respond in plain conversational English.
+Always be concise and professional. Speak like a helpful colleague.
+
+When you need to call a tool, respond with ONLY:
 {"tool": "tool_name", "params": {...}}
 
 Available tool formats:
 {"tool": "get_open_deals", "params": {}}
-{"tool": "get_line_items", "params": {"deal_id": "123"}}
-{"tool": "update_line_item", "params": {"line_item_id": "123", "unit_price": 450}}
-{"tool": "update_deal_amount", "params": {"deal_id": "123", "amount": 9000}}
+{"tool": "get_line_items", "params": {"deal_id": "339921027805"}}
+{"tool": "update_line_item", "params": {"line_item_id": "335654673094", "unit_price": 450}}
+{"tool": "update_deal_amount", "params": {"deal_id": "339921027805", "amount": 9000}}
 {"tool": "submit_form", "params": {"file_data": "base64...", "file_name": "form.pdf", "customer_name": "Farm Name", "email": "email@farm.com"}}
 
-After a tool call result is provided to you, respond naturally in plain English summarizing what you found or did.`;
+After a tool call result is provided, either call another tool or respond naturally.`;
 
     async function callMakeViaProxy(makeUrl, payload) {
       const res = await fetch('/proxy', {
@@ -95,13 +118,114 @@ After a tool call result is provided to you, respond naturally in plain English 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 1000,
+          max_tokens: 1500,
           system: SYSTEM_PROMPT,
           messages,
         }),
       });
       const data = await res.json();
       return data.content?.[0]?.text || "";
+    }
+
+    function fmt(n) {
+      if (n === null || n === undefined || n === "") return "—";
+      return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function DealsTable({ data }) {
+      const stageLabel = (s) => {
+        const map = { appointmentscheduled: "Scheduled", closedwon: "Won", closedlost: "Lost", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation" };
+        return map[s] || s;
+      };
+      return (
+        <div>
+          <div style={{ fontSize: 12, color: "#6b8fa8", marginBottom: 6 }}>{data.deals.length} open deals</div>
+          <table className="deal-table">
+            <thead>
+              <tr><th>#</th><th>Deal Name</th><th>Amount</th><th>Stage</th></tr>
+            </thead>
+            <tbody>
+              {data.deals.map((d, i) => (
+                <tr key={d.id}>
+                  <td style={{ color: "#6b8fa8" }}>{i + 1}</td>
+                  <td style={{ fontWeight: 500 }}>{d.name}</td>
+                  <td>{fmt(d.amount)}</td>
+                  <td><span className="tag tag-scheduled">{stageLabel(d.stage)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    function LineItemsTable({ data }) {
+      const total = data.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.unit_price || 0)), 0);
+      return (
+        <div>
+          <div style={{ fontSize: 12, color: "#6b8fa8", marginBottom: 6 }}>{data.deal_name} — {data.items.length} line items</div>
+          <table className="line-table">
+            <thead>
+              <tr><th>Fan</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>
+            </thead>
+            <tbody>
+              {data.items.map((item, i) => (
+                <tr key={item.id || i}>
+                  <td style={{ fontWeight: 500 }}>{item.brand}</td>
+                  <td>{item.size}"</td>
+                  <td>{item.qty}</td>
+                  <td>{fmt(item.unit_price)}</td>
+                  <td>{fmt(Number(item.qty) * Number(item.unit_price || 0))}</td>
+                </tr>
+              ))}
+              <tr className="total-row">
+                <td colSpan={4} style={{ textAlign: "right" }}>Total Contract Value</td>
+                <td>{fmt(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    function MessageContent({ content }) {
+      // Check for DEALS_TABLE
+      if (content.includes("DEALS_TABLE:")) {
+        const parts = content.split(/DEALS_TABLE:/);
+        return (
+          <div>
+            {parts[0] && <div style={{ marginBottom: 8 }}>{parts[0].trim()}</div>}
+            {(() => {
+              try {
+                const jsonStr = parts[1].trim().split("\n")[0];
+                const data = JSON.parse(jsonStr);
+                return <DealsTable data={data} />;
+              } catch { return <div>{parts[1]}</div>; }
+            })()}
+            {parts[2] && <div style={{ marginTop: 8 }}>{parts[2].trim()}</div>}
+          </div>
+        );
+      }
+
+      // Check for LINE_ITEMS_TABLE
+      if (content.includes("LINE_ITEMS_TABLE:")) {
+        const parts = content.split(/LINE_ITEMS_TABLE:/);
+        return (
+          <div>
+            {parts[0] && <div style={{ marginBottom: 8 }}>{parts[0].trim()}</div>}
+            {(() => {
+              try {
+                const jsonStr = parts[1].trim().split("\n")[0];
+                const data = JSON.parse(jsonStr);
+                return <LineItemsTable data={data} />;
+              } catch { return <div>{parts[1]}</div>; }
+            })()}
+            {parts[2] && <div style={{ marginTop: 8 }}>{parts[2].trim()}</div>}
+          </div>
+        );
+      }
+
+      return <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{content}</div>;
     }
 
     function App() {
@@ -250,8 +374,8 @@ After a tool call result is provided to you, respond naturally in plain English 
                     {msg.isThinking ? "⚙" : "P"}
                   </div>
                 )}
-                <div style={{ maxWidth: "72%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", whiteSpace: "pre-wrap", wordBreak: "break-word", fontStyle: msg.isThinking ? "italic" : "normal" }}>
-                  {msg.content}
+                <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" }}>
+                  {msg.isThinking ? msg.content : <MessageContent content={msg.content} />}
                 </div>
               </div>
             ))}
