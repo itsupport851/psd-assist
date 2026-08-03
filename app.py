@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
 import openpyxl
 import requests
 import os
@@ -6,6 +7,7 @@ import io
 import tempfile
 
 app = Flask(__name__)
+CORS(app)
 
 DROPBOX_REFRESH_TOKEN = os.environ.get('DROPBOX_REFRESH_TOKEN', '')
 DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
@@ -98,6 +100,31 @@ def fill_workbook_endpoint():
             as_attachment=True,
             download_name=filename
         )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/proxy', methods=['POST'])
+def proxy():
+    try:
+        data = request.get_json()
+        target_url = data.get('url')
+        payload = data.get('payload')
+
+        if not target_url:
+            return jsonify({'error': 'Missing target url'}), 400
+
+        response = requests.post(
+            target_url,
+            json=payload,
+            headers={'Content-Type': 'application/json'},
+            timeout=30
+        )
+
+        try:
+            return jsonify(response.json()), response.status_code
+        except Exception:
+            return jsonify({'raw': response.text}), response.status_code
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
