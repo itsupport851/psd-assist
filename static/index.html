@@ -81,7 +81,7 @@
       "When displaying line items use: LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
       "When showing map use: MAP_LINK after summarizing the farms found",
       "",
-      "Tool call format — respond with ONLY this JSON (no other text):",
+      "CRITICAL TOOL CALL RULE: When you need to call a tool, your ENTIRE response must be ONLY the JSON object. Zero text before it. Zero text after it. No explanation. No confirmation. Just the raw JSON and nothing else. If you write anything before or after the JSON, the tool will not execute.",
       "{\"tool\": \"get_open_deals\", \"params\": {}}",
       "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
       "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
@@ -327,8 +327,9 @@
 
             try {
               var trimmed = response.trim();
-              if (trimmed.charAt(0) === "{" && trimmed.includes('"tool"')) {
-                toolCall = JSON.parse(trimmed);
+              var jsonMatch = trimmed.match(/\{[\s\S]*"tool"[\s\S]*\}/);
+              if (jsonMatch) {
+                toolCall = JSON.parse(jsonMatch[0]);
               }
             } catch(e) {}
 
