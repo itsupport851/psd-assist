@@ -398,6 +398,52 @@ def hs_get_teams():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── HubSpot: Get service pipeline stages ────────────────────
+@app.route('/hubspot/service-stages', methods=['GET'])
+def hs_service_stages():
+    try:
+        pipeline_id = 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6'
+        res = requests.get(f'{HUBSPOT_BASE}/crm/v3/pipelines/services/{pipeline_id}/stages', headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+        stages = [{'id': s['id'], 'label': s['label']} for s in res.json().get('results', [])]
+        return jsonify({'stages': stages})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Get full service record (debug) ────────────────
+@app.route('/hubspot/service-debug/<service_id>', methods=['GET'])
+def hs_service_debug(service_id):
+    try:
+        # First get all available properties for services
+        props_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/properties/services', headers=HUBSPOT_HEADERS())
+        all_props = [p['name'] for p in props_res.json().get('results', [])]
+        prop_str = ','.join(all_props[:50])  # fetch first 50 props
+
+        # Fetch the service with all properties
+        res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}?properties={prop_str}', headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+
+        # Return only non-null properties
+        props = res.json().get('properties', {})
+        non_null = {k: v for k, v in props.items() if v is not None and v != ''}
+        return jsonify({'id': service_id, 'properties': non_null, 'all_available_props': all_props})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Get service properties (debug) ─────────────────
+@app.route('/hubspot/service-properties', methods=['GET'])
+def hs_service_properties():
+    try:
+        res = requests.get(f'{HUBSPOT_BASE}/crm/v3/properties/services', headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+        props = [{'name': p['name'], 'label': p['label'], 'type': p['type']} for p in res.json().get('results', [])]
+        return jsonify({'properties': props})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ── HubSpot: Get services for a deal ────────────────────────
 @app.route('/hubspot/services/<deal_id>', methods=['GET'])
 def hs_get_services(deal_id):
@@ -409,7 +455,7 @@ def hs_get_services(deal_id):
         service_ids = [r['id'] for r in assoc_res.json().get('results', [])]
         if not service_ids:
             return jsonify({'services': []})
-        props = 'hs_service_name,description,hs_pipeline,hs_pipeline_stage,hs_service_status,start_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount'
+        props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
         services = []
         for sid in service_ids:
             res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}?properties={props}', headers=HUBSPOT_HEADERS())
