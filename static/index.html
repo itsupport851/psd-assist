@@ -407,7 +407,6 @@
       function triggerStageSelector() {
         setShowStageSelector(true);
         setShowActions(false);
-        setShowStageSelector(false);
         setMessages(function(prev) {
           return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]);
         });
