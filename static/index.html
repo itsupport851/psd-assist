@@ -42,6 +42,22 @@
     .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .svc-form-btn:hover { opacity: 0.9; }
     .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
+    .li-form { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; margin-top: 8px; }
+    .li-form-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
+    .li-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .li-form-row { display: flex; flex-direction: column; gap: 4px; }
+    .li-form-label { font-size: 11px; color: #6b8fa8; font-weight: 500; }
+    .li-form-input { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
+    .li-form-input:focus { border-color: #25a35a; }
+    .li-form-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
+    .li-form-select option { background: #162130; }
+    .li-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .li-form-btn:hover { opacity: 0.9; }
+    .li-form-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .li-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
+    .li-form-deal-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .li-form-deal-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; width: 100%; }
+    .li-form-deal-select option { background: #162130; }
     .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
     .map-btn:hover { opacity: 0.9; }
     .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; animation: fadeIn 0.3s ease; }
@@ -74,7 +90,7 @@
       { icon: "🗺", label: "Farm Map", desc: "Plot farms on map", message: "Show scheduled farms on the map", isMap: true, roles: ["sales","analyst"] },
       { icon: "📍", label: "Farm Clusters", desc: "Find nearby farms", message: "Show me farm clusters to plan installer routes", roles: ["sales","analyst"] },
       { icon: "💰", label: "Update Pricing", desc: "Edit line item prices", message: "I want to update line item pricing for a deal", roles: ["sales"] },
-      { icon: "➕", label: "Add Line Item", desc: "Add fan to a deal", message: "I want to add a new line item to a deal", roles: ["sales"] },
+      { icon: "➕", label: "Add Line Item", desc: "Add fan to a deal", message: null, isLineItemForm: true, roles: ["sales"] },
       { icon: "📝", label: "New Deal", desc: "Create a deal", message: "I want to create a new deal in HubSpot", roles: ["sales"] },
       { icon: "👤", label: "New Contact", desc: "Add a contact", message: "I want to create a new contact in HubSpot", roles: ["sales"] },
       { icon: "🔧", label: "New Service", desc: "Create service for deal", message: "I want to create a new service for an appointment scheduled deal", roles: ["sales"] },
@@ -137,7 +153,7 @@
         "DEALS_TABLE:{\"deals\":[{\"id\":\"123\",\"name\":\"Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
         "LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
         "TEAMS_SELECTOR:{\"teams\":[{\"id\":\"123\",\"name\":\"Team Name\",\"userIds\":[]}]}",
-        "SERVICE_FORM:{\"deal_id\":\"123\",\"deal_name\":\"Farm\",\"team_id\":\"456\",\"team_name\":\"Boxy Services\",\"name\":\"Installation — Farm\",\"description\":\"Install 48 fans across 6 barns\",\"start_date\":\"2026-04-01\",\"target_end_date\":\"2026-04-30\",\"total_cost\":\"9600\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
+        "SERVICE_FORM:{\"deal_id\":\"123\",\"deal_name\":\"Farm\",\"team_id\":\"456\",\"team_name\":\"Boxy Services\",\"name\":\"Fan Motor Installation — Farm\",\"description\":\"Install 48 fans across 6 barns\",\"start_date\":\"2026-04-01\",\"target_end_date\":\"2026-04-30\",\"total_cost\":\"9600\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
         "MAP_LINK (at end of response after summarizing farms)",
         "SHOW_OPTIONS (when showing menu)",
         "STAGE_SELECTOR (when showing stage filter)",
@@ -383,6 +399,210 @@
       );
     }
 
+    function LineItemForm({ onSubmit, onCancel }) {
+      const [deals, setDeals] = React.useState([]);
+      const [loadingDeals, setLoadingDeals] = React.useState(true);
+      const [submitting, setSubmitting] = React.useState(false);
+      const [form, setForm] = React.useState({
+        deal_id: "",
+        name: "",
+        fan_brand: "",
+        fan_size: "",
+        motor_size: "",
+        quantity: "",
+        unit_price: "0",
+      });
+
+      React.useEffect(function() {
+        fetch("/hubspot/deals?limit=50&properties=dealname,dealstage,total_fans,total_barns", { headers: { "Content-Type": "application/json" } })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var open = (data.deals || []).filter(function(d) {
+              var s = (d.properties || {}).dealstage || "";
+              return s !== "closedwon" && s !== "closedlost";
+            });
+            setDeals(open);
+            if (open.length === 1) update("deal_id", open[0].id);
+          })
+          .catch(function() { setDeals([]); })
+          .finally(function() { setLoadingDeals(false); });
+      }, []);
+
+      function update(field, value) {
+        setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
+      }
+
+      function autoName(brand, size, motor) {
+        var parts = [];
+        if (brand) parts.push(brand);
+        if (size)  parts.push(size + '"');
+        if (motor) parts.push(motor + " HP");
+        return parts.join(" ") + (parts.length ? " Fan Motor" : "");
+      }
+
+      function handleBrand(v)  { update("fan_brand",  v); update("name", autoName(v, form.fan_size,  form.motor_size)); }
+      function handleSize(v)   { update("fan_size",   v); update("name", autoName(form.fan_brand, v, form.motor_size)); }
+      function handleMotor(v)  { update("motor_size", v); update("name", autoName(form.fan_brand, form.fan_size, v)); }
+
+      async function handleSubmit() {
+        if (!form.deal_id || !form.fan_brand || !form.fan_size || !form.quantity) return;
+        setSubmitting(true);
+        try {
+          const res = await fetch("/hubspot/line-items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              deal_id:    form.deal_id,
+              name:       form.name || autoName(form.fan_brand, form.fan_size, form.motor_size),
+              fan_brand:  form.fan_brand,
+              fan_size:   parseFloat(form.fan_size),
+              motor_size: parseFloat(form.motor_size) || 0,
+              quantity:   parseInt(form.quantity),
+              unit_price: parseFloat(form.unit_price) || 0,
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            onSubmit(form.deal_id, form.name || autoName(form.fan_brand, form.fan_size, form.motor_size), parseInt(form.quantity));
+          } else {
+            onSubmit(null, null, null, data.error || "Failed to add line item");
+          }
+        } catch(e) {
+          onSubmit(null, null, null, e.message);
+        }
+        setSubmitting(false);
+      }
+
+      var isValid = form.deal_id && form.fan_brand && form.fan_size && form.quantity;
+
+      var dealName = "";
+      if (form.deal_id) {
+        var found = deals.find(function(d) { return d.id === form.deal_id; });
+        if (found) dealName = (found.properties || {}).dealname || "";
+      }
+
+      return React.createElement("div", { className: "li-form" },
+        React.createElement("div", { className: "li-form-title" }, "➕ Add Line Item"),
+
+        // Deal selector
+        React.createElement("div", { className: "li-form-deal-row" },
+          React.createElement("div", { className: "li-form-label" }, "Deal " + (loadingDeals ? "(loading…)" : "(" + deals.length + " open)")),
+          React.createElement("select", {
+            className: "li-form-deal-select",
+            value: form.deal_id,
+            onChange: function(e) { update("deal_id", e.target.value); }
+          },
+            React.createElement("option", { value: "" }, "— select a deal —"),
+            deals.map(function(d) {
+              var dp = d.properties || {};
+              return React.createElement("option", { key: d.id, value: d.id },
+                (dp.dealname || d.id) + (dp.total_fans ? " · " + dp.total_fans + " fans" : "")
+              );
+            })
+          )
+        ),
+
+        // Fan details grid
+        React.createElement("div", { className: "li-form-grid" },
+          // Brand
+          React.createElement("div", { className: "li-form-row" },
+            React.createElement("div", { className: "li-form-label" }, "Fan Brand *"),
+            React.createElement("select", {
+              className: "li-form-select",
+              value: form.fan_brand,
+              onChange: function(e) { handleBrand(e.target.value); }
+            },
+              React.createElement("option", { value: "" }, "— select —"),
+              ["Chore-Time","Hired-Hand","Aerovent","Tunnel","Vostermans","Munters","Other"].map(function(b) {
+                return React.createElement("option", { key: b, value: b }, b);
+              })
+            )
+          ),
+          // Fan Size
+          React.createElement("div", { className: "li-form-row" },
+            React.createElement("div", { className: "li-form-label" }, "Fan Size (in) *"),
+            React.createElement("select", {
+              className: "li-form-select",
+              value: form.fan_size,
+              onChange: function(e) { handleSize(e.target.value); }
+            },
+              React.createElement("option", { value: "" }, "— select —"),
+              ["36","48","52","54"].map(function(s) {
+                return React.createElement("option", { key: s, value: s }, s + '"');
+              })
+            )
+          ),
+          // Motor HP
+          React.createElement("div", { className: "li-form-row" },
+            React.createElement("div", { className: "li-form-label" }, "Motor Size (HP)"),
+            React.createElement("select", {
+              className: "li-form-select",
+              value: form.motor_size,
+              onChange: function(e) { handleMotor(e.target.value); }
+            },
+              React.createElement("option", { value: "" }, "— select —"),
+              ["0.5","1","1.5","2","3"].map(function(h) {
+                return React.createElement("option", { key: h, value: h }, h + " HP");
+              })
+            )
+          ),
+          // Quantity
+          React.createElement("div", { className: "li-form-row" },
+            React.createElement("div", { className: "li-form-label" }, "Quantity *"),
+            React.createElement("input", {
+              className: "li-form-input",
+              type: "number", min: "1", step: "1",
+              placeholder: "e.g. 24",
+              value: form.quantity,
+              onChange: function(e) { update("quantity", e.target.value); }
+            })
+          ),
+          // Unit Price
+          React.createElement("div", { className: "li-form-row" },
+            React.createElement("div", { className: "li-form-label" }, "Unit Price ($)"),
+            React.createElement("input", {
+              className: "li-form-input",
+              type: "number", min: "0", step: "0.01",
+              placeholder: "0.00",
+              value: form.unit_price,
+              onChange: function(e) { update("unit_price", e.target.value); }
+            })
+          ),
+          // Line Total (read-only)
+          React.createElement("div", { className: "li-form-row" },
+            React.createElement("div", { className: "li-form-label" }, "Line Total"),
+            React.createElement("input", {
+              className: "li-form-input",
+              readOnly: true,
+              style: { color: "#6b8fa8" },
+              value: (form.quantity && form.unit_price)
+                ? "$" + (parseInt(form.quantity||0) * parseFloat(form.unit_price||0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : "—"
+            })
+          )
+        ),
+
+        // Auto-generated name
+        React.createElement("div", { className: "li-form-row", style: { marginBottom: 12 } },
+          React.createElement("div", { className: "li-form-label" }, "Line Item Name (auto-generated)"),
+          React.createElement("input", {
+            className: "li-form-input",
+            value: form.name,
+            placeholder: "Fill fields above to auto-generate",
+            onChange: function(e) { update("name", e.target.value); },
+            style: { color: form.name ? "#e8edf2" : "#6b8fa8" }
+          })
+        ),
+
+        React.createElement("button", {
+          className: "li-form-btn",
+          onClick: handleSubmit,
+          disabled: !isValid || submitting
+        }, submitting ? "Adding…" : "➕ Add to Deal"),
+        React.createElement("button", { className: "li-form-btn-cancel", onClick: onCancel }, "Cancel")
+      );
+    }
+
     function TeamsSelector({ teams, onAction }) {
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a team to assign:"),
@@ -415,7 +635,7 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, role }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, onLineItemForm, role }) {
       var actions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role); });
       return React.createElement("div", { className: "quick-actions" },
         actions.map(function(a, i) {
@@ -424,6 +644,7 @@
               if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
               if (a.isUpload) { onUpload(); return; }
               if (a.isStageSelector) { onStageSelector(); return; }
+              if (a.isLineItemForm) { onLineItemForm(); return; }
               onAction(a.message);
             }
           },
@@ -437,9 +658,16 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, role: role });
+    function MessageContent({ content, onAction, onUpload, onStageSelector, onLineItemForm, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onLineItemForm: onLineItemForm, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
+      if (content === "ADD_LINE_ITEM_FORM") return React.createElement(LineItemForm, {
+        onSubmit: function(dealId, name, qty, err) {
+          if (err) { onAction("Line item add failed: " + err); return; }
+          onAction("Line item added: " + qty + "x " + name + " added to deal " + dealId + ". Please confirm and show updated line items.");
+        },
+        onCancel: function() { onAction("Cancelled adding line item"); }
+      });
 
       if (content.includes("SERVICE_FORM:")) {
         var sfParts = content.split("SERVICE_FORM:");
@@ -609,6 +837,11 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]); });
       }
 
+      function triggerLineItemForm() {
+        setShowActions(false);
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "ADD_LINE_ITEM_FORM", display: true }]); });
+      }
+
       async function sendMessage(overrideText) {
         var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
@@ -695,6 +928,7 @@
               onClick: function() {
                 setShowActions(true);
                 setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
+                // re-set lineItemForm trigger so Options panel has it
               },
               style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, cursor: "pointer" }
             }, "⚡ Options"),
@@ -714,12 +948,12 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onLineItemForm: triggerLineItemForm, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onLineItemForm: triggerLineItemForm, role: auth.role })
                 )
             );
           }),
