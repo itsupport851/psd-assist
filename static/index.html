@@ -173,6 +173,7 @@
         "SERVICE_STAGE_SELECTOR (when showing service stage/status filter)",
         "",
         "CRITICAL: When calling a tool, respond with ONLY the JSON — no text before or after:",
+        "CRITICAL: In your final response after receiving tool results, NEVER repeat or show the tool call JSON, tool name, or raw tool result data. Only show the formatted display output (DEALS_TABLE, SERVICES_TABLE, etc.) or a natural language summary.",
         "{\"tool\": \"get_open_deals\", \"params\": {}}",
         "{\"tool\": \"get_open_deals\", \"params\": {\"stage\": \"appointmentscheduled\"}}",
         "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
@@ -770,7 +771,14 @@
         setInput("");
         setLoading(true);
 
-        var apiMessages = updatedMessages.filter(function(m) { return m.display && m.content !== "SHOW_OPTIONS" && m.content !== "STAGE_SELECTOR" && m.content !== "SERVICE_STAGE_SELECTOR"; }).map(function(m) { return { role: m.role, content: m.content }; });
+        var apiMessages = updatedMessages.filter(function(m) {
+          return m.display
+            && m.content !== "SHOW_OPTIONS"
+            && m.content !== "STAGE_SELECTOR"
+            && m.content !== "SERVICE_STAGE_SELECTOR"
+            && !m.isToolCall
+            && !m.isToolResult;
+        }).map(function(m) { return { role: m.role, content: m.content }; });
 
         if (uploadedFile) {
           apiMessages = apiMessages.map(function(m, i) {
@@ -796,14 +804,19 @@
               try { toolResult = await executeTool(toolCall.tool, toolCall.params); }
               catch(err) { toolResult = { error: err.message }; }
               setMessages(function(prev) { return prev.filter(function(m) { return !m.isThinking; }); });
-              iterMessages = iterMessages.concat([{ role: "assistant", content: response }, { role: "user", content: "Tool result for " + toolCall.tool + ": " + JSON.stringify(toolResult) }]);
+              iterMessages = iterMessages.concat([
+                { role: "assistant", content: response },
+                { role: "user", content: "Tool result for " + toolCall.tool + " (use this data to build your display output — do NOT echo this JSON or the tool call in your response): " + JSON.stringify(toolResult) }
+              ]);
             } else {
               finalResponse = response;
               break;
             }
           }
           if (finalResponse) {
-            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: finalResponse, display: true }]); });
+            // Strip any leaked tool-call JSON that Claude may have prepended
+            var cleaned = finalResponse.replace(/^\s*\{[\s\S]*?"tool"[\s\S]*?\}\s*/g, '').replace(/^\s*\{[\s\S]*?"deals"[\s\S]*?\}\s*/, '').trim();
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: cleaned, display: true }]); });
           }
         } catch(err) {
           setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Something went wrong: " + err.message, display: true }]); });
