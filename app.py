@@ -4,6 +4,8 @@ import openpyxl
 import requests
 import os
 import io
+import re
+import json
 import tempfile
 
 app = Flask(__name__, static_folder='static')
@@ -14,6 +16,10 @@ DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
 DROPBOX_APP_SECRET = os.environ.get('DROPBOX_APP_SECRET', '')
 TEMPLATE_PATH = os.environ.get('TEMPLATE_PATH', '/PSD Customers/GPC_Commercial_Workbook_template.xlsm')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+HUBSPOT_API_KEY = os.environ.get('HUBSPOT_API_KEY', '')
+HUBSPOT_BASE = 'https://api.hubapi.com'
+HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
+PORTAL_ID = '246901747'
 
 def get_dropbox_access_token():
     response = requests.post(
@@ -51,13 +57,7 @@ def fill_workbook(template_bytes, data):
 
     ws['F8'] = data.get('gp_account_name', '')
     ws['F9'] = data.get('owner_name', '')
-
-    address_parts = [
-        data.get('farm_address', ''),
-        data.get('city', ''),
-        data.get('state', ''),
-        data.get('zip', '')
-    ]
+    address_parts = [data.get('farm_address', ''), data.get('city', ''), data.get('state', ''), data.get('zip', '')]
     ws['F10'] = ', '.join(p for p in address_parts if p)
     ws['F11'] = data.get('phone', '')
     ws['F12'] = data.get('email', '')
@@ -95,28 +95,125 @@ def fill_workbook_endpoint():
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
-
         required = ['gp_account_name', 'gp_account_number']
         missing = [f for f in required if not data.get(f)]
         if missing:
             return jsonify({'error': f'Missing required fields: {missing}'}), 400
-
         template_bytes = download_template_from_dropbox()
         filled_workbook = fill_workbook(template_bytes, data)
-
         safe_name = data.get('gp_account_name', 'Customer').replace('/', '-').replace('\\', '-')
         filename = f"GPC_Commercial_Workbook_{safe_name}.xlsm"
-
-        return send_file(
-            filled_workbook,
-            mimetype='application/vnd.ms-excel.sheet.macroEnabled.12',
-            as_attachment=True,
-            download_name=filename
-        )
+        return send_file(filled_workbook, mimetype='application/vnd.ms-excel.sheet.macroEnabled.12', as_attachment=True, download_name=filename)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ── Proxy to Make webhooks ───────────────────────────────────
+# ── HubSpot: Get open deals ──────────────────────────────────
+@app.route('/hubspot/deals', methods=['GET'])
+def hs_get_deals():
+    try:
+        props = 'dealname,amount,dealstage,closedate,hs_object_id,total_fans,total_barns,operation_type'
+        url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=50&properties={props}'
+        res = requests.get(url, headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+        data = res.json()
+        deals = []
+        for d in data.get('results', []):
+            deals.append({
+                'id': d['id'],
+                'properties': d.get('properties', {})
+            })
+        return jsonify({'deals': deals})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Get line items for a deal ──────────────────────
+@app.route('/hubspot/line-items/<deal_id>', methods=['GET'])
+def hs_get_line_items(deal_id):
+    try:
+        # Get associated line item IDs
+        assoc_url = f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}/associations/line_items'
+        assoc_res = requests.get(assoc_url, headers=HUBSPOT_HEADERS())
+        if assoc_res.status_code != 200:
+            return jsonify({'error': assoc_res.text}), assoc_res.status_code
+
+        assoc_data = assoc_res.json()
+        line_item_ids = [r['id'] for r in assoc_data.get('results', [])]
+
+        if not line_item_ids:
+            return jsonify({'line_items': []})
+
+        # Fetch each line item
+        props = 'name,price,quantity,description,fan_brand,fan_size,motor_size,number_of_fans,hs_object_id'
+        line_items = []
+        for lid in line_item_ids:
+            li_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/line_items/{lid}?properties={props}', headers=HUBSPOT_HEADERS())
+            if li_res.status_code == 200:
+                li = li_res.json()
+                line_items.append({
+                    'id': li['id'],
+                    'properties': li.get('properties', {})
+                })
+
+        return jsonify({'line_items': line_items})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Get deals with addresses ───────────────────────
+@app.route('/hubspot/deals-with-addresses', methods=['GET'])
+def hs_deals_with_addresses():
+    try:
+        # Get appointmentscheduled deals
+        props = 'dealname,amount,dealstage,total_fans,total_barns,hs_object_id'
+        url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=50&properties={props}'
+        res = requests.get(url, headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+
+        deals = [d for d in res.json().get('results', []) if d.get('properties', {}).get('dealstage') == 'appointmentscheduled']
+
+        result = []
+        contact_props = 'address,city,state,zip,company,firstname,ower_name,email,phone,georgia_power_account'
+
+        for deal in deals:
+            deal_id = deal['id']
+            # Get associated contact
+            assoc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}/associations/contacts', headers=HUBSPOT_HEADERS())
+            if assoc_res.status_code != 200:
+                continue
+            contacts = assoc_res.json().get('results', [])
+            if not contacts:
+                continue
+
+            contact_id = contacts[0]['id']
+            contact_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contact_id}?properties={contact_props}', headers=HUBSPOT_HEADERS())
+            if contact_res.status_code != 200:
+                continue
+
+            contact = contact_res.json().get('properties', {})
+            dp = deal.get('properties', {})
+
+            result.append({
+                'deal_id': deal_id,
+                'deal_name': dp.get('dealname', ''),
+                'amount': dp.get('amount', ''),
+                'total_fans': dp.get('total_fans', ''),
+                'total_barns': dp.get('total_barns', ''),
+                'company': contact.get('company', ''),
+                'owner': contact.get('ower_name', '') or contact.get('firstname', ''),
+                'address': contact.get('address', ''),
+                'city': contact.get('city', ''),
+                'state': contact.get('state', ''),
+                'zip': contact.get('zip', ''),
+                'email': contact.get('email', ''),
+                'phone': contact.get('phone', '')
+            })
+
+        return jsonify({'deals_with_addresses': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── Proxy to Make webhooks (write operations only) ───────────
 @app.route('/proxy', methods=['POST'])
 def proxy():
     try:
@@ -127,12 +224,7 @@ def proxy():
         if not target_url:
             return jsonify({'error': 'Missing target url'}), 400
 
-        response = requests.post(
-            target_url,
-            json=payload,
-            headers={'Content-Type': 'application/json'},
-            timeout=30
-        )
+        response = requests.post(target_url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
 
         content_type = response.headers.get('Content-Type', '')
         if 'text/html' in content_type or response.text.strip().startswith('<'):
@@ -142,13 +234,12 @@ def proxy():
             return jsonify(response.json()), response.status_code
         except Exception:
             try:
-                import json, re
                 cleaned = response.text.strip()
                 cleaned = re.sub(r',\s*}', '}', cleaned)
                 cleaned = re.sub(r',\s*]', ']', cleaned)
                 return jsonify(json.loads(cleaned)), response.status_code
             except Exception:
-                return jsonify({"raw": response.text}), response.status_code
+                return jsonify({'raw': response.text}), response.status_code
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -161,11 +252,7 @@ def claude_proxy():
         response = requests.post(
             'https://api.anthropic.com/v1/messages',
             json=data,
-            headers={
-                'Content-Type': 'application/json',
-                'x-api-key': ANTHROPIC_API_KEY,
-                'anthropic-version': '2023-06-01'
-            },
+            headers={'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01'},
             timeout=60
         )
         return jsonify(response.json()), response.status_code
