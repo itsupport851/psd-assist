@@ -346,6 +346,41 @@ def hs_create_contact():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── HubSpot: Get teams ───────────────────────────────────────
+@app.route('/hubspot/teams', methods=['GET'])
+def hs_get_teams():
+    try:
+        res = requests.get(f'{HUBSPOT_BASE}/settings/v3/users/teams', headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+        teams = []
+        for t in res.json().get('results', []):
+            teams.append({
+                'id': t.get('id'),
+                'name': t.get('name'),
+                'userIds': t.get('userIds', [])
+            })
+        return jsonify({'teams': teams})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Create new team ────────────────────────────────
+@app.route('/hubspot/teams', methods=['POST'])
+def hs_create_team():
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        if not name:
+            return jsonify({'error': 'Team name is required'}), 400
+        payload = {'name': name, 'userIds': data.get('userIds', [])}
+        res = requests.post(f'{HUBSPOT_BASE}/settings/v3/users/teams', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code not in [200, 201]:
+            return jsonify({'error': res.text}), res.status_code
+        team = res.json()
+        return jsonify({'success': True, 'team_id': team.get('id'), 'name': team.get('name')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ── HubSpot: Get services for a deal ────────────────────────
 @app.route('/hubspot/services/<deal_id>', methods=['GET'])
 def hs_get_services(deal_id):
@@ -387,6 +422,7 @@ def hs_create_service():
                 'start_date': data.get('start_date', ''),
                 'target_end_date': data.get('target_end_date', ''),
                 'hs_total_cost': str(data.get('total_cost', '')),
+                'hubspot_team_id': str(data.get('team_id', '')),
             }
         }
         # Remove empty values
