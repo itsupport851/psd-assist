@@ -31,6 +31,8 @@
     .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
     .tag-scheduled { background: #1a3a5c; color: #5ab4f0; }
     .tag-won { background: #0d3320; color: #25a35a; }
+    .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
+    .map-btn:hover { opacity: 0.9; }
   </style>
 </head>
 <body>
@@ -41,61 +43,55 @@
     const MAKE_READ_WEBHOOK = "https://hook.us2.make.com/fbf052s9udk8xv3apxgct1xiptjqfi7s";
     const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
     const MAKE_INTAKE_WEBHOOK = "https://hook.us2.make.com/tl8ovivxtbwxq3rwrifg6lhgyn5f6es6";
+    const MAP_URL = "https://web-production-0b9c8.up.railway.app/map";
 
-    const SYSTEM_PROMPT = `You are PSD Sales Assistant, an AI agent for Precision Systems Development (PSD) — a contractor that installs exhaust fan motors on poultry farms under Georgia Power's Commercial Energy Efficiency Program (CEEP).
-
-You help the sales team with two main jobs:
-1. Submit customer intake forms (PDF or screenshot) to kick off the processing pipeline
-2. View and update HubSpot deals and line items (fan motor pricing)
-
-You have access to these tools:
-- get_open_deals: fetch all open deals from HubSpot
-- get_line_items: fetch line items for a specific deal (requires deal_id)
-- update_line_item: update unit price on a line item (requires line_item_id, unit_price)
-- update_deal_amount: update the total amount on a deal (requires deal_id, amount)
-- submit_form: submit a customer PDF form to trigger the intake pipeline (requires file_data as base64, file_name, customer_name, email)
-
-CRITICAL ID RULES — READ CAREFULLY:
-The HubSpot data returns deals in this exact structure:
-{"deals": [{"id": 339921027805, "properties": {"dealname": "Henderson Broiler Farm — GP 4423019876", "amount": 0, "dealstage": "appointmentscheduled"}}]}
-
-- The deal ID is ALWAYS the top-level "id" field (e.g. 339921027805) — NOT the GP account number inside the deal name
-- The GP account number (e.g. 4423019876) appears inside the dealname string after "GP " — this is NOT the deal ID
-- NEVER use the GP account number as a deal ID
-- NEVER use list position numbers as deal IDs
-- ALWAYS use the numeric "id" field from the raw tool result
-
-Line items return this structure:
-{"line_items": [{"id": 335654673094, "properties": {"name": "Chore-Time 48in", "quantity": 24, "price": 0, "fan_brand": "Chore-Time", "fan_size": 48}}]}
-- The line item ID is ALWAYS the top-level "id" field
-
-When the sales person wants to update prices:
-1. First fetch the line items to show current prices
-2. Update each line item price as requested using the correct line item id
-3. Calculate the new total: sum of (quantity * unit_price) for ALL line items
-4. Update the deal amount with the correct deal id and new total
-5. Confirm everything to the sales person
-
-When displaying deals, respond with a special JSON block for rendering:
-DEALS_TABLE:{"deals":[{"id":"339921027805","name":"Henderson Broiler Farm — GP 4423019876","amount":0,"stage":"appointmentscheduled"},...]}
-
-When displaying line items, respond with a special JSON block for rendering:
-LINE_ITEMS_TABLE:{"deal_name":"Henderson Broiler Farm","deal_id":"339921027805","items":[{"id":"335654673094","name":"Chore-Time 48in","brand":"Chore-Time","size":48,"qty":24,"unit_price":0,"line_total":0},...]}
-
-For everything else, respond in plain conversational English.
-Always be concise and professional. Speak like a helpful colleague.
-
-When you need to call a tool, respond with ONLY:
-{"tool": "tool_name", "params": {...}}
-
-Available tool formats:
-{"tool": "get_open_deals", "params": {}}
-{"tool": "get_line_items", "params": {"deal_id": "339921027805"}}
-{"tool": "update_line_item", "params": {"line_item_id": "335654673094", "unit_price": 450}}
-{"tool": "update_deal_amount", "params": {"deal_id": "339921027805", "amount": 9000}}
-{"tool": "submit_form", "params": {"file_data": "base64...", "file_name": "form.pdf", "customer_name": "Farm Name", "email": "email@farm.com"}}
-
-After a tool call result is provided, either call another tool or respond naturally.`;
+    const SYSTEM_PROMPT = [
+      "You are PSD Sales Assistant, an AI agent for Precision Systems Development (PSD) — a contractor that installs exhaust fan motors on poultry farms under Georgia Power's Commercial Energy Efficiency Program (CEEP).",
+      "",
+      "You help the sales team with:",
+      "1. Submit customer intake forms (PDF or screenshot) to kick off the processing pipeline",
+      "2. View and update HubSpot deals and line items (fan motor pricing)",
+      "3. Show farm locations on a map for scheduling and cluster analysis",
+      "",
+      "You have access to these tools:",
+      "- get_open_deals: fetch all open deals from HubSpot",
+      "- get_line_items: fetch line items for a specific deal (requires deal_id)",
+      "- update_line_item: update unit price on a line item (requires line_item_id, unit_price)",
+      "- update_deal_amount: update the total amount on a deal (requires deal_id, amount)",
+      "- submit_form: submit a customer PDF form (requires file_data as base64, file_name, customer_name, email)",
+      "- get_deals_with_addresses: fetch all appointmentscheduled deals with farm addresses — use when asked about farm locations, clusters, distance, scheduling routes, or map",
+      "",
+      "CRITICAL ID RULES:",
+      "The HubSpot data returns deals like: {id: 339921027805, properties: {dealname: 'Henderson Broiler Farm - GP 4423019876'}}",
+      "- The deal ID is ALWAYS the top-level id field (e.g. 339921027805)",
+      "- The GP account number (e.g. 4423019876) is inside the deal name — NOT the deal ID",
+      "- NEVER use GP account number or list position as deal ID",
+      "",
+      "Line items: {id: 335654673094, properties: {name: 'Chore-Time 48in', quantity: 24, price: 0}}",
+      "- Line item ID is ALWAYS the top-level id field",
+      "",
+      "When updating prices:",
+      "1. Fetch line items first",
+      "2. Update each line item using correct line_item_id",
+      "3. Calculate total: sum of (quantity x unit_price) for ALL items",
+      "4. Update deal amount with correct deal_id",
+      "5. Confirm to sales person",
+      "",
+      "When displaying deals use: DEALS_TABLE:{\"deals\":[{\"id\":\"339921027805\",\"name\":\"Henderson Broiler Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\"}]}",
+      "When displaying line items use: LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
+      "When showing map use: MAP_LINK after summarizing the farms found",
+      "",
+      "Tool call format — respond with ONLY this JSON (no other text):",
+      "{\"tool\": \"get_open_deals\", \"params\": {}}",
+      "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
+      "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
+      "{\"tool\": \"update_deal_amount\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
+      "{\"tool\": \"submit_form\", \"params\": {\"file_data\": \"base64\", \"file_name\": \"form.pdf\", \"customer_name\": \"Farm\", \"email\": \"email@farm.com\"}}",
+      "{\"tool\": \"get_deals_with_addresses\", \"params\": {}}",
+      "",
+      "After tool result, respond naturally. For get_deals_with_addresses, summarize farms found then end with exactly: MAP_LINK",
+      "Always be concise and professional. Speak like a helpful colleague."
+    ].join("\n");
 
     async function callMakeViaProxy(makeUrl, payload) {
       const res = await fetch('/proxy', {
@@ -103,7 +99,7 @@ After a tool call result is provided, either call another tool or respond natura
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: makeUrl, payload }),
       });
-      if (!res.ok) throw new Error(`Proxy error: ${res.status}`);
+      if (!res.ok) throw new Error("Proxy error: " + res.status);
       try { return await res.json(); } catch { return { success: true }; }
     }
 
@@ -118,7 +114,9 @@ After a tool call result is provided, either call another tool or respond natura
         return await callMakeViaProxy(MAKE_UPDATE_WEBHOOK, { action: "update_deal_amount", deal_id: params.deal_id, amount: params.amount });
       if (tool === "submit_form")
         return await callMakeViaProxy(MAKE_INTAKE_WEBHOOK, params);
-      throw new Error(`Unknown tool: ${tool}`);
+      if (tool === "get_deals_with_addresses")
+        return await callMakeViaProxy(MAKE_READ_WEBHOOK, { action: "get_deals_with_addresses" });
+      throw new Error("Unknown tool: " + tool);
     }
 
     async function callClaude(messages) {
@@ -133,7 +131,7 @@ After a tool call result is provided, either call another tool or respond natura
         }),
       });
       const data = await res.json();
-      return data.content?.[0]?.text || "";
+      return data.content && data.content[0] ? data.content[0].text : "";
     }
 
     function fmt(n) {
@@ -142,194 +140,221 @@ After a tool call result is provided, either call another tool or respond natura
     }
 
     function DealsTable({ data }) {
-      const stageLabel = (s) => {
-        const map = { appointmentscheduled: "Scheduled", closedwon: "Won", closedlost: "Lost", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation" };
+      const stageLabel = function(s) {
+        var map = { appointmentscheduled: "Scheduled", closedwon: "Won", closedlost: "Lost", qualifiedtobuy: "Qualified" };
         return map[s] || s;
       };
       return (
-        <div>
-          <div style={{ fontSize: 12, color: "#6b8fa8", marginBottom: 6 }}>{data.deals.length} open deals</div>
-          <table className="deal-table">
-            <thead>
-              <tr><th>#</th><th>Deal Name</th><th>Amount</th><th>Stage</th></tr>
-            </thead>
-            <tbody>
-              {data.deals.map((d, i) => (
-                <tr key={d.id}>
-                  <td style={{ color: "#6b8fa8" }}>{i + 1}</td>
-                  <td style={{ fontWeight: 500 }}>{d.name}</td>
-                  <td>{fmt(d.amount)}</td>
-                  <td><span className="tag tag-scheduled">{stageLabel(d.stage)}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deals.length + " open deals"),
+          React.createElement("table", { className: "deal-table" },
+            React.createElement("thead", null,
+              React.createElement("tr", null,
+                React.createElement("th", null, "#"),
+                React.createElement("th", null, "Deal Name"),
+                React.createElement("th", null, "Amount"),
+                React.createElement("th", null, "Stage")
+              )
+            ),
+            React.createElement("tbody", null,
+              data.deals.map(function(d, i) {
+                return React.createElement("tr", { key: d.id },
+                  React.createElement("td", { style: { color: "#6b8fa8" } }, i + 1),
+                  React.createElement("td", { style: { fontWeight: 500 } }, d.name),
+                  React.createElement("td", null, fmt(d.amount)),
+                  React.createElement("td", null,
+                    React.createElement("span", { className: "tag tag-scheduled" }, stageLabel(d.stage))
+                  )
+                );
+              })
+            )
+          )
+        )
       );
     }
 
     function LineItemsTable({ data }) {
-      const total = data.items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.unit_price || 0)), 0);
+      var total = data.items.reduce(function(sum, item) {
+        return sum + (Number(item.qty) * Number(item.unit_price || 0));
+      }, 0);
       return (
-        <div>
-          <div style={{ fontSize: 12, color: "#6b8fa8", marginBottom: 6 }}>{data.deal_name} — {data.items.length} line items</div>
-          <table className="line-table">
-            <thead>
-              <tr><th>Fan</th><th>Size</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>
-            </thead>
-            <tbody>
-              {data.items.map((item, i) => (
-                <tr key={item.id || i}>
-                  <td style={{ fontWeight: 500 }}>{item.brand}</td>
-                  <td>{item.size}"</td>
-                  <td>{item.qty}</td>
-                  <td>{fmt(item.unit_price)}</td>
-                  <td>{fmt(Number(item.qty) * Number(item.unit_price || 0))}</td>
-                </tr>
-              ))}
-              <tr className="total-row">
-                <td colSpan={4} style={{ textAlign: "right" }}>Total Contract Value</td>
-                <td>{fmt(total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deal_name + " — " + data.items.length + " line items"),
+          React.createElement("table", { className: "line-table" },
+            React.createElement("thead", null,
+              React.createElement("tr", null,
+                React.createElement("th", null, "Fan"),
+                React.createElement("th", null, "Size"),
+                React.createElement("th", null, "Qty"),
+                React.createElement("th", null, "Unit Price"),
+                React.createElement("th", null, "Line Total")
+              )
+            ),
+            React.createElement("tbody", null,
+              data.items.map(function(item, i) {
+                return React.createElement("tr", { key: item.id || i },
+                  React.createElement("td", { style: { fontWeight: 500 } }, item.brand),
+                  React.createElement("td", null, item.size + '"'),
+                  React.createElement("td", null, item.qty),
+                  React.createElement("td", null, fmt(item.unit_price)),
+                  React.createElement("td", null, fmt(Number(item.qty) * Number(item.unit_price || 0)))
+                );
+              }),
+              React.createElement("tr", { className: "total-row" },
+                React.createElement("td", { colSpan: 4, style: { textAlign: "right" } }, "Total Contract Value"),
+                React.createElement("td", null, fmt(total))
+              )
+            )
+          )
+        )
       );
     }
 
     function MessageContent({ content }) {
-      // Check for DEALS_TABLE
       if (content.includes("DEALS_TABLE:")) {
-        const parts = content.split(/DEALS_TABLE:/);
-        return (
-          <div>
-            {parts[0] && <div style={{ marginBottom: 8 }}>{parts[0].trim()}</div>}
-            {(() => {
-              try {
-                const jsonStr = parts[1].trim().split("\n")[0];
-                const data = JSON.parse(jsonStr);
-                return <DealsTable data={data} />;
-              } catch { return <div>{parts[1]}</div>; }
-            })()}
-            {parts[2] && <div style={{ marginTop: 8 }}>{parts[2].trim()}</div>}
-          </div>
-        );
+        var parts = content.split("DEALS_TABLE:");
+        try {
+          var jsonStr = parts[1].trim().split("\n")[0];
+          var data = JSON.parse(jsonStr);
+          return React.createElement("div", null,
+            parts[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts[0].trim()),
+            React.createElement(DealsTable, { data: data }),
+            parts[2] && React.createElement("div", { style: { marginTop: 8 } }, parts[2].trim())
+          );
+        } catch(e) {
+          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
+        }
       }
 
-      // Check for LINE_ITEMS_TABLE
       if (content.includes("LINE_ITEMS_TABLE:")) {
-        const parts = content.split(/LINE_ITEMS_TABLE:/);
-        return (
-          <div>
-            {parts[0] && <div style={{ marginBottom: 8 }}>{parts[0].trim()}</div>}
-            {(() => {
-              try {
-                const jsonStr = parts[1].trim().split("\n")[0];
-                const data = JSON.parse(jsonStr);
-                return <LineItemsTable data={data} />;
-              } catch { return <div>{parts[1]}</div>; }
-            })()}
-            {parts[2] && <div style={{ marginTop: 8 }}>{parts[2].trim()}</div>}
-          </div>
+        var parts2 = content.split("LINE_ITEMS_TABLE:");
+        try {
+          var jsonStr2 = parts2[1].trim().split("\n")[0];
+          var data2 = JSON.parse(jsonStr2);
+          return React.createElement("div", null,
+            parts2[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts2[0].trim()),
+            React.createElement(LineItemsTable, { data: data2 }),
+            parts2[2] && React.createElement("div", { style: { marginTop: 8 } }, parts2[2].trim())
+          );
+        } catch(e) {
+          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
+        }
+      }
+
+      if (content.includes("MAP_LINK")) {
+        var mapParts = content.split("MAP_LINK");
+        return React.createElement("div", null,
+          mapParts[0] && React.createElement("div", { style: { whiteSpace: "pre-wrap", marginBottom: 12 } }, mapParts[0].trim()),
+          React.createElement("a", {
+            href: MAP_URL,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "map-btn"
+          }, "🗺 Open Farm Map"),
+          mapParts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, mapParts[1].trim())
         );
       }
 
-      return <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{content}</div>;
+      return React.createElement("div", { style: { whiteSpace: "pre-wrap", wordBreak: "break-word" } }, content);
     }
 
     function App() {
-      const [messages, setMessages] = useState([
-        {
-          role: "assistant",
-          content: "Hey! I'm your PSD Sales Assistant. I can help you submit customer forms, check open deals, view line items, and update pricing. What do you need?",
-          display: true,
-        },
-      ]);
+      var initialMessages = [{
+        role: "assistant",
+        content: "Hey! I'm your PSD Sales Assistant. I can help you submit customer forms, check open deals, view line items, update pricing, and show farms on a map. What do you need?",
+        display: true,
+      }];
+
+      const [messages, setMessages] = useState(initialMessages);
       const [input, setInput] = useState("");
       const [loading, setLoading] = useState(false);
       const [uploadedFile, setUploadedFile] = useState(null);
       const fileRef = useRef();
       const bottomRef = useRef();
 
-      useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      useEffect(function() {
+        bottomRef.current && bottomRef.current.scrollIntoView({ behavior: "smooth" });
       }, [messages, loading]);
 
-      const handleFile = (e) => {
-        const file = e.target.files[0];
+      function handleFile(e) {
+        var file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result.split(",")[1];
-          setUploadedFile({ name: file.name, base64, type: file.type });
+        var reader = new FileReader();
+        reader.onload = function() {
+          var base64 = reader.result.split(",")[1];
+          setUploadedFile({ name: file.name, base64: base64, type: file.type });
         };
         reader.readAsDataURL(file);
-      };
+      }
 
-      const sendMessage = async () => {
-        const text = input.trim();
+      async function sendMessage() {
+        var text = input.trim();
         if (!text && !uploadedFile) return;
 
-        let userContent = text;
+        var userContent = text;
         if (uploadedFile) {
           userContent = text
-            ? `${text} [Attached: ${uploadedFile.name}]`
-            : `I have a customer form to submit: ${uploadedFile.name}`;
+            ? text + " [Attached: " + uploadedFile.name + "]"
+            : "I have a customer form to submit: " + uploadedFile.name;
         }
 
-        const newUserMsg = { role: "user", content: userContent, display: true };
-        const updatedMessages = [...messages, newUserMsg];
+        var newUserMsg = { role: "user", content: userContent, display: true };
+        var updatedMessages = messages.concat([newUserMsg]);
         setMessages(updatedMessages);
         setInput("");
         setLoading(true);
 
-        let apiMessages = updatedMessages
-          .filter((m) => m.display)
-          .map((m) => ({ role: m.role, content: m.content }));
+        var apiMessages = updatedMessages
+          .filter(function(m) { return m.display; })
+          .map(function(m) { return { role: m.role, content: m.content }; });
 
         if (uploadedFile) {
-          apiMessages = apiMessages.map((m, i) =>
-            i === apiMessages.length - 1
-              ? { ...m, content: `${m.content}\n\n[FILE_DATA: base64=${uploadedFile.base64} file_name=${uploadedFile.name}]` }
-              : m
-          );
+          apiMessages = apiMessages.map(function(m, i) {
+            if (i === apiMessages.length - 1) {
+              return Object.assign({}, m, { content: m.content + "\n\n[FILE_DATA: base64=" + uploadedFile.base64 + " file_name=" + uploadedFile.name + "]" });
+            }
+            return m;
+          });
         }
 
         try {
-          let iterMessages = [...apiMessages];
-          let finalResponse = "";
+          var iterMessages = apiMessages.slice();
+          var finalResponse = "";
 
-          for (let i = 0; i < 10; i++) {
-            const response = await callClaude(iterMessages);
+          for (var i = 0; i < 10; i++) {
+            var response = await callClaude(iterMessages);
+            var toolCall = null;
 
-            let toolCall = null;
             try {
-              const trimmed = response.trim();
-              if (trimmed.startsWith("{") && trimmed.includes('"tool"')) {
+              var trimmed = response.trim();
+              if (trimmed.charAt(0) === "{" && trimmed.includes('"tool"')) {
                 toolCall = JSON.parse(trimmed);
               }
-            } catch {}
+            } catch(e) {}
 
             if (toolCall) {
-              setMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: `Calling ${toolCall.tool.replace(/_/g, " ")}...`, display: true, isThinking: true },
-              ]);
+              setMessages(function(prev) {
+                return prev.concat([{
+                  role: "assistant",
+                  content: "Calling " + toolCall.tool.replace(/_/g, " ") + "...",
+                  display: true,
+                  isThinking: true
+                }]);
+              });
 
-              let toolResult;
+              var toolResult;
               try {
                 toolResult = await executeTool(toolCall.tool, toolCall.params);
-              } catch (err) {
+              } catch(err) {
                 toolResult = { error: err.message };
               }
 
-              setMessages((prev) => prev.filter((m) => !m.isThinking));
+              setMessages(function(prev) { return prev.filter(function(m) { return !m.isThinking; }); });
 
-              iterMessages = [
-                ...iterMessages,
+              iterMessages = iterMessages.concat([
                 { role: "assistant", content: response },
-                { role: "user", content: `Tool result for ${toolCall.tool}: ${JSON.stringify(toolResult)}` },
-              ];
+                { role: "user", content: "Tool result for " + toolCall.tool + ": " + JSON.stringify(toolResult) }
+              ]);
             } else {
               finalResponse = response;
               break;
@@ -337,104 +362,91 @@ After a tool call result is provided, either call another tool or respond natura
           }
 
           if (finalResponse) {
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", content: finalResponse, display: true },
-            ]);
+            setMessages(function(prev) {
+              return prev.concat([{ role: "assistant", content: finalResponse, display: true }]);
+            });
           }
-        } catch (err) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: `Something went wrong: ${err.message}`, display: true },
-          ]);
+        } catch(err) {
+          setMessages(function(prev) {
+            return prev.concat([{ role: "assistant", content: "Something went wrong: " + err.message, display: true }]);
+          });
         }
 
         setUploadedFile(null);
         if (fileRef.current) fileRef.current.value = "";
         setLoading(false);
-      };
+      }
 
-      const handleKey = (e) => {
+      function handleKey(e) {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
         }
-      };
+      }
 
-      const displayMessages = messages.filter((m) => m.display);
+      var displayMessages = messages.filter(function(m) { return m.display; });
 
       return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" }}>
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 }}>P</div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15, letterSpacing: 0.2 }}>PSD Sales Assistant</div>
-              <div style={{ fontSize: 11, color: "#4a9a6b", marginTop: 1 }}>● Online — Precision Systems Development</div>
-            </div>
-          </div>
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" } },
 
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
-            {displayMessages.map((msg, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                {msg.role === "assistant" && (
-                  <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", marginRight: 10, marginTop: 2 }}>
-                    {msg.isThinking ? "⚙" : "P"}
-                  </div>
-                )}
-                <div style={{ maxWidth: "80%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" }}>
-                  {msg.isThinking ? msg.content : <MessageContent content={msg.content} />}
-                </div>
-              </div>
-            ))}
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
+            React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
+            React.createElement("div", null,
+              React.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, "PSD Sales Assistant"),
+              React.createElement("div", { style: { fontSize: 11, color: "#4a9a6b", marginTop: 1 } }, "● Online — Precision Systems Development")
+            ),
+            React.createElement("a", { href: "/map", target: "_blank", style: { marginLeft: "auto", padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, textDecoration: "none" } }, "🗺 Farm Map")
+          ),
 
-            {loading && !messages.some((m) => m.isThinking) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>P</div>
-                <div style={{ display: "flex", gap: 5, padding: "10px 14px", background: "#162130", borderRadius: "16px 16px 16px 4px", border: "1px solid #1e2d3d" }}>
-                  {[0, 1, 2].map((j) => (
-                    <div key={j} style={{ width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: `${j * 0.2}s` }} />
-                  ))}
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
+          React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 } },
+            displayMessages.map(function(msg, i) {
+              return React.createElement("div", { key: i, style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
+                msg.role === "assistant" && React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", marginRight: 10, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
+                React.createElement("div", { style: { maxWidth: "80%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content })
+                )
+              );
+            }),
 
-          {/* File preview */}
-          {uploadedFile && (
-            <div style={{ margin: "0 16px 8px", padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
-              <span>📎 {uploadedFile.name}</span>
-              <button onClick={() => setUploadedFile(null)} style={{ background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
-            </div>
-          )}
+            loading && !messages.some(function(m) { return m.isThinking; }) &&
+              React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+                React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" } }, "P"),
+                React.createElement("div", { style: { display: "flex", gap: 5, padding: "10px 14px", background: "#162130", borderRadius: "16px 16px 16px 4px", border: "1px solid #1e2d3d" } },
+                  [0,1,2].map(function(j) {
+                    return React.createElement("div", { key: j, style: { width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: (j * 0.2) + "s" } });
+                  })
+                )
+              ),
+            React.createElement("div", { ref: bottomRef })
+          ),
 
-          {/* Input */}
-          <div style={{ padding: "12px 16px 20px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 10, alignItems: "flex-end" }}>
-            <button onClick={() => fileRef.current?.click()} title="Attach customer form" style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>📎</button>
-            <input ref={fileRef} type="file" accept=".pdf,image/*" onChange={handleFile} style={{ display: "none" }} />
+          uploadedFile && React.createElement("div", { style: { margin: "0 16px 8px", padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 } },
+            React.createElement("span", null, "📎 " + uploadedFile.name),
+            React.createElement("button", { onClick: function() { setUploadedFile(null); }, style: { background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 16 } }, "×")
+          ),
 
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Ask me anything — show deals, update prices, submit a form..."
-              rows={1}
-              style={{ flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 12, padding: "10px 14px", color: "#e8edf2", fontSize: 14, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }}
-            />
-
-            <button
-              onClick={sendMessage}
-              disabled={loading || (!input.trim() && !uploadedFile)}
-              style={{ width: 40, height: 40, borderRadius: 10, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-            >➤</button>
-          </div>
-        </div>
+          React.createElement("div", { style: { padding: "12px 16px 20px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 10, alignItems: "flex-end" } },
+            React.createElement("button", { onClick: function() { fileRef.current && fileRef.current.click(); }, style: { width: 40, height: 40, borderRadius: 10, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
+            React.createElement("input", { ref: fileRef, type: "file", accept: ".pdf,image/*", onChange: handleFile, style: { display: "none" } }),
+            React.createElement("textarea", {
+              value: input,
+              onChange: function(e) { setInput(e.target.value); },
+              onKeyDown: handleKey,
+              placeholder: "Ask me anything — show deals, update prices, submit a form, show farm map...",
+              rows: 1,
+              style: { flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 12, padding: "10px 14px", color: "#e8edf2", fontSize: 14, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
+            }),
+            React.createElement("button", {
+              onClick: sendMessage,
+              disabled: loading || (!input.trim() && !uploadedFile),
+              style: { width: 40, height: 40, borderRadius: 10, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+            }, "➤")
+          )
+        )
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
   </script>
 </body>
 </html>
