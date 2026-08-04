@@ -97,11 +97,11 @@
     ];
 
     const STAGE_BUTTONS = [
-      { icon: "📋", label: "All Deals", message: "Show me all deals with fans, barns, operation type and amounts" },
-      { icon: "📅", label: "Scheduled", message: "Show me all appointment scheduled deals with fans, barns, operation type and amounts" },
-      { icon: "🎯", label: "Qualified", message: "Show me all qualified to buy deals with fans, barns, operation type and amounts" },
-      { icon: "🏆", label: "Won", message: "Show me all closed won deals with fans, barns, operation type and amounts" },
-      { icon: "❌", label: "Lost", message: "Show me all closed lost deals with fans, barns, operation type and amounts" },
+      { icon: "📋", label: "All Deals",    message: "Show me all deals with fans, barns, operation type and amounts" },
+      { icon: "📅", label: "Scheduled",    message: "Show me all deals with stage appointmentscheduled — include fans, barns, operation type and amounts" },
+      { icon: "🎯", label: "Qualified",    message: "Show me all deals with stage qualifiedtobuy — include fans, barns, operation type and amounts" },
+      { icon: "🏆", label: "Won",          message: "Show me all deals with stage closedwon — include fans, barns, operation type and amounts" },
+      { icon: "❌", label: "Lost",         message: "Show me all deals with stage closedlost — include fans, barns, operation type and amounts" },
     ];
 
     const SERVICE_STAGE_BUTTONS = [
@@ -152,6 +152,15 @@
         "- Deal ID is ALWAYS the top-level numeric id field (e.g. 339921027805)",
         "- GP account number inside dealname is NOT the deal ID",
         "- Line item ID is ALWAYS the top-level id field",
+        "",
+        "HubSpot deal stage IDs (use these exactly when calling get_open_deals with a stage param):",
+        "- appointmentscheduled = Appointment Scheduled / Scheduled",
+        "- qualifiedtobuy = Qualified to Buy / Qualified",
+        "- presentationscheduled = Presentation Scheduled",
+        "- decisionmakerboughtin = Decision Maker Bought In",
+        "- contractsent = Contract Sent",
+        "- closedwon = Closed Won / Won",
+        "- closedlost = Closed Lost / Lost",
         "",
         "When updating prices: fetch line items → update each → calculate total (sum qty x unit_price) → update deal amount → confirm.",
         "When creating a service: call get_teams first, show TEAMS_SELECTOR, wait for team selection, then create.",
@@ -351,22 +360,50 @@
     function ServicesTable({ data, role }) {
       var showFinancials = role !== "analyst" && role !== "installer";
 
+      // Stage: backend now sends human-readable label; normalize for display + color
       function stageLabel(s) {
-        var map = { new: "New", in_progress: "In Progress", inprogress: "In Progress", closed: "Closed" };
-        return map[(s || "").toLowerCase()] || s || "—";
+        if (!s) return "—";
+        var norm = s.toLowerCase().replace(/[\s_-]/g, '');
+        if (norm === 'new')          return 'New';
+        if (norm === 'inprogress')   return 'In Progress';
+        if (norm === 'closed')       return 'Closed';
+        return s; // pass through any custom stage labels as-is
       }
       function stageClass(s) {
-        var map = { new: "tag-svc-new", in_progress: "tag-svc-inprogress", inprogress: "tag-svc-inprogress", closed: "tag-svc-closed" };
-        return "tag " + (map[(s || "").toLowerCase()] || "tag-svc-new");
+        if (!s) return 'tag tag-svc-new';
+        var norm = s.toLowerCase().replace(/[\s_-]/g, '');
+        if (norm === 'new')          return 'tag tag-svc-new';
+        if (norm === 'inprogress')   return 'tag tag-svc-inprogress';
+        if (norm === 'closed')       return 'tag tag-svc-closed';
+        return 'tag tag-svc-new';
       }
+
+      // Status: stored as hs_ticket_priority (ON_TRACK, AT_RISK, BEHIND, COMPLETE)
       function statusLabel(s) {
-        var map = { ON_TRACK: "On Track", AT_RISK: "At Risk", BEHIND: "Behind", COMPLETE: "Complete" };
-        return map[s] || s || "—";
+        if (!s) return "—";
+        var map = {
+          'ON_TRACK': 'On Track',
+          'AT_RISK':  'At Risk',
+          'BEHIND':   'Behind',
+          'COMPLETE': 'Completed',
+          // also handle if hs_object_status values come through
+          'open':     'Open',
+          'closed':   'Closed',
+        };
+        return map[s] || s;
       }
       function statusClass(s) {
-        var map = { ON_TRACK: "tag-svc-ontrack", AT_RISK: "tag-svc-atrisk", BEHIND: "tag-svc-behind", COMPLETE: "tag-svc-complete" };
-        return "tag " + (map[s] || "tag-svc-new");
+        var map = {
+          'ON_TRACK': 'tag tag-svc-ontrack',
+          'AT_RISK':  'tag tag-svc-atrisk',
+          'BEHIND':   'tag tag-svc-behind',
+          'COMPLETE': 'tag tag-svc-complete',
+          'open':     'tag tag-svc-new',
+          'closed':   'tag tag-svc-closed',
+        };
+        return map[s] || 'tag tag-svc-new';
       }
+
       function fmtDate(d) {
         if (!d) return "—";
         try { return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return d; }
