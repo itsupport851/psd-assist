@@ -112,6 +112,7 @@ def fill_workbook_endpoint():
 def hs_get_deals():
     try:
         props = 'dealname,amount,dealstage,closedate,hs_object_id,total_fans,total_barns,operation_type'
+        stage_filter = request.args.get('stage', None)
         url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=50&properties={props}'
         res = requests.get(url, headers=HUBSPOT_HEADERS())
         if res.status_code != 200:
@@ -119,9 +120,12 @@ def hs_get_deals():
         data = res.json()
         deals = []
         for d in data.get('results', []):
+            props_data = d.get('properties', {})
+            if stage_filter and props_data.get('dealstage') != stage_filter:
+                continue
             deals.append({
                 'id': d['id'],
-                'properties': d.get('properties', {})
+                'properties': props_data
             })
         return jsonify({'deals': deals})
     except Exception as e:
