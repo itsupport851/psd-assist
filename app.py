@@ -431,17 +431,18 @@ def hs_create_service():
 
         payload = {
             'properties': {
-                'hs_service_name': data.get('name', ''),
+                'subject': data.get('name', ''),
                 'description': data.get('description', ''),
                 'hs_pipeline': 'default',
                 'hs_pipeline_stage': data.get('stage', 'new'),
-                'hs_service_status': data.get('status', 'ON_TRACK'),
-                'start_date': data.get('start_date', ''),
-                'target_end_date': data.get('target_end_date', ''),
-                'hs_total_cost': str(data.get('total_cost', '')),
-                'hubspot_team_id': str(data.get('team_id', '')),
+                'hs_ticket_priority': data.get('status', 'ON_TRACK'),
+                'createdate': data.get('start_date', ''),
+                'hs_due_date': data.get('target_end_date', ''),
+                'hs_ticket_category': 'Fan Motor Installation',
             }
         }
+        if data.get('team_id'):
+            payload['properties']['hubspot_team_id'] = str(data.get('team_id', ''))
         # Remove empty values
         payload['properties'] = {k: v for k, v in payload['properties'].items() if v}
 
