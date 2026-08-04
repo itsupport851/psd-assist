@@ -382,6 +382,7 @@
       const [loading, setLoading] = useState(false);
       const [uploadedFile, setUploadedFile] = useState(null);
       const [showActions, setShowActions] = useState(true);
+      const [showStageSelector, setShowStageSelector] = useState(false);
       const fileRef = useRef();
       const bottomRef = useRef();
 
@@ -405,8 +406,8 @@
       }
 
       function triggerStageSelector() {
-        setShowStageSelector(true);
         setShowActions(false);
+        setShowStageSelector(false);
         setMessages(function(prev) {
           return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]);
         });
