@@ -137,7 +137,14 @@ def proxy():
         try:
             return jsonify(response.json()), response.status_code
         except Exception:
-            return jsonify({'raw': response.text}), response.status_code
+            try:
+                import json, re
+                cleaned = response.text.strip()
+                cleaned = re.sub(r',\s*}', '}', cleaned)
+                cleaned = re.sub(r',\s*]', ']', cleaned)
+                return jsonify(json.loads(cleaned)), response.status_code
+            except Exception:
+                return jsonify({"raw": response.text}), response.status_code
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
