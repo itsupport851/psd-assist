@@ -456,15 +456,33 @@ def hs_get_all_services():
             for d in deals_res.json().get('results', []):
                 deal_map[d['id']] = d.get('properties', {}).get('dealname', '')
 
-        # 2. Get all services directly
-        svc_props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        # 2. Fetch pipeline stage labels so we can map IDs → names
+        pipeline_id = 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6'
+        stage_map = {}  # id -> label
+        try:
+            stages_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/pipelines/services/{pipeline_id}/stages', headers=HUBSPOT_HEADERS())
+            if stages_res.status_code == 200:
+                for st in stages_res.json().get('results', []):
+                    stage_map[st['id']] = st['label']
+        except:
+            pass
+        # Fallback common internal IDs used by HubSpot default service pipeline
+        stage_map.setdefault('new',         'New')
+        stage_map.setdefault('in_progress', 'In Progress')
+        stage_map.setdefault('closed',      'Closed')
+        stage_map.setdefault('1',           'New')
+        stage_map.setdefault('2',           'In Progress')
+        stage_map.setdefault('3',           'Closed')
+
+        # 3. Get all services directly
+        svc_props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
 
         services_raw = svc_res.json().get('results', [])
 
-        # 3. For each service, find the associated deal
+        # 4. For each service, find the associated deal
         services = []
         for s in services_raw:
             sid = s['id']
@@ -486,13 +504,21 @@ def hs_get_all_services():
             team_id = sp.get('hubspot_team_id', '')
             team_name = team_id  # fallback to ID; enriched below if possible
 
+            # Resolve pipeline stage ID → label
+            raw_stage = sp.get('hs_pipeline_stage', '') or ''
+            stage_label = stage_map.get(raw_stage, raw_stage)
+
+            # Status: stored in hs_ticket_priority by hs_create_service; hs_object_status is fallback
+            raw_status = sp.get('hs_ticket_priority', '') or sp.get('hs_object_status', '') or ''
+
             services.append({
                 'id': sid,
                 'name': sp.get('subject', ''),
                 'description': sp.get('description', ''),
                 'deal_name': deal_name,
-                'stage': sp.get('hs_pipeline_stage', ''),
-                'status': sp.get('hs_object_status', ''),
+                'stage': stage_label,
+                'stage_id': raw_stage,
+                'status': raw_status,
                 'team': team_name,
                 'team_id': team_id,
                 'start_date': sp.get('start_date') or sp.get('hs_start_date', ''),
@@ -502,7 +528,7 @@ def hs_get_all_services():
                 'remaining': sp.get('hs_remaining_amount', ''),
             })
 
-        # 4. Enrich team names in one call
+        # 5. Enrich team names in one call
         try:
             teams_res = requests.get(f'{HUBSPOT_BASE}/settings/v3/users/teams', headers=HUBSPOT_HEADERS())
             if teams_res.status_code == 200:
