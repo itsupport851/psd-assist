@@ -32,7 +32,18 @@
     .tag-won { background: #0d3320; color: #25a35a; }
     .tag-lost { background: #3a1a1a; color: #e05252; }
     .tag-qualified { background: #2a1a3a; color: #a87af0; }
-    .svc-form { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; margin-top: 8px; }
+    .tag-svc-new { background: #1a2535; color: #8ab4cc; }
+    .tag-svc-inprogress { background: #1a3a5c; color: #5ab4f0; }
+    .tag-svc-closed { background: #0d3320; color: #25a35a; }
+    .tag-svc-ontrack { background: #0d3320; color: #25a35a; }
+    .tag-svc-atrisk { background: #2a1a00; color: #f59e0b; }
+    .tag-svc-behind { background: #3a1a1a; color: #e05252; }
+    .tag-svc-complete { background: #0d2030; color: #5ab4f0; }
+    .svc-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .svc-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
+    .svc-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; vertical-align: middle; }
+    .svc-table tr:last-child td { border-bottom: none; }
+    .svc-table tr:hover td { background: #1a2535; }
     .svc-form-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
     .svc-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
     .svc-form-label { font-size: 11px; color: #6b8fa8; font-weight: 500; }
@@ -42,22 +53,6 @@
     .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .svc-form-btn:hover { opacity: 0.9; }
     .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
-    .li-form { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; margin-top: 8px; }
-    .li-form-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
-    .li-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-    .li-form-row { display: flex; flex-direction: column; gap: 4px; }
-    .li-form-label { font-size: 11px; color: #6b8fa8; font-weight: 500; }
-    .li-form-input { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
-    .li-form-input:focus { border-color: #25a35a; }
-    .li-form-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
-    .li-form-select option { background: #162130; }
-    .li-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
-    .li-form-btn:hover { opacity: 0.9; }
-    .li-form-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .li-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
-    .li-form-deal-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-    .li-form-deal-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; width: 100%; }
-    .li-form-deal-select option { background: #162130; }
     .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
     .map-btn:hover { opacity: 0.9; }
     .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; animation: fadeIn 0.3s ease; }
@@ -85,16 +80,20 @@
 
     // Role-based quick actions
     const ALL_ACTIONS = [
-      { icon: "📋", label: "Open Deals", desc: "View all active deals", message: "Show me all open deals", roles: ["sales","analyst","installer"] },
-      { icon: "📊", label: "Deal Summary", desc: "Filter by stage", message: null, isStageSelector: true, roles: ["sales","analyst"] },
-      { icon: "🗺", label: "Farm Map", desc: "Plot farms on map", message: "Show scheduled farms on the map", isMap: true, roles: ["sales","analyst"] },
-      { icon: "📍", label: "Farm Clusters", desc: "Find nearby farms", message: "Show me farm clusters to plan installer routes", roles: ["sales","analyst"] },
-      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices", message: "I want to update line item pricing for a deal", roles: ["sales"] },
-      { icon: "➕", label: "Add Line Item", desc: "Add fan to a deal", message: null, isLineItemForm: true, roles: ["sales"] },
-      { icon: "📝", label: "New Deal", desc: "Create a deal", message: "I want to create a new deal in HubSpot", roles: ["sales"] },
-      { icon: "👤", label: "New Contact", desc: "Add a contact", message: "I want to create a new contact in HubSpot", roles: ["sales"] },
-      { icon: "🔧", label: "New Service", desc: "Create service for deal", message: "I want to create a new service for an appointment scheduled deal", roles: ["sales"] },
-      { icon: "📤", label: "Submit Form", desc: "Upload customer PDF", message: null, isUpload: true, roles: ["sales"] },
+      // ── Sales ──
+      { icon: "📊", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst"] },
+      { icon: "📋", label: "Open Deals",     desc: "View all active deals",    message: "Show me all open deals",            roles: ["sales","analyst","installer"] },
+      { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        message: "I want to add a new line item to a deal", roles: ["sales"] },
+      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales"] },
+      { icon: "📝", label: "New Deal",       desc: "Create a deal",            message: "I want to create a new deal in HubSpot", roles: ["sales"] },
+      { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales"] },
+      { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales"] },
+      // ── Operations ──
+      { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["sales","analyst","installer"] },
+      { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["sales","analyst","installer"] },
+      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["sales"] },
+      { icon: "📍", label: "Farm Clusters",  desc: "Find nearby farms",        message: "Show me farm clusters to plan installer routes", roles: ["sales","analyst"] },
+      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms on map",        message: "Show scheduled farms on the map", isMap: true, roles: ["sales","analyst"] },
     ];
 
     const STAGE_BUTTONS = [
@@ -105,12 +104,23 @@
       { icon: "❌", label: "Lost", message: "Show me all closed lost deals with fans, barns, operation type and amounts" },
     ];
 
+    const SERVICE_STAGE_BUTTONS = [
+      { icon: "🔧", label: "All Services", message: "Show me all open services" },
+      { icon: "🆕", label: "New", message: "Show me all services with stage new" },
+      { icon: "⚙️", label: "In Progress", message: "Show me all services with stage in progress" },
+      { icon: "✅", label: "Closed", message: "Show me all services with stage closed" },
+      { icon: "🟢", label: "On Track", message: "Show me all services with status on track" },
+      { icon: "🟡", label: "At Risk", message: "Show me all services with status at risk" },
+      { icon: "🔴", label: "Behind", message: "Show me all services with status behind" },
+    ];
+
     function getSystemPrompt(role, teamId) {
       const baseTools = [
         "- get_open_deals: fetch all open deals (optional stage filter)",
         "- get_line_items: fetch line items for a specific deal (requires deal_id)",
         "- get_deals_with_addresses: fetch appointmentscheduled deals with farm addresses for map",
-        "- get_services: get services for a deal (requires deal_id)",
+        "- get_services: get services for a specific deal (requires deal_id)",
+        "- get_all_services: fetch ALL services across all deals (no params needed). Use this for Open Services and Services Summary requests.",
         "- get_teams: fetch all HubSpot teams",
       ];
       const salesTools = [
@@ -148,15 +158,19 @@
         "When showing map: call get_deals_with_addresses then end response with MAP_LINK.",
         "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
         "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
+        "When user asks for open services or services summary: call get_all_services then respond with SERVICES_TABLE.",
+        "When user asks for service summary by stage/status: respond with SERVICE_STAGE_SELECTOR.",
         "",
         "Display formats:",
         "DEALS_TABLE:{\"deals\":[{\"id\":\"123\",\"name\":\"Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
         "LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
+        "SERVICES_TABLE:{\"services\":[{\"id\":\"123\",\"name\":\"Fan Motor Installation — Farm\",\"deal_name\":\"Henderson Broiler Farm\",\"stage\":\"new\",\"status\":\"ON_TRACK\",\"team\":\"Team Name\",\"start_date\":\"2026-04-01\",\"due_date\":\"2026-04-30\",\"total_cost\":\"9600\"}]}",
         "TEAMS_SELECTOR:{\"teams\":[{\"id\":\"123\",\"name\":\"Team Name\",\"userIds\":[]}]}",
         "SERVICE_FORM:{\"deal_id\":\"123\",\"deal_name\":\"Farm\",\"team_id\":\"456\",\"team_name\":\"Boxy Services\",\"name\":\"Fan Motor Installation — Farm\",\"description\":\"Install 48 fans across 6 barns\",\"start_date\":\"2026-04-01\",\"target_end_date\":\"2026-04-30\",\"total_cost\":\"9600\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
         "MAP_LINK (at end of response after summarizing farms)",
         "SHOW_OPTIONS (when showing menu)",
-        "STAGE_SELECTOR (when showing stage filter)",
+        "STAGE_SELECTOR (when showing deal stage filter)",
+        "SERVICE_STAGE_SELECTOR (when showing service stage/status filter)",
         "",
         "CRITICAL: When calling a tool, respond with ONLY the JSON — no text before or after:",
         "{\"tool\": \"get_open_deals\", \"params\": {}}",
@@ -169,6 +183,7 @@
         "{\"tool\": \"create_deal\", \"params\": {\"dealname\": \"Farm - GP 1234\", \"gp_account_name\": \"Farm\", \"gp_account_number\": \"1234\", \"owner_name\": \"John\", \"farm_address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"total_fans\": 48, \"total_barns\": 6}}",
         "{\"tool\": \"create_contact\", \"params\": {\"email\": \"john@farm.com\", \"firstname\": \"John Smith\", \"company\": \"Farm LLC\", \"phone\": \"555-1234\", \"address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"owner_name\": \"John Smith\", \"gp_account_number\": \"1234\"}}",
         "{\"tool\": \"get_services\", \"params\": {\"deal_id\": \"339921027805\"}}",
+        "{\"tool\": \"get_all_services\", \"params\": {}}",
         "{\"tool\": \"get_teams\", \"params\": {}}",
         
         "{\"tool\": \"create_service\", \"params\": {\"deal_id\": \"339921027805\", \"name\": \"Fan Motor Installation\", \"description\": \"Install fans\", \"stage\": \"new\", \"status\": \"ON_TRACK\", \"start_date\": \"2026-04-01\", \"target_end_date\": \"2026-04-30\", \"total_cost\": \"9600\", \"team_id\": \"369709672\"}}",
@@ -199,6 +214,7 @@
       if (tool === "get_line_items") return await callRailway("/hubspot/line-items/" + params.deal_id);
       if (tool === "get_deals_with_addresses") return await callRailway("/hubspot/deals-with-addresses");
       if (tool === "get_services") return await callRailway("/hubspot/services/" + params.deal_id);
+      if (tool === "get_all_services") return await callRailway("/hubspot/all-services");
       if (tool === "get_teams") return await callRailway("/hubspot/teams");
       if (tool === "update_line_item") {
         const res = await fetch("/hubspot/line-items/" + params.line_item_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit_price: params.unit_price }) });
@@ -331,6 +347,80 @@
       );
     }
 
+    function ServicesTable({ data, role }) {
+      var showFinancials = role !== "analyst" && role !== "installer";
+
+      function stageLabel(s) {
+        var map = { new: "New", in_progress: "In Progress", inprogress: "In Progress", closed: "Closed" };
+        return map[(s || "").toLowerCase()] || s || "—";
+      }
+      function stageClass(s) {
+        var map = { new: "tag-svc-new", in_progress: "tag-svc-inprogress", inprogress: "tag-svc-inprogress", closed: "tag-svc-closed" };
+        return "tag " + (map[(s || "").toLowerCase()] || "tag-svc-new");
+      }
+      function statusLabel(s) {
+        var map = { ON_TRACK: "On Track", AT_RISK: "At Risk", BEHIND: "Behind", COMPLETE: "Complete" };
+        return map[s] || s || "—";
+      }
+      function statusClass(s) {
+        var map = { ON_TRACK: "tag-svc-ontrack", AT_RISK: "tag-svc-atrisk", BEHIND: "tag-svc-behind", COMPLETE: "tag-svc-complete" };
+        return "tag " + (map[s] || "tag-svc-new");
+      }
+      function fmtDate(d) {
+        if (!d) return "—";
+        try { return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return d; }
+      }
+
+      var svcs = data.services || [];
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, svcs.length + " service" + (svcs.length !== 1 ? "s" : "")),
+        React.createElement("table", { className: "svc-table" },
+          React.createElement("thead", null,
+            React.createElement("tr", null,
+              React.createElement("th", null, "#"),
+              React.createElement("th", null, "Service Name"),
+              React.createElement("th", null, "Deal / Farm"),
+              React.createElement("th", null, "Team"),
+              React.createElement("th", null, "Stage"),
+              React.createElement("th", null, "Status"),
+              React.createElement("th", null, "Start"),
+              React.createElement("th", null, "Due"),
+              showFinancials && React.createElement("th", null, "Total Cost")
+            )
+          ),
+          React.createElement("tbody", null,
+            svcs.map(function(s, i) {
+              return React.createElement("tr", { key: s.id || i },
+                React.createElement("td", { style: { color: "#6b8fa8" } }, i + 1),
+                React.createElement("td", { style: { fontWeight: 500 } }, s.name || "—"),
+                React.createElement("td", { style: { color: "#8ab4cc", fontSize: 12 } }, s.deal_name || "—"),
+                React.createElement("td", { style: { fontSize: 12, color: "#8ab4cc" } }, s.team || "—"),
+                React.createElement("td", null, React.createElement("span", { className: stageClass(s.stage) }, stageLabel(s.stage))),
+                React.createElement("td", null, React.createElement("span", { className: statusClass(s.status) }, statusLabel(s.status))),
+                React.createElement("td", { style: { fontSize: 12, color: "#8ab4cc" } }, fmtDate(s.start_date)),
+                React.createElement("td", { style: { fontSize: 12, color: "#8ab4cc" } }, fmtDate(s.due_date)),
+                showFinancials && React.createElement("td", null, s.total_cost ? fmt(s.total_cost) : "—")
+              );
+            })
+          )
+        )
+      );
+    }
+
+    function ServiceStageSelector({ onAction }) {
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Filter services by:"),
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+          SERVICE_STAGE_BUTTONS.map(function(s, i) {
+            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction(s.message); } },
+              React.createElement("span", { className: "qa-icon" }, s.icon),
+              React.createElement("div", null, React.createElement("div", { className: "qa-label" }, s.label))
+            );
+          })
+        )
+      );
+    }
+
     function ServiceForm({ data, onSubmit, onCancel }) {
       const [form, setForm] = React.useState({
         name: data.name || "",
@@ -399,210 +489,6 @@
       );
     }
 
-    function LineItemForm({ onSubmit, onCancel }) {
-      const [deals, setDeals] = React.useState([]);
-      const [loadingDeals, setLoadingDeals] = React.useState(true);
-      const [submitting, setSubmitting] = React.useState(false);
-      const [form, setForm] = React.useState({
-        deal_id: "",
-        name: "",
-        fan_brand: "",
-        fan_size: "",
-        motor_size: "",
-        quantity: "",
-        unit_price: "0",
-      });
-
-      React.useEffect(function() {
-        fetch("/hubspot/deals?limit=50&properties=dealname,dealstage,total_fans,total_barns", { headers: { "Content-Type": "application/json" } })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            var open = (data.deals || []).filter(function(d) {
-              var s = (d.properties || {}).dealstage || "";
-              return s !== "closedwon" && s !== "closedlost";
-            });
-            setDeals(open);
-            if (open.length === 1) update("deal_id", open[0].id);
-          })
-          .catch(function() { setDeals([]); })
-          .finally(function() { setLoadingDeals(false); });
-      }, []);
-
-      function update(field, value) {
-        setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
-      }
-
-      function autoName(brand, size, motor) {
-        var parts = [];
-        if (brand) parts.push(brand);
-        if (size)  parts.push(size + '"');
-        if (motor) parts.push(motor + " HP");
-        return parts.join(" ") + (parts.length ? " Fan Motor" : "");
-      }
-
-      function handleBrand(v)  { update("fan_brand",  v); update("name", autoName(v, form.fan_size,  form.motor_size)); }
-      function handleSize(v)   { update("fan_size",   v); update("name", autoName(form.fan_brand, v, form.motor_size)); }
-      function handleMotor(v)  { update("motor_size", v); update("name", autoName(form.fan_brand, form.fan_size, v)); }
-
-      async function handleSubmit() {
-        if (!form.deal_id || !form.fan_brand || !form.fan_size || !form.quantity) return;
-        setSubmitting(true);
-        try {
-          const res = await fetch("/hubspot/line-items", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              deal_id:    form.deal_id,
-              name:       form.name || autoName(form.fan_brand, form.fan_size, form.motor_size),
-              fan_brand:  form.fan_brand,
-              fan_size:   parseFloat(form.fan_size),
-              motor_size: parseFloat(form.motor_size) || 0,
-              quantity:   parseInt(form.quantity),
-              unit_price: parseFloat(form.unit_price) || 0,
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            onSubmit(form.deal_id, form.name || autoName(form.fan_brand, form.fan_size, form.motor_size), parseInt(form.quantity));
-          } else {
-            onSubmit(null, null, null, data.error || "Failed to add line item");
-          }
-        } catch(e) {
-          onSubmit(null, null, null, e.message);
-        }
-        setSubmitting(false);
-      }
-
-      var isValid = form.deal_id && form.fan_brand && form.fan_size && form.quantity;
-
-      var dealName = "";
-      if (form.deal_id) {
-        var found = deals.find(function(d) { return d.id === form.deal_id; });
-        if (found) dealName = (found.properties || {}).dealname || "";
-      }
-
-      return React.createElement("div", { className: "li-form" },
-        React.createElement("div", { className: "li-form-title" }, "➕ Add Line Item"),
-
-        // Deal selector
-        React.createElement("div", { className: "li-form-deal-row" },
-          React.createElement("div", { className: "li-form-label" }, "Deal " + (loadingDeals ? "(loading…)" : "(" + deals.length + " open)")),
-          React.createElement("select", {
-            className: "li-form-deal-select",
-            value: form.deal_id,
-            onChange: function(e) { update("deal_id", e.target.value); }
-          },
-            React.createElement("option", { value: "" }, "— select a deal —"),
-            deals.map(function(d) {
-              var dp = d.properties || {};
-              return React.createElement("option", { key: d.id, value: d.id },
-                (dp.dealname || d.id) + (dp.total_fans ? " · " + dp.total_fans + " fans" : "")
-              );
-            })
-          )
-        ),
-
-        // Fan details grid
-        React.createElement("div", { className: "li-form-grid" },
-          // Brand
-          React.createElement("div", { className: "li-form-row" },
-            React.createElement("div", { className: "li-form-label" }, "Fan Brand *"),
-            React.createElement("select", {
-              className: "li-form-select",
-              value: form.fan_brand,
-              onChange: function(e) { handleBrand(e.target.value); }
-            },
-              React.createElement("option", { value: "" }, "— select —"),
-              ["Chore-Time","Hired-Hand","Aerovent","Tunnel","Vostermans","Munters","Other"].map(function(b) {
-                return React.createElement("option", { key: b, value: b }, b);
-              })
-            )
-          ),
-          // Fan Size
-          React.createElement("div", { className: "li-form-row" },
-            React.createElement("div", { className: "li-form-label" }, "Fan Size (in) *"),
-            React.createElement("select", {
-              className: "li-form-select",
-              value: form.fan_size,
-              onChange: function(e) { handleSize(e.target.value); }
-            },
-              React.createElement("option", { value: "" }, "— select —"),
-              ["36","48","52","54"].map(function(s) {
-                return React.createElement("option", { key: s, value: s }, s + '"');
-              })
-            )
-          ),
-          // Motor HP
-          React.createElement("div", { className: "li-form-row" },
-            React.createElement("div", { className: "li-form-label" }, "Motor Size (HP)"),
-            React.createElement("select", {
-              className: "li-form-select",
-              value: form.motor_size,
-              onChange: function(e) { handleMotor(e.target.value); }
-            },
-              React.createElement("option", { value: "" }, "— select —"),
-              ["0.5","1","1.5","2","3"].map(function(h) {
-                return React.createElement("option", { key: h, value: h }, h + " HP");
-              })
-            )
-          ),
-          // Quantity
-          React.createElement("div", { className: "li-form-row" },
-            React.createElement("div", { className: "li-form-label" }, "Quantity *"),
-            React.createElement("input", {
-              className: "li-form-input",
-              type: "number", min: "1", step: "1",
-              placeholder: "e.g. 24",
-              value: form.quantity,
-              onChange: function(e) { update("quantity", e.target.value); }
-            })
-          ),
-          // Unit Price
-          React.createElement("div", { className: "li-form-row" },
-            React.createElement("div", { className: "li-form-label" }, "Unit Price ($)"),
-            React.createElement("input", {
-              className: "li-form-input",
-              type: "number", min: "0", step: "0.01",
-              placeholder: "0.00",
-              value: form.unit_price,
-              onChange: function(e) { update("unit_price", e.target.value); }
-            })
-          ),
-          // Line Total (read-only)
-          React.createElement("div", { className: "li-form-row" },
-            React.createElement("div", { className: "li-form-label" }, "Line Total"),
-            React.createElement("input", {
-              className: "li-form-input",
-              readOnly: true,
-              style: { color: "#6b8fa8" },
-              value: (form.quantity && form.unit_price)
-                ? "$" + (parseInt(form.quantity||0) * parseFloat(form.unit_price||0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : "—"
-            })
-          )
-        ),
-
-        // Auto-generated name
-        React.createElement("div", { className: "li-form-row", style: { marginBottom: 12 } },
-          React.createElement("div", { className: "li-form-label" }, "Line Item Name (auto-generated)"),
-          React.createElement("input", {
-            className: "li-form-input",
-            value: form.name,
-            placeholder: "Fill fields above to auto-generate",
-            onChange: function(e) { update("name", e.target.value); },
-            style: { color: form.name ? "#e8edf2" : "#6b8fa8" }
-          })
-        ),
-
-        React.createElement("button", {
-          className: "li-form-btn",
-          onClick: handleSubmit,
-          disabled: !isValid || submitting
-        }, submitting ? "Adding…" : "➕ Add to Deal"),
-        React.createElement("button", { className: "li-form-btn-cancel", onClick: onCancel }, "Cancel")
-      );
-    }
-
     function TeamsSelector({ teams, onAction }) {
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a team to assign:"),
@@ -635,39 +521,59 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, onLineItemForm, role }) {
-      var actions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role); });
-      return React.createElement("div", { className: "quick-actions" },
-        actions.map(function(a, i) {
-          return React.createElement("button", { key: i, className: "qa-btn",
-            onClick: function() {
-              if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
-              if (a.isUpload) { onUpload(); return; }
-              if (a.isStageSelector) { onStageSelector(); return; }
-              if (a.isLineItemForm) { onLineItemForm(); return; }
-              onAction(a.message);
-            }
-          },
-            React.createElement("span", { className: "qa-icon" }, a.icon),
-            React.createElement("div", null,
-              React.createElement("div", { className: "qa-label" }, a.label),
-              React.createElement("div", { className: "qa-desc" }, a.desc)
-            )
-          );
-        })
+    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, role }) {
+      var SALES_LABELS = ["Deal Summary","Open Deals","Add Line Item","Update Pricing","New Deal","New Contact","Submit Form"];
+      var OPS_LABELS   = ["Services Summary","Open Services","New Service","Farm Clusters","Farm Map"];
+
+      var salesActions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && SALES_LABELS.includes(a.label); });
+      var opsActions   = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && OPS_LABELS.includes(a.label); });
+
+      function renderBtn(a, i) {
+        return React.createElement("button", { key: i, className: "qa-btn",
+          onClick: function() {
+            if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
+            if (a.isUpload) { onUpload(); return; }
+            if (a.isStageSelector) { onStageSelector(); return; }
+            if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
+            onAction(a.message);
+          }
+        },
+          React.createElement("span", { className: "qa-icon" }, a.icon),
+          React.createElement("div", null,
+            React.createElement("div", { className: "qa-label" }, a.label),
+            React.createElement("div", { className: "qa-desc" }, a.desc)
+          )
+        );
+      }
+
+      return React.createElement("div", null,
+        salesActions.length > 0 && React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 4 } }, "Sales"),
+          React.createElement("div", { className: "quick-actions" }, salesActions.map(renderBtn))
+        ),
+        opsActions.length > 0 && React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 } }, "Operations"),
+          React.createElement("div", { className: "quick-actions" }, opsActions.map(renderBtn))
+        )
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector, onLineItemForm, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onLineItemForm: onLineItemForm, role: role });
+    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
-      if (content === "ADD_LINE_ITEM_FORM") return React.createElement(LineItemForm, {
-        onSubmit: function(dealId, name, qty, err) {
-          if (err) { onAction("Line item add failed: " + err); return; }
-          onAction("Line item added: " + qty + "x " + name + " added to deal " + dealId + ". Please confirm and show updated line items.");
-        },
-        onCancel: function() { onAction("Cancelled adding line item"); }
-      });
+      if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
+
+      if (content.includes("SERVICES_TABLE:")) {
+        var svParts = content.split("SERVICES_TABLE:");
+        try {
+          var svData = JSON.parse(svParts[1].trim().split("\n")[0]);
+          return React.createElement("div", null,
+            svParts[0] && React.createElement("div", { style: { marginBottom: 8 } }, svParts[0].trim()),
+            React.createElement(ServicesTable, { data: svData, role: role }),
+            svParts[2] && React.createElement("div", { style: { marginTop: 8 } }, svParts[2].trim())
+          );
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
+      }
 
       if (content.includes("SERVICE_FORM:")) {
         var sfParts = content.split("SERVICE_FORM:");
@@ -837,9 +743,9 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]); });
       }
 
-      function triggerLineItemForm() {
+      function triggerServiceStageSelector() {
         setShowActions(false);
-        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "ADD_LINE_ITEM_FORM", display: true }]); });
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SERVICE_STAGE_SELECTOR", display: true }]); });
       }
 
       async function sendMessage(overrideText) {
@@ -864,7 +770,7 @@
         setInput("");
         setLoading(true);
 
-        var apiMessages = updatedMessages.filter(function(m) { return m.display && m.content !== "SHOW_OPTIONS" && m.content !== "STAGE_SELECTOR"; }).map(function(m) { return { role: m.role, content: m.content }; });
+        var apiMessages = updatedMessages.filter(function(m) { return m.display && m.content !== "SHOW_OPTIONS" && m.content !== "STAGE_SELECTOR" && m.content !== "SERVICE_STAGE_SELECTOR"; }).map(function(m) { return { role: m.role, content: m.content }; });
 
         if (uploadedFile) {
           apiMessages = apiMessages.map(function(m, i) {
@@ -928,7 +834,6 @@
               onClick: function() {
                 setShowActions(true);
                 setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
-                // re-set lineItemForm trigger so Options panel has it
               },
               style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, cursor: "pointer" }
             }, "⚡ Options"),
@@ -948,12 +853,12 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onLineItemForm: triggerLineItemForm, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onLineItemForm: triggerLineItemForm, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, role: auth.role })
                 )
             );
           }),
