@@ -455,7 +455,7 @@ def hs_get_services(deal_id):
         service_ids = [r['id'] for r in assoc_res.json().get('results', [])]
         if not service_ids:
             return jsonify({'services': []})
-        props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_amount_paid,hs_amount_remaining,hs_shared_team_ids'
         services = []
         for sid in service_ids:
             res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}?properties={props}', headers=HUBSPOT_HEADERS())
