@@ -70,6 +70,40 @@ def fill_workbook(template_bytes, data):
     os.unlink(tmp_path)
     return output
 
+# ── PIN Authentication ──────────────────────────────────────
+@app.route('/auth', methods=['POST'])
+def auth():
+    try:
+        data = request.get_json()
+        pin = str(data.get('pin', ''))
+        if not pin:
+            return jsonify({'error': 'PIN required'}), 400
+
+        # Check Sales PIN
+        if pin == os.environ.get('PIN_SALES', ''):
+            return jsonify({'success': True, 'role': 'sales', 'name': 'Sales'})
+
+        # Check Analyst PIN
+        if pin == os.environ.get('PIN_ANALYST', ''):
+            return jsonify({'success': True, 'role': 'analyst', 'name': 'Analyst'})
+
+        # Check Installer PINs (PIN_INSTALLER_{team_id})
+        for key, value in os.environ.items():
+            if key.startswith('PIN_INSTALLER_') and pin == value:
+                team_id = key.replace('PIN_INSTALLER_', '')
+                # Get team name
+                try:
+                    res = requests.get(f'{HUBSPOT_BASE}/settings/v3/users/teams', headers=HUBSPOT_HEADERS())
+                    teams = res.json().get('results', [])
+                    team_name = next((t['name'] for t in teams if str(t['id']) == team_id), 'Installer')
+                except:
+                    team_name = 'Installer'
+                return jsonify({'success': True, 'role': 'installer', 'name': team_name, 'team_id': team_id})
+
+        return jsonify({'error': 'Invalid PIN'}), 401
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ── Serve frontend ──────────────────────────────────────────
 @app.route('/', methods=['GET'])
 def index():
@@ -361,23 +395,6 @@ def hs_get_teams():
                 'userIds': t.get('userIds', [])
             })
         return jsonify({'teams': teams})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# ── HubSpot: Create new team ────────────────────────────────
-@app.route('/hubspot/teams', methods=['POST'])
-def hs_create_team():
-    try:
-        data = request.get_json()
-        name = data.get('name')
-        if not name:
-            return jsonify({'error': 'Team name is required'}), 400
-        payload = {'name': name, 'userIds': data.get('userIds', [])}
-        res = requests.post(f'{HUBSPOT_BASE}/settings/v3/users/teams', json=payload, headers=HUBSPOT_HEADERS())
-        if res.status_code not in [200, 201]:
-            return jsonify({'error': res.text}), res.status_code
-        team = res.json()
-        return jsonify({'success': True, 'team_id': team.get('id'), 'name': team.get('name')})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
