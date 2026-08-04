@@ -18,6 +18,10 @@
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
       40% { transform: translateY(-6px); opacity: 1; }
     }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .deal-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
     .deal-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
     .deal-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
@@ -31,8 +35,16 @@
     .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
     .tag-scheduled { background: #1a3a5c; color: #5ab4f0; }
     .tag-won { background: #0d3320; color: #25a35a; }
+    .tag-lost { background: #3a1a1a; color: #e05252; }
+    .tag-qualified { background: #2a1a3a; color: #a87af0; }
     .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
     .map-btn:hover { opacity: 0.9; }
+    .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; animation: fadeIn 0.3s ease; }
+    .qa-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; color: #e8edf2; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: left; }
+    .qa-btn:hover { background: #1e2d3d; border-color: #25a35a; color: #25a35a; }
+    .qa-btn .qa-icon { font-size: 16px; flex-shrink: 0; }
+    .qa-btn .qa-label { line-height: 1.3; }
+    .qa-btn .qa-desc { font-size: 10px; color: #6b8fa8; margin-top: 1px; }
   </style>
 </head>
 <body>
@@ -44,6 +56,15 @@
     const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
     const MAKE_INTAKE_WEBHOOK = "https://hook.us2.make.com/tl8ovivxtbwxq3rwrifg6lhgyn5f6es6";
     const MAP_URL = "https://web-production-0b9c8.up.railway.app/map";
+
+    const QUICK_ACTIONS = [
+      { icon: "📋", label: "Open Deals", desc: "View all active deals", message: "Show me all open deals" },
+      { icon: "🗺", label: "Farm Map", desc: "Plot farms on map", message: "Show scheduled farms on the map", isMap: true },
+      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices", message: "I want to update line item pricing for a deal" },
+      { icon: "📤", label: "Submit Form", desc: "Upload customer PDF", message: null, isUpload: true },
+      { icon: "📍", label: "Farm Clusters", desc: "Find nearby farms", message: "Show me farm clusters to plan installer routes" },
+      { icon: "📊", label: "Deal Summary", desc: "Pipeline overview", message: "Give me a full summary of all deals including fans, barns, operation type and amounts" },
+    ];
 
     const SYSTEM_PROMPT = [
       "You are PSD Sales Assistant, an AI agent for Precision Systems Development (PSD) — a contractor that installs exhaust fan motors on poultry farms under Georgia Power's Commercial Energy Efficiency Program (CEEP).",
@@ -77,11 +98,14 @@
       "4. Update deal amount with correct deal_id",
       "5. Confirm to sales person",
       "",
-      "When displaying deals use: DEALS_TABLE:{\"deals\":[{\"id\":\"339921027805\",\"name\":\"Henderson Broiler Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\"}]}",
+      "When the user asks for help, options, menu, or what you can do — respond with SHOW_OPTIONS and a brief intro.",
+      "",
+      "When displaying deals use: DEALS_TABLE:{\"deals\":[{\"id\":\"339921027805\",\"name\":\"Henderson Broiler Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
       "When displaying line items use: LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
       "When showing map use: MAP_LINK after summarizing the farms found",
       "",
-      "CRITICAL TOOL CALL RULE: When you need to call a tool, your ENTIRE response must be ONLY the JSON object. Zero text before it. Zero text after it. No explanation. No confirmation. Just the raw JSON and nothing else. If you write anything before or after the JSON, the tool will not execute.",
+      "CRITICAL TOOL CALL RULE: When you need to call a tool, your ENTIRE response must be ONLY the JSON object. Zero text before it. Zero text after it. No explanation. No confirmation. Just the raw JSON and nothing else.",
+      "",
       "{\"tool\": \"get_open_deals\", \"params\": {}}",
       "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
       "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
@@ -141,32 +165,48 @@
 
     function DealsTable({ data }) {
       const stageLabel = function(s) {
-        var map = { appointmentscheduled: "Scheduled", closedwon: "Won", closedlost: "Lost", qualifiedtobuy: "Qualified" };
+        var map = { appointmentscheduled: "Scheduled", closedwon: "Won", closedlost: "Lost", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation" };
         return map[s] || s;
       };
-      return (
-        React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deals.length + " open deals"),
-          React.createElement("table", { className: "deal-table" },
-            React.createElement("thead", null,
-              React.createElement("tr", null,
-                React.createElement("th", null, "#"),
-                React.createElement("th", null, "Deal Name"),
-                React.createElement("th", null, "Amount"),
-                React.createElement("th", null, "Stage")
-              )
-            ),
-            React.createElement("tbody", null,
-              data.deals.map(function(d, i) {
-                return React.createElement("tr", { key: d.id },
-                  React.createElement("td", { style: { color: "#6b8fa8" } }, i + 1),
-                  React.createElement("td", { style: { fontWeight: 500 } }, d.name),
-                  React.createElement("td", null, fmt(d.amount)),
-                  React.createElement("td", null,
-                    React.createElement("span", { className: "tag tag-scheduled" }, stageLabel(d.stage))
-                  )
-                );
-              })
+      const stageColor = function(s) {
+        var map = { appointmentscheduled: "tag-scheduled", closedwon: "tag-won", closedlost: "tag-lost", qualifiedtobuy: "tag-qualified", presentationscheduled: "tag-scheduled" };
+        return map[s] || "tag-scheduled";
+      };
+      var totalFans = data.deals.reduce(function(s, d) { return s + (Number(d.total_fans) || 0); }, 0);
+      var totalBarns = data.deals.reduce(function(s, d) { return s + (Number(d.total_barns) || 0); }, 0);
+      var totalAmount = data.deals.reduce(function(s, d) { return s + (Number(d.amount) || 0); }, 0);
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deals.length + " deals"),
+        React.createElement("table", { className: "deal-table" },
+          React.createElement("thead", null,
+            React.createElement("tr", null,
+              React.createElement("th", null, "#"),
+              React.createElement("th", null, "Deal Name"),
+              React.createElement("th", null, "Operation"),
+              React.createElement("th", null, "Fans"),
+              React.createElement("th", null, "Barns"),
+              React.createElement("th", null, "Amount"),
+              React.createElement("th", null, "Stage")
+            )
+          ),
+          React.createElement("tbody", null,
+            data.deals.map(function(d, i) {
+              return React.createElement("tr", { key: d.id },
+                React.createElement("td", { style: { color: "#6b8fa8" } }, i + 1),
+                React.createElement("td", { style: { fontWeight: 500 } }, d.name),
+                React.createElement("td", { style: { color: "#8ab4cc", fontSize: 12 } }, d.operation_type ? d.operation_type.replace(/;/g, ", ") : "—"),
+                React.createElement("td", { style: { color: "#25a35a", fontWeight: 600 } }, d.total_fans || "—"),
+                React.createElement("td", { style: { color: "#25a35a", fontWeight: 600 } }, d.total_barns || "—"),
+                React.createElement("td", null, fmt(d.amount)),
+                React.createElement("td", null, React.createElement("span", { className: "tag " + stageColor(d.stage) }, stageLabel(d.stage)))
+              );
+            }),
+            React.createElement("tr", { style: { background: "#0d1f15" } },
+              React.createElement("td", { colSpan: 3, style: { textAlign: "right", fontWeight: 700, color: "#25a35a", fontSize: 12 } }, "Totals"),
+              React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, totalFans),
+              React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, totalBarns),
+              React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, fmt(totalAmount)),
+              React.createElement("td", null)
             )
           )
         )
@@ -177,63 +217,77 @@
       var total = data.items.reduce(function(sum, item) {
         return sum + (Number(item.qty) * Number(item.unit_price || 0));
       }, 0);
-      return (
-        React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deal_name + " — " + data.items.length + " line items"),
-          React.createElement("table", { className: "line-table" },
-            React.createElement("thead", null,
-              React.createElement("tr", null,
-                React.createElement("th", null, "Fan"),
-                React.createElement("th", null, "Size"),
-                React.createElement("th", null, "Qty"),
-                React.createElement("th", null, "Unit Price"),
-                React.createElement("th", null, "Line Total")
-              )
-            ),
-            React.createElement("tbody", null,
-              data.items.map(function(item, i) {
-                return React.createElement("tr", { key: item.id || i },
-                  React.createElement("td", { style: { fontWeight: 500 } }, item.brand),
-                  React.createElement("td", null, item.size + '"'),
-                  React.createElement("td", null, item.qty),
-                  React.createElement("td", null, fmt(item.unit_price)),
-                  React.createElement("td", null, fmt(Number(item.qty) * Number(item.unit_price || 0)))
-                );
-              }),
-              React.createElement("tr", { className: "total-row" },
-                React.createElement("td", { colSpan: 4, style: { textAlign: "right" } }, "Total Contract Value"),
-                React.createElement("td", null, fmt(total))
-              )
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deal_name + " — " + data.items.length + " line items"),
+        React.createElement("table", { className: "line-table" },
+          React.createElement("thead", null,
+            React.createElement("tr", null,
+              React.createElement("th", null, "Fan"),
+              React.createElement("th", null, "Size"),
+              React.createElement("th", null, "Qty"),
+              React.createElement("th", null, "Unit Price"),
+              React.createElement("th", null, "Line Total")
+            )
+          ),
+          React.createElement("tbody", null,
+            data.items.map(function(item, i) {
+              return React.createElement("tr", { key: item.id || i },
+                React.createElement("td", { style: { fontWeight: 500 } }, item.brand),
+                React.createElement("td", null, item.size + '"'),
+                React.createElement("td", null, item.qty),
+                React.createElement("td", null, fmt(item.unit_price)),
+                React.createElement("td", null, fmt(Number(item.qty) * Number(item.unit_price || 0)))
+              );
+            }),
+            React.createElement("tr", { className: "total-row" },
+              React.createElement("td", { colSpan: 4, style: { textAlign: "right" } }, "Total Contract Value"),
+              React.createElement("td", null, fmt(total))
             )
           )
         )
       );
     }
 
-    function MessageContent({ content }) {
-      if (content.includes("DEALS_TABLE:")) {
-        var parts = content.split("DEALS_TABLE:");
-        try {
-          var jsonStr = parts[1].trim().split("\n")[0];
-          var data = JSON.parse(jsonStr);
-          return React.createElement("div", null,
-            parts[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts[0].trim()),
-            React.createElement(DealsTable, { data: data }),
-            parts[2] && React.createElement("div", { style: { marginTop: 8 } }, parts[2].trim())
+    function QuickActions({ onAction, onUpload }) {
+      return React.createElement("div", { className: "quick-actions" },
+        QUICK_ACTIONS.map(function(a, i) {
+          return React.createElement("button", {
+            key: i,
+            className: "qa-btn",
+            onClick: function() {
+              if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
+              if (a.isUpload) { onUpload(); return; }
+              onAction(a.message);
+            }
+          },
+            React.createElement("span", { className: "qa-icon" }, a.icon),
+            React.createElement("div", null,
+              React.createElement("div", { className: "qa-label" }, a.label),
+              React.createElement("div", { className: "qa-desc" }, a.desc)
+            )
           );
-        } catch(e) {
-          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
-        }
+        })
+      );
+    }
+
+    function MessageContent({ content, onAction, onUpload }) {
+      if (content.includes("SHOW_OPTIONS")) {
+        var parts = content.split("SHOW_OPTIONS");
+        return React.createElement("div", null,
+          parts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, parts[0].trim()),
+          React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload }),
+          parts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, parts[1].trim())
+        );
       }
 
-      if (content.includes("LINE_ITEMS_TABLE:")) {
-        var parts2 = content.split("LINE_ITEMS_TABLE:");
+      if (content.includes("DEALS_TABLE:")) {
+        var parts2 = content.split("DEALS_TABLE:");
         try {
-          var jsonStr2 = parts2[1].trim().split("\n")[0];
-          var data2 = JSON.parse(jsonStr2);
+          var jsonStr = parts2[1].trim().split("\n")[0];
+          var data = JSON.parse(jsonStr);
           return React.createElement("div", null,
             parts2[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts2[0].trim()),
-            React.createElement(LineItemsTable, { data: data2 }),
+            React.createElement(DealsTable, { data: data }),
             parts2[2] && React.createElement("div", { style: { marginTop: 8 } }, parts2[2].trim())
           );
         } catch(e) {
@@ -241,17 +295,27 @@
         }
       }
 
+      if (content.includes("LINE_ITEMS_TABLE:")) {
+        var parts3 = content.split("LINE_ITEMS_TABLE:");
+        try {
+          var jsonStr2 = parts3[1].trim().split("\n")[0];
+          var data2 = JSON.parse(jsonStr2);
+          return React.createElement("div", null,
+            parts3[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts3[0].trim()),
+            React.createElement(LineItemsTable, { data: data2 }),
+            parts3[2] && React.createElement("div", { style: { marginTop: 8 } }, parts3[2].trim())
+          );
+        } catch(e) {
+          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
+        }
+      }
+
       if (content.includes("MAP_LINK")) {
-        var mapParts = content.split("MAP_LINK");
+        var parts4 = content.split("MAP_LINK");
         return React.createElement("div", null,
-          mapParts[0] && React.createElement("div", { style: { whiteSpace: "pre-wrap", marginBottom: 12 } }, mapParts[0].trim()),
-          React.createElement("a", {
-            href: MAP_URL,
-            target: "_blank",
-            rel: "noopener noreferrer",
-            className: "map-btn"
-          }, "🗺 Open Farm Map"),
-          mapParts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, mapParts[1].trim())
+          parts4[0] && React.createElement("div", { style: { whiteSpace: "pre-wrap", marginBottom: 12 } }, parts4[0].trim()),
+          React.createElement("a", { href: MAP_URL, target: "_blank", rel: "noopener noreferrer", className: "map-btn" }, "🗺 Open Farm Map"),
+          parts4[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, parts4[1].trim())
         );
       }
 
@@ -259,16 +323,13 @@
     }
 
     function App() {
-      var initialMessages = [{
-        role: "assistant",
-        content: "Hey! I'm your PSD Sales Assistant. I can help you submit customer forms, check open deals, view line items, update pricing, and show farms on a map. What do you need?",
-        display: true,
-      }];
+      const WELCOME = "Hey! I'm your PSD Sales Assistant. How can I help you today?";
 
-      const [messages, setMessages] = useState(initialMessages);
+      const [messages, setMessages] = useState([{ role: "assistant", content: WELCOME, display: true, showActions: true }]);
       const [input, setInput] = useState("");
       const [loading, setLoading] = useState(false);
       const [uploadedFile, setUploadedFile] = useState(null);
+      const [showActions, setShowActions] = useState(true);
       const fileRef = useRef();
       const bottomRef = useRef();
 
@@ -287,9 +348,15 @@
         reader.readAsDataURL(file);
       }
 
-      async function sendMessage() {
-        var text = input.trim();
+      function triggerUpload() {
+        fileRef.current && fileRef.current.click();
+      }
+
+      async function sendMessage(overrideText) {
+        var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
+
+        setShowActions(false);
 
         var userContent = text;
         if (uploadedFile) {
@@ -335,12 +402,7 @@
 
             if (toolCall) {
               setMessages(function(prev) {
-                return prev.concat([{
-                  role: "assistant",
-                  content: "Calling " + toolCall.tool.replace(/_/g, " ") + "...",
-                  display: true,
-                  isThinking: true
-                }]);
+                return prev.concat([{ role: "assistant", content: "Calling " + toolCall.tool.replace(/_/g, " ") + "...", display: true, isThinking: true }]);
               });
 
               var toolResult;
@@ -363,9 +425,11 @@
           }
 
           if (finalResponse) {
+            var showActionsAgain = /\bSHOW_OPTIONS\b/.test(finalResponse);
             setMessages(function(prev) {
               return prev.concat([{ role: "assistant", content: finalResponse, display: true }]);
             });
+            if (showActionsAgain) setShowActions(true);
           }
         } catch(err) {
           setMessages(function(prev) {
@@ -387,62 +451,78 @@
 
       var displayMessages = messages.filter(function(m) { return m.display; });
 
-      return (
-        React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" } },
+      return React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" } },
 
-          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
-            React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
-            React.createElement("div", null,
-              React.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, "PSD Sales Assistant"),
-              React.createElement("div", { style: { fontSize: 11, color: "#4a9a6b", marginTop: 1 } }, "● Online — Precision Systems Development")
-            ),
-            React.createElement("a", { href: "/map", target: "_blank", style: { marginLeft: "auto", padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, textDecoration: "none" } }, "🗺 Farm Map")
+        // Header
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
+          React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
+          React.createElement("div", null,
+            React.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, "PSD Sales Assistant"),
+            React.createElement("div", { style: { fontSize: 11, color: "#4a9a6b", marginTop: 1 } }, "● Online — Precision Systems Development")
           ),
+          React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 8 } },
+            React.createElement("button", {
+              onClick: function() { setShowActions(true); },
+              style: { padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, cursor: "pointer" }
+            }, "⚡ Options"),
+            React.createElement("a", { href: "/map", target: "_blank", style: { padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, textDecoration: "none" } }, "🗺 Map")
+          )
+        ),
 
-          React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 } },
-            displayMessages.map(function(msg, i) {
-              return React.createElement("div", { key: i, style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
+        // Messages
+        React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 } },
+          displayMessages.map(function(msg, i) {
+            var isLast = i === displayMessages.length - 1;
+            return React.createElement("div", { key: i },
+              React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", marginRight: 10, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "80%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content })
-                )
-              );
-            }),
-
-            loading && !messages.some(function(m) { return m.isThinking; }) &&
-              React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
-                React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" } }, "P"),
-                React.createElement("div", { style: { display: "flex", gap: 5, padding: "10px 14px", background: "#162130", borderRadius: "16px 16px 16px 4px", border: "1px solid #1e2d3d" } },
-                  [0,1,2].map(function(j) {
-                    return React.createElement("div", { key: j, style: { width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: (j * 0.2) + "s" } });
-                  })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload })
                 )
               ),
-            React.createElement("div", { ref: bottomRef })
-          ),
+              // Show quick actions below welcome or when triggered
+              msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
+                React.createElement("div", { style: { marginLeft: 38, marginTop: 8 } },
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload })
+                )
+            );
+          }),
 
-          uploadedFile && React.createElement("div", { style: { margin: "0 16px 8px", padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 } },
-            React.createElement("span", null, "📎 " + uploadedFile.name),
-            React.createElement("button", { onClick: function() { setUploadedFile(null); }, style: { background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 16 } }, "×")
-          ),
+          loading && !messages.some(function(m) { return m.isThinking; }) &&
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+              React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" } }, "P"),
+              React.createElement("div", { style: { display: "flex", gap: 5, padding: "10px 14px", background: "#162130", borderRadius: "16px 16px 16px 4px", border: "1px solid #1e2d3d" } },
+                [0,1,2].map(function(j) {
+                  return React.createElement("div", { key: j, style: { width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: (j * 0.2) + "s" } });
+                })
+              )
+            ),
+          React.createElement("div", { ref: bottomRef })
+        ),
 
-          React.createElement("div", { style: { padding: "12px 16px 20px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 10, alignItems: "flex-end" } },
-            React.createElement("button", { onClick: function() { fileRef.current && fileRef.current.click(); }, style: { width: 40, height: 40, borderRadius: 10, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
-            React.createElement("input", { ref: fileRef, type: "file", accept: ".pdf,image/*", onChange: handleFile, style: { display: "none" } }),
-            React.createElement("textarea", {
-              value: input,
-              onChange: function(e) { setInput(e.target.value); },
-              onKeyDown: handleKey,
-              placeholder: "Ask me anything — show deals, update prices, submit a form, show farm map...",
-              rows: 1,
-              style: { flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 12, padding: "10px 14px", color: "#e8edf2", fontSize: 14, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
-            }),
-            React.createElement("button", {
-              onClick: sendMessage,
-              disabled: loading || (!input.trim() && !uploadedFile),
-              style: { width: 40, height: 40, borderRadius: 10, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
-            }, "➤")
-          )
+        // File preview
+        uploadedFile && React.createElement("div", { style: { margin: "0 16px 8px", padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 } },
+          React.createElement("span", null, "📎 " + uploadedFile.name),
+          React.createElement("button", { onClick: function() { setUploadedFile(null); }, style: { background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 16 } }, "×")
+        ),
+
+        // Input
+        React.createElement("div", { style: { padding: "12px 16px 20px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 10, alignItems: "flex-end" } },
+          React.createElement("button", { onClick: triggerUpload, style: { width: 40, height: 40, borderRadius: 10, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
+          React.createElement("input", { ref: fileRef, type: "file", accept: ".pdf,image/*", onChange: handleFile, style: { display: "none" } }),
+          React.createElement("textarea", {
+            value: input,
+            onChange: function(e) { setInput(e.target.value); },
+            onKeyDown: handleKey,
+            placeholder: "Ask me anything or use the quick actions above...",
+            rows: 1,
+            style: { flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 12, padding: "10px 14px", color: "#e8edf2", fontSize: 14, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
+          }),
+          React.createElement("button", {
+            onClick: function() { sendMessage(); },
+            disabled: loading || (!input.trim() && !uploadedFile),
+            style: { width: 40, height: 40, borderRadius: 10, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+          }, "➤")
         )
       );
     }
