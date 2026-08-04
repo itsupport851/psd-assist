@@ -14,19 +14,14 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 3px; }
     textarea::placeholder { color: #3a5a70; }
-    @keyframes bounce {
-      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-      40% { transform: translateY(-6px); opacity: 1; }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
     .deal-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
     .deal-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
     .deal-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
     .deal-table tr:last-child td { border-bottom: none; }
-    .deal-table tr:hover td { background: #1a2535; cursor: pointer; }
+    .deal-table tr:hover td { background: #1a2535; }
     .line-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
     .line-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
     .line-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
@@ -45,6 +40,12 @@
     .qa-btn .qa-icon { font-size: 16px; flex-shrink: 0; }
     .qa-btn .qa-label { line-height: 1.3; }
     .qa-btn .qa-desc { font-size: 10px; color: #6b8fa8; margin-top: 1px; }
+    .pin-key { width: 72px; height: 56px; background: #162130; border: 1px solid #1e2d3d; border-radius: 12px; color: #e8edf2; font-size: 20px; font-weight: 600; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; }
+    .pin-key:hover { background: #1e2d3d; border-color: #25a35a; }
+    .pin-key:active { transform: scale(0.95); }
+    .pin-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #3a5a70; transition: all 0.2s; }
+    .pin-dot.filled { background: #25a35a; border-color: #25a35a; }
+    .pin-dot.error { background: #e05252; border-color: #e05252; }
   </style>
 </head>
 <body>
@@ -52,211 +53,160 @@
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
 
-    const MAKE_READ_WEBHOOK = "https://hook.us2.make.com/fbf052s9udk8xv3apxgct1xiptjqfi7s";
-    const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
     const MAKE_INTAKE_WEBHOOK = "https://hook.us2.make.com/tl8ovivxtbwxq3rwrifg6lhgyn5f6es6";
+    const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
     const MAP_URL = "https://web-production-0b9c8.up.railway.app/map";
 
-    const QUICK_ACTIONS = [
-      { icon: "📋", label: "Open Deals", desc: "View all active deals", message: "Show me all open deals" },
-      { icon: "📊", label: "Deal Summary", desc: "Filter by stage", message: null, isStageSelector: true },
-      { icon: "🗺", label: "Farm Map", desc: "Plot farms on map", message: "Show scheduled farms on the map", isMap: true },
-      { icon: "📍", label: "Farm Clusters", desc: "Find nearby farms", message: "Show me farm clusters to plan installer routes" },
-      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices", message: "I want to update line item pricing for a deal" },
-      { icon: "➕", label: "Add Line Item", desc: "Add fan to a deal", message: "I want to add a new line item to a deal" },
-      { icon: "📝", label: "New Deal", desc: "Create a deal", message: "I want to create a new deal in HubSpot" },
-      { icon: "👤", label: "New Contact", desc: "Add a contact", message: "I want to create a new contact in HubSpot" },
-      { icon: "🔧", label: "New Service", desc: "Create service for deal", message: "I want to create a new service for an appointment scheduled deal" },
-      { icon: "📤", label: "Submit Form", desc: "Upload customer PDF", message: null, isUpload: true },
+    // Role-based quick actions
+    const ALL_ACTIONS = [
+      { icon: "📋", label: "Open Deals", desc: "View all active deals", message: "Show me all open deals", roles: ["sales","analyst","installer"] },
+      { icon: "📊", label: "Deal Summary", desc: "Filter by stage", message: null, isStageSelector: true, roles: ["sales","analyst"] },
+      { icon: "🗺", label: "Farm Map", desc: "Plot farms on map", message: "Show scheduled farms on the map", isMap: true, roles: ["sales","analyst"] },
+      { icon: "📍", label: "Farm Clusters", desc: "Find nearby farms", message: "Show me farm clusters to plan installer routes", roles: ["sales","analyst"] },
+      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices", message: "I want to update line item pricing for a deal", roles: ["sales"] },
+      { icon: "➕", label: "Add Line Item", desc: "Add fan to a deal", message: "I want to add a new line item to a deal", roles: ["sales"] },
+      { icon: "📝", label: "New Deal", desc: "Create a deal", message: "I want to create a new deal in HubSpot", roles: ["sales"] },
+      { icon: "👤", label: "New Contact", desc: "Add a contact", message: "I want to create a new contact in HubSpot", roles: ["sales"] },
+      { icon: "🔧", label: "New Service", desc: "Create service for deal", message: "I want to create a new service for an appointment scheduled deal", roles: ["sales"] },
+      { icon: "📤", label: "Submit Form", desc: "Upload customer PDF", message: null, isUpload: true, roles: ["sales"] },
     ];
 
-    const SYSTEM_PROMPT = [
-      "You are PSD Sales Assistant, an AI agent for Precision Systems Development (PSD) — a contractor that installs exhaust fan motors on poultry farms under Georgia Power's Commercial Energy Efficiency Program (CEEP).",
-      "",
-      "You help the sales team with:",
-      "1. Submit customer intake forms (PDF or screenshot) to kick off the processing pipeline",
-      "2. View and update HubSpot deals and line items (fan motor pricing)",
-      "3. Show farm locations on a map for scheduling and cluster analysis",
-      "",
-      "You have access to these tools:",
-      "- get_open_deals: fetch all open deals from HubSpot",
-      "- get_line_items: fetch line items for a specific deal (requires deal_id)",
-      "- update_line_item: update unit price on a line item (requires line_item_id, unit_price)",
-      "- update_deal_amount: update the total amount on a deal (requires deal_id, amount)",
-      "- submit_form: submit a customer PDF form (requires file_data as base64, file_name, customer_name, email)",
-      "- get_deals_with_addresses: fetch all appointmentscheduled deals with farm addresses — use when asked about farm locations, clusters, distance, scheduling routes, or map",
-      "- update_line_item: update unit price on a line item via Railway (requires line_item_id, unit_price)",
-      "- update_deal: update deal properties via Railway — can update amount, dealstage, or dealname (requires deal_id, plus any of: amount, dealstage, dealname). Valid stages: appointmentscheduled, qualifiedtobuy, presentationscheduled, closedwon, closedlost",
-      "- add_line_item: add a new fan motor line item to a deal (requires deal_id, name, fan_brand, fan_size, motor_size, quantity, unit_price)",
-      "- create_deal: create a new HubSpot deal (requires dealname, gp_account_name, gp_account_number, owner_name, farm_address, city, state, zip, total_fans, total_barns)",
-      "- create_contact: create a new HubSpot contact (requires email, firstname, company, phone, address, city, state, zip, owner_name, gp_account_number, optional: deal_id to associate)",
-      "- get_services: get services associated to a deal (requires deal_id) — only for appointmentscheduled deals",
-      "- create_service: create a new service and associate to a deal (requires deal_id, name, description, optional: stage [new/in_progress/closed], status [ON_TRACK/DELAYED/FAILED/SUCCEEDED], start_date [YYYY-MM-DD], target_end_date [YYYY-MM-DD], total_cost, team_id) — only for appointmentscheduled deals",
-      "- get_teams: fetch all HubSpot teams — call this first when creating a service so the sales person can pick a team to assign",
-      "- create_team: create a new HubSpot team (requires name)",
-      "",
-      "CRITICAL ID RULES:",
-      "The HubSpot data returns deals like: {id: 339921027805, properties: {dealname: 'Henderson Broiler Farm - GP 4423019876'}}",
-      "- The deal ID is ALWAYS the top-level id field (e.g. 339921027805)",
-      "- The GP account number (e.g. 4423019876) is inside the deal name — NOT the deal ID",
-      "- NEVER use GP account number or list position as deal ID",
-      "",
-      "Line items: {id: 335654673094, properties: {name: 'Chore-Time 48in', quantity: 24, price: 0}}",
-      "- Line item ID is ALWAYS the top-level id field",
-      "",
-      "When updating prices:",
-      "1. Fetch line items first",
-      "2. Update each line item using correct line_item_id",
-      "3. Calculate total: sum of (quantity x unit_price) for ALL items",
-      "4. Update deal amount with correct deal_id",
-      "5. Confirm to sales person",
-      "",
-      "When the user asks for help, options, menu, or what you can do — respond with SHOW_OPTIONS and a brief intro.",
-      "When the user asks about deal summary, deal stages, or wants to filter deals by stage — respond with STAGE_SELECTOR and a brief intro.",
-      "When the user asks to show deals for a specific stage in natural language (e.g. show me scheduled deals, show won deals, qualified deals) — call get_open_deals then filter and display only deals matching that stage.",
-      "",
-      "When displaying deals use: DEALS_TABLE:{\"deals\":[{\"id\":\"339921027805\",\"name\":\"Henderson Broiler Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
-      "When displaying line items use: LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
-      "When showing map use: MAP_LINK after summarizing the farms found",
-      "",
-      "CRITICAL TOOL CALL RULE: When you need to call a tool, your ENTIRE response must be ONLY the JSON object. Zero text before it. Zero text after it. No explanation. No confirmation. Just the raw JSON and nothing else.",
-      "",
-      "{\"tool\": \"get_open_deals\", \"params\": {}}",
-      "{\"tool\": \"get_open_deals\", \"params\": {\"stage\": \"appointmentscheduled\"}}", // optional stage filter: appointmentscheduled, closedwon, closedlost, qualifiedtobuy, presentationscheduled
-      "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
-      "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
-      "{\"tool\": \"update_deal\", \"params\": {\"deal_id\": \"339921027805\", \"dealstage\": \"closedwon\"}}",
-      "{\"tool\": \"update_deal\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
-      "{\"tool\": \"update_deal_amount\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
-      "{\"tool\": \"submit_form\", \"params\": {\"file_data\": \"base64\", \"file_name\": \"form.pdf\", \"customer_name\": \"Farm\", \"email\": \"email@farm.com\"}}",
-      "{\"tool\": \"get_deals_with_addresses\", \"params\": {}}",
-      "{\"tool\": \"add_line_item\", \"params\": {\"deal_id\": \"123\", \"name\": \"Chore-Time 48in 2HP\", \"fan_brand\": \"Chore-Time\", \"fan_size\": 48, \"motor_size\": 2, \"quantity\": 12, \"unit_price\": 450}}",
-      "{\"tool\": \"create_deal\", \"params\": {\"dealname\": \"Farm Name - GP 1234\", \"gp_account_name\": \"Farm Name\", \"gp_account_number\": \"1234\", \"owner_name\": \"John\", \"farm_address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"total_fans\": 48, \"total_barns\": 6}}",
-      "{\"tool\": \"create_contact\", \"params\": {\"email\": \"john@farm.com\", \"firstname\": \"John Smith\", \"company\": \"Farm LLC\", \"phone\": \"555-1234\", \"address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"owner_name\": \"John Smith\", \"gp_account_number\": \"1234\", \"deal_id\": \"optional\"}}",
-      "{\"tool\": \"get_services\", \"params\": {\"deal_id\": \"339921027805\"}}",
-      "{\"tool\": \"get_teams\", \"params\": {}}",
-      "{\"tool\": \"create_team\", \"params\": {\"name\": \"Installation Team\"}}",
-      "{\"tool\": \"create_service\", \"params\": {\"deal_id\": \"339921027805\", \"name\": \"Fan Motor Installation\", \"description\": \"Install 48 exhaust fan motors\", \"stage\": \"new\", \"status\": \"ON_TRACK\", \"start_date\": \"2026-04-01\", \"target_end_date\": \"2026-04-30\", \"total_cost\": \"9600\", \"team_id\": \"optional_team_id\"}}",
-      "",
-      "After tool result, respond naturally. For get_deals_with_addresses, summarize farms found then end with exactly: MAP_LINK",
-      "When creating a service: first call get_teams, then respond with TEAMS_SELECTOR:{teams data as JSON} so the sales person can pick a team via buttons. If they pick an existing team use its ID. If they want a new team call create_team first then proceed.",
-      "When showing teams use: TEAMS_SELECTOR:{\"teams\":[{\"id\":\"123\",\"name\":\"Installation Team\",\"userIds\":[]}]}",
-      "Always be concise and professional. Speak like a helpful colleague."
-    ].join("\n");
+    const STAGE_BUTTONS = [
+      { icon: "📋", label: "All Deals", message: "Show me all deals with fans, barns, operation type and amounts" },
+      { icon: "📅", label: "Scheduled", message: "Show me all appointment scheduled deals with fans, barns, operation type and amounts" },
+      { icon: "🎯", label: "Qualified", message: "Show me all qualified to buy deals with fans, barns, operation type and amounts" },
+      { icon: "🏆", label: "Won", message: "Show me all closed won deals with fans, barns, operation type and amounts" },
+      { icon: "❌", label: "Lost", message: "Show me all closed lost deals with fans, barns, operation type and amounts" },
+    ];
 
-    async function callMakeViaProxy(makeUrl, payload) {
-      const res = await fetch('/proxy', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: makeUrl, payload }),
-      });
-      if (!res.ok) throw new Error("Proxy error: " + res.status);
-      try { return await res.json(); } catch { return { success: true }; }
+    function getSystemPrompt(role, teamId) {
+      const baseTools = [
+        "- get_open_deals: fetch all open deals (optional stage filter)",
+        "- get_line_items: fetch line items for a specific deal (requires deal_id)",
+        "- get_deals_with_addresses: fetch appointmentscheduled deals with farm addresses for map",
+        "- get_services: get services for a deal (requires deal_id)",
+        "- get_teams: fetch all HubSpot teams",
+      ];
+      const salesTools = [
+        "- update_line_item: update unit price (requires line_item_id, unit_price)",
+        "- update_deal: update deal properties — amount, dealstage, dealname (requires deal_id)",
+        "- add_line_item: add new line item to deal (requires deal_id, name, fan_brand, fan_size, motor_size, quantity, unit_price)",
+        "- create_deal: create new HubSpot deal",
+        "- create_contact: create new HubSpot contact (optional deal_id to associate)",
+        "- create_service: create service for appointmentscheduled deal only (requires deal_id, name, description, optional: stage, status, start_date, target_end_date, total_cost, team_id)",
+        
+        "- submit_form: submit customer PDF form (requires file_data as base64, file_name, customer_name, email)",
+      ];
+
+      var tools = role === "sales" ? baseTools.concat(salesTools) : baseTools;
+      var roleDesc = role === "sales"
+        ? "You are helping the PSD sales team. You have full access to view and create/update all HubSpot records."
+        : role === "analyst"
+        ? "You are helping a PSD analyst. You can view deals, line items, map, and farm data. Do NOT show or mention pricing, amounts, or unit prices. Hide all financial data."
+        : "You are helping a PSD field installer from team ID " + teamId + ". Only show deals that have a service associated with team ID " + teamId + ". Show line items for those deals only. Do NOT show pricing, amounts, or financial data. Do NOT allow any create or update operations.";
+
+      return [
+        "You are PSD Sales Assistant for Precision Systems Development (PSD).",
+        roleDesc,
+        "",
+        "Available tools:",
+        tools.join("\n"),
+        "",
+        "CRITICAL ID RULES:",
+        "- Deal ID is ALWAYS the top-level numeric id field (e.g. 339921027805)",
+        "- GP account number inside dealname is NOT the deal ID",
+        "- Line item ID is ALWAYS the top-level id field",
+        "",
+        "When updating prices: fetch line items → update each → calculate total (sum qty x unit_price) → update deal amount → confirm.",
+        "When creating a service: call get_teams first, show TEAMS_SELECTOR, wait for team selection, then create.",
+        "When showing map: call get_deals_with_addresses then end response with MAP_LINK.",
+        "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
+        "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
+        "",
+        "Display formats:",
+        "DEALS_TABLE:{\"deals\":[{\"id\":\"123\",\"name\":\"Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
+        "LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
+        "TEAMS_SELECTOR:{\"teams\":[{\"id\":\"123\",\"name\":\"Team Name\",\"userIds\":[]}]}",
+        "MAP_LINK (at end of response after summarizing farms)",
+        "SHOW_OPTIONS (when showing menu)",
+        "STAGE_SELECTOR (when showing stage filter)",
+        "",
+        "CRITICAL: When calling a tool, respond with ONLY the JSON — no text before or after:",
+        "{\"tool\": \"get_open_deals\", \"params\": {}}",
+        "{\"tool\": \"get_open_deals\", \"params\": {\"stage\": \"appointmentscheduled\"}}",
+        "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
+        "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
+        "{\"tool\": \"update_deal\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
+        "{\"tool\": \"update_deal\", \"params\": {\"deal_id\": \"339921027805\", \"dealstage\": \"closedwon\"}}",
+        "{\"tool\": \"add_line_item\", \"params\": {\"deal_id\": \"123\", \"name\": \"Chore-Time 48in\", \"fan_brand\": \"Chore-Time\", \"fan_size\": 48, \"motor_size\": 2, \"quantity\": 12, \"unit_price\": 0}}",
+        "{\"tool\": \"create_deal\", \"params\": {\"dealname\": \"Farm - GP 1234\", \"gp_account_name\": \"Farm\", \"gp_account_number\": \"1234\", \"owner_name\": \"John\", \"farm_address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"total_fans\": 48, \"total_barns\": 6}}",
+        "{\"tool\": \"create_contact\", \"params\": {\"email\": \"john@farm.com\", \"firstname\": \"John Smith\", \"company\": \"Farm LLC\", \"phone\": \"555-1234\", \"address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"owner_name\": \"John Smith\", \"gp_account_number\": \"1234\"}}",
+        "{\"tool\": \"get_services\", \"params\": {\"deal_id\": \"339921027805\"}}",
+        "{\"tool\": \"get_teams\", \"params\": {}}",
+        
+        "{\"tool\": \"create_service\", \"params\": {\"deal_id\": \"339921027805\", \"name\": \"Fan Motor Installation\", \"description\": \"Install fans\", \"stage\": \"new\", \"status\": \"ON_TRACK\", \"start_date\": \"2026-04-01\", \"target_end_date\": \"2026-04-30\", \"total_cost\": \"9600\", \"team_id\": \"369709672\"}}",
+        "{\"tool\": \"get_deals_with_addresses\", \"params\": {}}",
+        "{\"tool\": \"submit_form\", \"params\": {\"file_data\": \"base64\", \"file_name\": \"form.pdf\", \"customer_name\": \"Farm\", \"email\": \"email@farm.com\"}}",
+        "",
+        "Always be concise and professional. Speak like a helpful colleague."
+      ].join("\n");
     }
 
     async function callRailway(path) {
       const res = await fetch(path, { method: "GET", headers: { "Content-Type": "application/json" } });
-      if (!res.ok) throw new Error("Railway error: " + res.status);
+      if (!res.ok) throw new Error("Error: " + res.status);
       return await res.json();
     }
 
+    async function callMakeViaProxy(makeUrl, payload) {
+      const res = await fetch('/proxy', { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: makeUrl, payload }) });
+      if (!res.ok) throw new Error("Proxy error: " + res.status);
+      try { return await res.json(); } catch { return { success: true }; }
+    }
+
     async function executeTool(tool, params) {
-      // Read operations → direct HubSpot via Railway (free, no Make credits)
       if (tool === "get_open_deals") {
         var stage = params && params.stage ? "?stage=" + params.stage : "";
         return await callRailway("/hubspot/deals" + stage);
       }
-      if (tool === "get_line_items")
-        return await callRailway("/hubspot/line-items/" + params.deal_id);
-      if (tool === "get_deals_with_addresses")
-        return await callRailway("/hubspot/deals-with-addresses");
-      // Write operations → Railway HubSpot API (free)
+      if (tool === "get_line_items") return await callRailway("/hubspot/line-items/" + params.deal_id);
+      if (tool === "get_deals_with_addresses") return await callRailway("/hubspot/deals-with-addresses");
+      if (tool === "get_services") return await callRailway("/hubspot/services/" + params.deal_id);
+      if (tool === "get_teams") return await callRailway("/hubspot/teams");
       if (tool === "update_line_item") {
-        const res = await fetch("/hubspot/line-items/" + params.line_item_id, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unit_price: params.unit_price })
-        });
+        const res = await fetch("/hubspot/line-items/" + params.line_item_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit_price: params.unit_price }) });
         return await res.json();
       }
       if (tool === "update_deal_amount" || tool === "update_deal") {
-        const res = await fetch("/hubspot/deals/" + params.deal_id, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params)
-        });
+        const res = await fetch("/hubspot/deals/" + params.deal_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) });
         return await res.json();
       }
       if (tool === "add_line_item") {
-        const res = await fetch("/hubspot/line-items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params)
-        });
+        const res = await fetch("/hubspot/line-items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) });
         return await res.json();
       }
       if (tool === "create_deal") {
-        const res = await fetch("/hubspot/deals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params)
-        });
+        const res = await fetch("/hubspot/deals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) });
         return await res.json();
       }
       if (tool === "create_contact") {
-        const res = await fetch("/hubspot/contacts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params)
-        });
-        return await res.json();
-      }
-      if (tool === "get_teams") {
-        const res = await fetch("/hubspot/teams", {
-          method: "GET",
-          headers: { "Content-Type": "application/json" }
-        });
-        return await res.json();
-      }
-      if (tool === "create_team") {
-        const res = await fetch("/hubspot/teams", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params)
-        });
-        return await res.json();
-      }
-      if (tool === "get_services") {
-        const res = await fetch("/hubspot/services/" + params.deal_id, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" }
-        });
+        const res = await fetch("/hubspot/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) });
         return await res.json();
       }
       if (tool === "create_service") {
-        const res = await fetch("/hubspot/services", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params)
-        });
+        const res = await fetch("/hubspot/services", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) });
         return await res.json();
       }
-      // Intake form still goes through Make pipeline
-      if (tool === "submit_form")
-        return await callMakeViaProxy(MAKE_INTAKE_WEBHOOK, params);
+
+      if (tool === "submit_form") return await callMakeViaProxy(MAKE_INTAKE_WEBHOOK, params);
       throw new Error("Unknown tool: " + tool);
     }
 
-    async function callClaude(messages) {
+    async function callClaude(messages, role, teamId) {
       const res = await fetch('/claude', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          system: SYSTEM_PROMPT,
-          messages,
-        }),
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, system: getSystemPrompt(role, teamId), messages })
       });
       const data = await res.json();
       return data.content && data.content[0] ? data.content[0].text : "";
@@ -267,7 +217,7 @@
       return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function DealsTable({ data }) {
+    function DealsTable({ data, role }) {
       const stageLabel = function(s) {
         var map = { appointmentscheduled: "Scheduled", closedwon: "Won", closedlost: "Lost", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation" };
         return map[s] || s;
@@ -279,6 +229,8 @@
       var totalFans = data.deals.reduce(function(s, d) { return s + (Number(d.total_fans) || 0); }, 0);
       var totalBarns = data.deals.reduce(function(s, d) { return s + (Number(d.total_barns) || 0); }, 0);
       var totalAmount = data.deals.reduce(function(s, d) { return s + (Number(d.amount) || 0); }, 0);
+      var showFinancials = role !== "analyst" && role !== "installer";
+
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deals.length + " deals"),
         React.createElement("table", { className: "deal-table" },
@@ -289,7 +241,7 @@
               React.createElement("th", null, "Operation"),
               React.createElement("th", null, "Fans"),
               React.createElement("th", null, "Barns"),
-              React.createElement("th", null, "Amount"),
+              showFinancials && React.createElement("th", null, "Amount"),
               React.createElement("th", null, "Stage")
             )
           ),
@@ -301,15 +253,15 @@
                 React.createElement("td", { style: { color: "#8ab4cc", fontSize: 12 } }, d.operation_type ? d.operation_type.replace(/;/g, ", ") : "—"),
                 React.createElement("td", { style: { color: "#25a35a", fontWeight: 600 } }, d.total_fans || "—"),
                 React.createElement("td", { style: { color: "#25a35a", fontWeight: 600 } }, d.total_barns || "—"),
-                React.createElement("td", null, fmt(d.amount)),
+                showFinancials && React.createElement("td", null, fmt(d.amount)),
                 React.createElement("td", null, React.createElement("span", { className: "tag " + stageColor(d.stage) }, stageLabel(d.stage)))
               );
             }),
             React.createElement("tr", { style: { background: "#0d1f15" } },
-              React.createElement("td", { colSpan: 3, style: { textAlign: "right", fontWeight: 700, color: "#25a35a", fontSize: 12 } }, "Totals"),
+              React.createElement("td", { colSpan: showFinancials ? 3 : 3, style: { textAlign: "right", fontWeight: 700, color: "#25a35a", fontSize: 12 } }, "Totals"),
               React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, totalFans),
               React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, totalBarns),
-              React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, fmt(totalAmount)),
+              showFinancials && React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, fmt(totalAmount)),
               React.createElement("td", null)
             )
           )
@@ -317,10 +269,9 @@
       );
     }
 
-    function LineItemsTable({ data }) {
-      var total = data.items.reduce(function(sum, item) {
-        return sum + (Number(item.qty) * Number(item.unit_price || 0));
-      }, 0);
+    function LineItemsTable({ data, role }) {
+      var showFinancials = role !== "analyst" && role !== "installer";
+      var total = data.items.reduce(function(s, item) { return s + (Number(item.qty) * Number(item.unit_price || 0)); }, 0);
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deal_name + " — " + data.items.length + " line items"),
         React.createElement("table", { className: "line-table" },
@@ -329,8 +280,8 @@
               React.createElement("th", null, "Fan"),
               React.createElement("th", null, "Size"),
               React.createElement("th", null, "Qty"),
-              React.createElement("th", null, "Unit Price"),
-              React.createElement("th", null, "Line Total")
+              showFinancials && React.createElement("th", null, "Unit Price"),
+              showFinancials && React.createElement("th", null, "Line Total")
             )
           ),
           React.createElement("tbody", null,
@@ -339,38 +290,26 @@
                 React.createElement("td", { style: { fontWeight: 500 } }, item.brand),
                 React.createElement("td", null, item.size + '"'),
                 React.createElement("td", null, item.qty),
-                React.createElement("td", null, fmt(item.unit_price)),
-                React.createElement("td", null, fmt(Number(item.qty) * Number(item.unit_price || 0)))
+                showFinancials && React.createElement("td", null, fmt(item.unit_price)),
+                showFinancials && React.createElement("td", null, fmt(Number(item.qty) * Number(item.unit_price || 0)))
               );
             }),
-            React.createElement("tr", { className: "total-row" },
-              React.createElement("td", { colSpan: 4, style: { textAlign: "right" } }, "Total Contract Value"),
-              React.createElement("td", null, fmt(total))
+            showFinancials && React.createElement("tr", { className: "total-row" },
+              React.createElement("td", { colSpan: 3, style: { textAlign: "right" } }, "Total Contract Value"),
+              React.createElement("td", null, fmt(total)),
+              React.createElement("td", null)
             )
           )
         )
       );
     }
 
-    const STAGE_BUTTONS = [
-      { icon: "📋", label: "All Deals", stage: null, message: "Show me all deals with fans, barns, operation type and amounts" },
-      { icon: "📅", label: "Scheduled", stage: "appointmentscheduled", message: "Show me all appointment scheduled deals with fans, barns, operation type and amounts" },
-      { icon: "🎯", label: "Qualified", stage: "qualifiedtobuy", message: "Show me all qualified to buy deals with fans, barns, operation type and amounts" },
-      { icon: "🏆", label: "Won", stage: "closedwon", message: "Show me all closed won deals with fans, barns, operation type and amounts" },
-      { icon: "❌", label: "Lost", stage: "closedlost", message: "Show me all closed lost deals with fans, barns, operation type and amounts" },
-    ];
-
     function TeamsSelector({ teams, onAction }) {
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a team to assign to this service:"),
+        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a team to assign:"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           teams.map(function(t, i) {
-            return React.createElement("button", {
-              key: i,
-              className: "qa-btn",
-              style: { flex: "0 0 auto" },
-              onClick: function() { onAction("Use team: " + t.name + " (ID: " + t.id + ")"); }
-            },
+            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction("Use team: " + t.name + " (ID: " + t.id + ")"); } },
               React.createElement("span", { className: "qa-icon" }, "🏢"),
               React.createElement("div", null,
                 React.createElement("div", { className: "qa-label" }, t.name),
@@ -378,17 +317,7 @@
               )
             );
           }),
-          React.createElement("button", {
-            className: "qa-btn",
-            style: { flex: "0 0 auto" },
-            onClick: function() { onAction("I want to create a new team"); }
-          },
-            React.createElement("span", { className: "qa-icon" }, "➕"),
-            React.createElement("div", null,
-              React.createElement("div", { className: "qa-label" }, "Create New Team"),
-              React.createElement("div", { className: "qa-desc" }, "Add a new team")
-            )
-          )
+
         )
       );
     }
@@ -398,28 +327,20 @@
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which deals do you want to see?"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           STAGE_BUTTONS.map(function(s, i) {
-            return React.createElement("button", {
-              key: i,
-              className: "qa-btn",
-              style: { flex: "0 0 auto" },
-              onClick: function() { onAction(s.message); }
-            },
+            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction(s.message); } },
               React.createElement("span", { className: "qa-icon" }, s.icon),
-              React.createElement("div", null,
-                React.createElement("div", { className: "qa-label" }, s.label)
-              )
+              React.createElement("div", null, React.createElement("div", { className: "qa-label" }, s.label))
             );
           })
         )
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, role }) {
+      var actions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role); });
       return React.createElement("div", { className: "quick-actions" },
-        QUICK_ACTIONS.map(function(a, i) {
-          return React.createElement("button", {
-            key: i,
-            className: "qa-btn",
+        actions.map(function(a, i) {
+          return React.createElement("button", { key: i, className: "qa-btn",
             onClick: function() {
               if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
               if (a.isUpload) { onUpload(); return; }
@@ -437,7 +358,10 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector }) {
+    function MessageContent({ content, onAction, onUpload, onStageSelector, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, role: role });
+      if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
+
       if (content.includes("TEAMS_SELECTOR:")) {
         var tsParts = content.split("TEAMS_SELECTOR:");
         try {
@@ -447,82 +371,126 @@
             React.createElement(TeamsSelector, { teams: teamsData.teams, onAction: onAction }),
             tsParts[2] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, tsParts[2].trim())
           );
-        } catch(e) {
-          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
-        }
-      }
-
-      if (content.includes("STAGE_SELECTOR")) {
-        var ssParts = content.split("STAGE_SELECTOR");
-        return React.createElement("div", null,
-          ssParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, ssParts[0].trim()),
-          React.createElement(StageSelector, { onAction: onAction }),
-          ssParts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, ssParts[1].trim())
-        );
-      }
-
-      if (content.includes("SHOW_OPTIONS")) {
-        var parts = content.split("SHOW_OPTIONS");
-        return React.createElement("div", null,
-          parts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, parts[0].trim()),
-          React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector }),
-          parts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, parts[1].trim())
-        );
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
 
       if (content.includes("DEALS_TABLE:")) {
-        var parts2 = content.split("DEALS_TABLE:");
+        var parts = content.split("DEALS_TABLE:");
         try {
-          var jsonStr = parts2[1].trim().split("\n")[0];
-          var data = JSON.parse(jsonStr);
+          var data = JSON.parse(parts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            parts2[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts2[0].trim()),
-            React.createElement(DealsTable, { data: data }),
-            parts2[2] && React.createElement("div", { style: { marginTop: 8 } }, parts2[2].trim())
+            parts[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts[0].trim()),
+            React.createElement(DealsTable, { data: data, role: role }),
+            parts[2] && React.createElement("div", { style: { marginTop: 8 } }, parts[2].trim())
           );
-        } catch(e) {
-          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
-        }
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
 
       if (content.includes("LINE_ITEMS_TABLE:")) {
-        var parts3 = content.split("LINE_ITEMS_TABLE:");
+        var parts2 = content.split("LINE_ITEMS_TABLE:");
         try {
-          var jsonStr2 = parts3[1].trim().split("\n")[0];
-          var data2 = JSON.parse(jsonStr2);
+          var data2 = JSON.parse(parts2[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            parts3[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts3[0].trim()),
-            React.createElement(LineItemsTable, { data: data2 }),
-            parts3[2] && React.createElement("div", { style: { marginTop: 8 } }, parts3[2].trim())
+            parts2[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts2[0].trim()),
+            React.createElement(LineItemsTable, { data: data2, role: role }),
+            parts2[2] && React.createElement("div", { style: { marginTop: 8 } }, parts2[2].trim())
           );
-        } catch(e) {
-          return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content);
-        }
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
 
       if (content.includes("MAP_LINK")) {
-        var parts4 = content.split("MAP_LINK");
+        var parts3 = content.split("MAP_LINK");
         return React.createElement("div", null,
-          parts4[0] && React.createElement("div", { style: { whiteSpace: "pre-wrap", marginBottom: 12 } }, parts4[0].trim()),
+          parts3[0] && React.createElement("div", { style: { whiteSpace: "pre-wrap", marginBottom: 12 } }, parts3[0].trim()),
           React.createElement("a", { href: MAP_URL, target: "_blank", rel: "noopener noreferrer", className: "map-btn" }, "🗺 Open Farm Map"),
-          parts4[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, parts4[1].trim())
+          parts3[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, parts3[1].trim())
         );
       }
 
       return React.createElement("div", { style: { whiteSpace: "pre-wrap", wordBreak: "break-word" } }, content);
     }
 
-    function App() {
-      const WELCOME = "Hey! I'm your PSD Sales Assistant. How can I help you today?";
+    // ── PIN Screen ──────────────────────────────────────────────
+    function PinScreen({ onAuth }) {
+      const [pin, setPin] = useState("");
+      const [error, setError] = useState(false);
+      const [loading, setLoading] = useState(false);
 
-      const [messages, setMessages] = useState([{ role: "assistant", content: WELCOME, display: true, showActions: true }]);
+      async function submitPin(p) {
+        if (p.length < 4) return;
+        setLoading(true);
+        try {
+          const res = await fetch('/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: p }) });
+          const data = await res.json();
+          if (data.success) {
+            onAuth(data.role, data.name, data.team_id || null);
+          } else {
+            setError(true);
+            setTimeout(function() { setError(false); setPin(""); }, 1000);
+          }
+        } catch(e) {
+          setError(true);
+          setTimeout(function() { setError(false); setPin(""); }, 1000);
+        }
+        setLoading(false);
+      }
+
+      function pressKey(k) {
+        if (loading) return;
+        if (k === "del") { setPin(function(p) { return p.slice(0, -1); }); return; }
+        var newPin = pin + k;
+        setPin(newPin);
+        if (newPin.length >= 6) submitPin(newPin);
+      }
+
+      var dots = [0,1,2,3,4,5].map(function(i) {
+        return React.createElement("div", { key: i, className: "pin-dot" + (i < pin.length ? (error ? " error" : " filled") : ""), style: error ? { animation: "shake 0.3s ease" } : {} });
+      });
+
+      var keys = [["1","2","3"],["4","5","6"],["7","8","9"],["del","0","✓"]];
+
+      return React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0f1923", gap: 32 } },
+        React.createElement("div", { style: { textAlign: "center" } },
+          React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 auto 16px" } }, "P"),
+          React.createElement("div", { style: { fontSize: 20, fontWeight: 700, marginBottom: 4 } }, "PSD Sales Assistant"),
+          React.createElement("div", { style: { fontSize: 13, color: "#6b8fa8" } }, "Enter your PIN to continue")
+        ),
+        React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center" } }, dots),
+        error && React.createElement("div", { style: { fontSize: 12, color: "#e05252" } }, "Invalid PIN — try again"),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 72px)", gap: 10 } },
+          keys.map(function(row, ri) {
+            return row.map(function(k, ki) {
+              return React.createElement("button", { key: ri + "-" + ki, className: "pin-key",
+                onClick: function() { pressKey(k); },
+                style: k === "✓" ? { background: "linear-gradient(135deg, #1a6b3c, #25a35a)", color: "#fff", border: "none" } : k === "del" ? { fontSize: 16 } : {}
+              }, k === "del" ? "⌫" : k);
+            });
+          })
+        )
+      );
+    }
+
+    // ── Main App ────────────────────────────────────────────────
+    function App() {
+      const [auth, setAuth] = useState(null); // { role, name, teamId }
+      const [messages, setMessages] = useState([]);
       const [input, setInput] = useState("");
       const [loading, setLoading] = useState(false);
       const [uploadedFile, setUploadedFile] = useState(null);
       const [showActions, setShowActions] = useState(true);
-      const [showStageSelector, setShowStageSelector] = useState(false);
       const fileRef = useRef();
       const bottomRef = useRef();
+
+      function handleAuth(role, name, teamId) {
+        setAuth({ role, name, teamId });
+        var welcome = role === "installer"
+          ? "Hey! I'm your PSD Assistant. I can show your assigned installations and line items. What do you need?"
+          : role === "analyst"
+          ? "Hey! I'm your PSD Analytics Assistant. I can show deals, farm maps, and summaries. What would you like to see?"
+          : "Hey! I'm your PSD Sales Assistant. I can help with deals, pricing, forms, and more. What do you need?";
+        setMessages([{ role: "assistant", content: welcome, display: true }]);
+        setShowActions(true);
+      }
 
       useEffect(function() {
         bottomRef.current && bottomRef.current.scrollIntoView({ behavior: "smooth" });
@@ -533,107 +501,70 @@
         if (!file) return;
         var reader = new FileReader();
         reader.onload = function() {
-          var base64 = reader.result.split(",")[1];
-          setUploadedFile({ name: file.name, base64: base64, type: file.type });
+          setUploadedFile({ name: file.name, base64: reader.result.split(",")[1] });
         };
         reader.readAsDataURL(file);
       }
 
-      function triggerUpload() {
-        fileRef.current && fileRef.current.click();
-      }
+      function triggerUpload() { fileRef.current && fileRef.current.click(); }
 
       function triggerStageSelector() {
         setShowActions(false);
-        setShowStageSelector(false);
-        setMessages(function(prev) {
-          return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]);
-        });
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]); });
       }
 
       async function sendMessage(overrideText) {
         var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
-
         setShowActions(false);
 
-        var userContent = text;
-        if (uploadedFile) {
-          userContent = text
-            ? text + " [Attached: " + uploadedFile.name + "]"
-            : "I have a customer form to submit: " + uploadedFile.name;
-        }
+        var userContent = uploadedFile
+          ? (text ? text + " [Attached: " + uploadedFile.name + "]" : "I have a customer form to submit: " + uploadedFile.name)
+          : text;
 
-        var newUserMsg = { role: "user", content: userContent, display: true };
-        var updatedMessages = messages.concat([newUserMsg]);
+        var newMsg = { role: "user", content: userContent, display: true };
+        var updatedMessages = messages.concat([newMsg]);
         setMessages(updatedMessages);
         setInput("");
         setLoading(true);
 
-        var apiMessages = updatedMessages
-          .filter(function(m) { return m.display; })
-          .map(function(m) { return { role: m.role, content: m.content }; });
+        var apiMessages = updatedMessages.filter(function(m) { return m.display && m.content !== "SHOW_OPTIONS" && m.content !== "STAGE_SELECTOR"; }).map(function(m) { return { role: m.role, content: m.content }; });
 
         if (uploadedFile) {
           apiMessages = apiMessages.map(function(m, i) {
-            if (i === apiMessages.length - 1) {
-              return Object.assign({}, m, { content: m.content + "\n\n[FILE_DATA: base64=" + uploadedFile.base64 + " file_name=" + uploadedFile.name + "]" });
-            }
-            return m;
+            return i === apiMessages.length - 1 ? Object.assign({}, m, { content: m.content + "\n\n[FILE_DATA: base64=" + uploadedFile.base64 + " file_name=" + uploadedFile.name + "]" }) : m;
           });
         }
 
         try {
           var iterMessages = apiMessages.slice();
           var finalResponse = "";
-
           for (var i = 0; i < 10; i++) {
-            var response = await callClaude(iterMessages);
+            var response = await callClaude(iterMessages, auth.role, auth.teamId);
             var toolCall = null;
-
             try {
               var trimmed = response.trim();
               var jsonMatch = trimmed.match(/\{[\s\S]*"tool"[\s\S]*\}/);
-              if (jsonMatch) {
-                toolCall = JSON.parse(jsonMatch[0]);
-              }
+              if (jsonMatch) toolCall = JSON.parse(jsonMatch[0]);
             } catch(e) {}
 
             if (toolCall) {
-              setMessages(function(prev) {
-                return prev.concat([{ role: "assistant", content: "Calling " + toolCall.tool.replace(/_/g, " ") + "...", display: true, isThinking: true }]);
-              });
-
+              setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Calling " + toolCall.tool.replace(/_/g, " ") + "...", display: true, isThinking: true }]); });
               var toolResult;
-              try {
-                toolResult = await executeTool(toolCall.tool, toolCall.params);
-              } catch(err) {
-                toolResult = { error: err.message };
-              }
-
+              try { toolResult = await executeTool(toolCall.tool, toolCall.params); }
+              catch(err) { toolResult = { error: err.message }; }
               setMessages(function(prev) { return prev.filter(function(m) { return !m.isThinking; }); });
-
-              iterMessages = iterMessages.concat([
-                { role: "assistant", content: response },
-                { role: "user", content: "Tool result for " + toolCall.tool + ": " + JSON.stringify(toolResult) }
-              ]);
+              iterMessages = iterMessages.concat([{ role: "assistant", content: response }, { role: "user", content: "Tool result for " + toolCall.tool + ": " + JSON.stringify(toolResult) }]);
             } else {
               finalResponse = response;
               break;
             }
           }
-
           if (finalResponse) {
-            var showActionsAgain = /\bSHOW_OPTIONS\b/.test(finalResponse);
-            setMessages(function(prev) {
-              return prev.concat([{ role: "assistant", content: finalResponse, display: true }]);
-            });
-            if (showActionsAgain) setShowActions(true);
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: finalResponse, display: true }]); });
           }
         } catch(err) {
-          setMessages(function(prev) {
-            return prev.concat([{ role: "assistant", content: "Something went wrong: " + err.message, display: true }]);
-          });
+          setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Something went wrong: " + err.message, display: true }]); });
         }
 
         setUploadedFile(null);
@@ -641,91 +572,86 @@
         setLoading(false);
       }
 
-      function handleKey(e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          sendMessage();
-        }
-      }
+      function handleKey(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+
+      if (!auth) return React.createElement(PinScreen, { onAuth: handleAuth });
 
       var displayMessages = messages.filter(function(m) { return m.display; });
 
       return React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" } },
 
         // Header
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "16px 24px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
-          React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
+          React.createElement("div", { style: { width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
           React.createElement("div", null,
-            React.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, "PSD Sales Assistant"),
-            React.createElement("div", { style: { fontSize: 11, color: "#4a9a6b", marginTop: 1 } }, "● Online — Precision Systems Development")
+            React.createElement("div", { style: { fontWeight: 600, fontSize: 14 } }, "PSD Sales Assistant"),
+            React.createElement("div", { style: { fontSize: 10, color: "#4a9a6b", marginTop: 1 } }, "● " + auth.name + " — " + auth.role.charAt(0).toUpperCase() + auth.role.slice(1))
           ),
           React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 8 } },
             React.createElement("button", {
               onClick: function() {
                 setShowActions(true);
-                setMessages(function(prev) {
-                  return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]);
-                });
+                setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
               },
-              style: { padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, cursor: "pointer" }
+              style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, cursor: "pointer" }
             }, "⚡ Options"),
-            React.createElement("a", { href: "/map", target: "_blank", style: { padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, textDecoration: "none" } }, "🗺 Map")
+            auth.role !== "installer" && React.createElement("a", { href: "/map", target: "_blank", style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, textDecoration: "none" } }, "🗺 Map"),
+            React.createElement("button", {
+              onClick: function() { setAuth(null); setMessages([]); },
+              style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#6b8fa8", fontSize: 11, cursor: "pointer" }
+            }, "🔒 Lock")
           )
         ),
 
         // Messages
-        React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 } },
+        React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14 } },
           displayMessages.map(function(msg, i) {
             var isLast = i === displayMessages.length - 1;
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
-                msg.role === "assistant" && React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", marginRight: 10, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
-                React.createElement("div", { style: { maxWidth: "80%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector })
+                msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
+                React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, role: auth.role })
                 )
               ),
-              // Show quick actions below welcome or when triggered
               msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
-                React.createElement("div", { style: { marginLeft: 38, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector })
+                React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, role: auth.role })
                 )
             );
           }),
-
           loading && !messages.some(function(m) { return m.isThinking; }) &&
-            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
-              React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" } }, "P"),
-              React.createElement("div", { style: { display: "flex", gap: 5, padding: "10px 14px", background: "#162130", borderRadius: "16px 16px 16px 4px", border: "1px solid #1e2d3d" } },
-                [0,1,2].map(function(j) {
-                  return React.createElement("div", { key: j, style: { width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: (j * 0.2) + "s" } });
-                })
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } },
+              React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" } }, "P"),
+              React.createElement("div", { style: { display: "flex", gap: 5, padding: "9px 13px", background: "#162130", borderRadius: "15px 15px 15px 4px", border: "1px solid #1e2d3d" } },
+                [0,1,2].map(function(j) { return React.createElement("div", { key: j, style: { width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: (j * 0.2) + "s" } }); })
               )
             ),
           React.createElement("div", { ref: bottomRef })
         ),
 
         // File preview
-        uploadedFile && React.createElement("div", { style: { margin: "0 16px 8px", padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 } },
+        uploadedFile && React.createElement("div", { style: { margin: "0 16px 8px", padding: "7px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 } },
           React.createElement("span", null, "📎 " + uploadedFile.name),
-          React.createElement("button", { onClick: function() { setUploadedFile(null); }, style: { background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 16 } }, "×")
+          React.createElement("button", { onClick: function() { setUploadedFile(null); }, style: { background: "none", border: "none", color: "#e05252", cursor: "pointer", fontSize: 15 } }, "×")
         ),
 
         // Input
-        React.createElement("div", { style: { padding: "12px 16px 20px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 10, alignItems: "flex-end" } },
-          React.createElement("button", { onClick: triggerUpload, style: { width: 40, height: 40, borderRadius: 10, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
+        React.createElement("div", { style: { padding: "10px 16px 18px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 9, alignItems: "flex-end" } },
+          auth.role === "sales" && React.createElement("button", { onClick: triggerUpload, style: { width: 38, height: 38, borderRadius: 9, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
           React.createElement("input", { ref: fileRef, type: "file", accept: ".pdf,image/*", onChange: handleFile, style: { display: "none" } }),
           React.createElement("textarea", {
             value: input,
             onChange: function(e) { setInput(e.target.value); },
             onKeyDown: handleKey,
-            placeholder: "Ask me anything or use the quick actions above...",
+            placeholder: "Ask me anything...",
             rows: 1,
-            style: { flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 12, padding: "10px 14px", color: "#e8edf2", fontSize: 14, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
+            style: { flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 11, padding: "9px 13px", color: "#e8edf2", fontSize: 13, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
           }),
           React.createElement("button", {
             onClick: function() { sendMessage(); },
             disabled: loading || (!input.trim() && !uploadedFile),
-            style: { width: 40, height: 40, borderRadius: 10, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+            style: { width: 38, height: 38, borderRadius: 9, border: "none", background: loading || (!input.trim() && !uploadedFile) ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || (!input.trim() && !uploadedFile) ? "#3a5a70" : "#fff", cursor: loading || (!input.trim() && !uploadedFile) ? "not-allowed" : "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
           }, "➤")
         )
       );
