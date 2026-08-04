@@ -127,19 +127,27 @@
       try { return await res.json(); } catch { return { success: true }; }
     }
 
+    async function callRailway(path) {
+      const res = await fetch(path, { method: "GET", headers: { "Content-Type": "application/json" } });
+      if (!res.ok) throw new Error("Railway error: " + res.status);
+      return await res.json();
+    }
+
     async function executeTool(tool, params) {
+      // Read operations → direct HubSpot via Railway (free, no Make credits)
       if (tool === "get_open_deals")
-        return await callMakeViaProxy(MAKE_READ_WEBHOOK, { action: "get_open_deals" });
+        return await callRailway("/hubspot/deals");
       if (tool === "get_line_items")
-        return await callMakeViaProxy(MAKE_READ_WEBHOOK, { action: "get_line_items", deal_id: params.deal_id });
+        return await callRailway("/hubspot/line-items/" + params.deal_id);
+      if (tool === "get_deals_with_addresses")
+        return await callRailway("/hubspot/deals-with-addresses");
+      // Write operations → still go through Make
       if (tool === "update_line_item")
         return await callMakeViaProxy(MAKE_UPDATE_WEBHOOK, { action: "update_line_item", line_item_id: params.line_item_id, unit_price: params.unit_price });
       if (tool === "update_deal_amount")
         return await callMakeViaProxy(MAKE_UPDATE_WEBHOOK, { action: "update_deal_amount", deal_id: params.deal_id, amount: params.amount });
       if (tool === "submit_form")
         return await callMakeViaProxy(MAKE_INTAKE_WEBHOOK, params);
-      if (tool === "get_deals_with_addresses")
-        return await callMakeViaProxy(MAKE_READ_WEBHOOK, { action: "get_deals_with_addresses" });
       throw new Error("Unknown tool: " + tool);
     }
 
