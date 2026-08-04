@@ -444,6 +444,79 @@ def hs_service_properties():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── HubSpot: Get ALL services across all deals ───────────────
+@app.route('/hubspot/all-services', methods=['GET'])
+def hs_get_all_services():
+    try:
+        # 1. Get all deals (we need deal names to enrich services)
+        deal_props = 'dealname'
+        deals_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=100&properties={deal_props}', headers=HUBSPOT_HEADERS())
+        deal_map = {}
+        if deals_res.status_code == 200:
+            for d in deals_res.json().get('results', []):
+                deal_map[d['id']] = d.get('properties', {}).get('dealname', '')
+
+        # 2. Get all services directly
+        svc_props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
+        if svc_res.status_code != 200:
+            return jsonify({'error': svc_res.text}), svc_res.status_code
+
+        services_raw = svc_res.json().get('results', [])
+
+        # 3. For each service, find the associated deal
+        services = []
+        for s in services_raw:
+            sid = s['id']
+            sp = s.get('properties', {})
+
+            # Get associated deal for this service
+            deal_name = ''
+            try:
+                assoc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}/associations/deals', headers=HUBSPOT_HEADERS())
+                if assoc_res.status_code == 200:
+                    assoc_deals = assoc_res.json().get('results', [])
+                    if assoc_deals:
+                        deal_id = assoc_deals[0]['id']
+                        deal_name = deal_map.get(deal_id, '')
+            except:
+                pass
+
+            # Get team name
+            team_id = sp.get('hubspot_team_id', '')
+            team_name = team_id  # fallback to ID; enriched below if possible
+
+            services.append({
+                'id': sid,
+                'name': sp.get('subject', ''),
+                'description': sp.get('description', ''),
+                'deal_name': deal_name,
+                'stage': sp.get('hs_pipeline_stage', ''),
+                'status': sp.get('hs_object_status', ''),
+                'team': team_name,
+                'team_id': team_id,
+                'start_date': sp.get('start_date') or sp.get('hs_start_date', ''),
+                'due_date': sp.get('target_end_date') or sp.get('hs_due_date', ''),
+                'total_cost': sp.get('hs_total_cost', ''),
+                'amount_paid': sp.get('hs_amount_paid', ''),
+                'remaining': sp.get('hs_remaining_amount', ''),
+            })
+
+        # 4. Enrich team names in one call
+        try:
+            teams_res = requests.get(f'{HUBSPOT_BASE}/settings/v3/users/teams', headers=HUBSPOT_HEADERS())
+            if teams_res.status_code == 200:
+                team_map = {str(t['id']): t['name'] for t in teams_res.json().get('results', [])}
+                for svc in services:
+                    if svc['team_id']:
+                        svc['team'] = team_map.get(str(svc['team_id']), svc['team_id'])
+        except:
+            pass
+
+        return jsonify({'services': services, 'count': len(services)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ── HubSpot: Get services for a deal ────────────────────────
 @app.route('/hubspot/services/<deal_id>', methods=['GET'])
 def hs_get_services(deal_id):
@@ -455,7 +528,7 @@ def hs_get_services(deal_id):
         service_ids = [r['id'] for r in assoc_res.json().get('results', [])]
         if not service_ids:
             return jsonify({'services': []})
-        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_amount_paid,hs_amount_remaining,hs_shared_team_ids'
+        props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
         services = []
         for sid in service_ids:
             res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}?properties={props}', headers=HUBSPOT_HEADERS())
@@ -475,31 +548,20 @@ def hs_create_service():
         if not deal_id:
             return jsonify({'error': 'deal_id is required'}), 400
 
-        stage_map = {
-            'new': '8e2b21d0-7a90-4968-8f8c-a8525cc49c70',
-            'in_progress': '600b692d-a3fe-4052-9cd7-278b134d7941',
-            'closed': 'de53e7d9-6b57-4701-b576-92de01c9ed65',
-        }
-        stage_id = stage_map.get(data.get('stage', 'new'), '8e2b21d0-7a90-4968-8f8c-a8525cc49c70')
-        
         payload = {
             'properties': {
-                'hs_name': data.get('name', ''),
-                'hs_description': data.get('description', ''),
-                'hs_pipeline': 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6',
-                'hs_pipeline_stage': stage_id,
-                'hs_status': data.get('status', 'on_track').lower(),
-                'hs_start_date': data.get('start_date', ''),
-                'hs_target_end_date': data.get('target_end_date', ''),
-                'hs_total_cost': str(data.get('total_cost', '')),
+                'subject': data.get('name', ''),
+                'description': data.get('description', ''),
+                'hs_pipeline': 'default',
+                'hs_pipeline_stage': data.get('stage', 'new'),
+                'hs_ticket_priority': data.get('status', 'ON_TRACK'),
+                'createdate': data.get('start_date', ''),
+                'hs_due_date': data.get('target_end_date', ''),
+                'hs_ticket_category': 'Fan Motor Installation',
             }
         }
-        if data.get('start_date'):
-            payload['properties']['hs_start_date'] = data['start_date']
-        if data.get('target_end_date'):
-            payload['properties']['hs_target_end_date'] = data['target_end_date']
         if data.get('team_id'):
-            payload['properties']['hs_shared_team_ids'] = str(data['team_id'])
+            payload['properties']['hubspot_team_id'] = str(data.get('team_id', ''))
         # Remove empty values
         payload['properties'] = {k: v for k, v in payload['properties'].items() if v}
 
