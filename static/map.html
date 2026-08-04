@@ -100,13 +100,9 @@
 
     async function loadDeals() {
       try {
-        const res = await fetch('/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: 'https://hook.us2.make.com/fbf052s9udk8xv3apxgct1xiptjqfi7s',
-            payload: { action: 'get_deals_with_addresses' }
-          })
+        const res = await fetch('/hubspot/deals-with-addresses', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
         });
         const data = await res.json();
         deals = data.deals_with_addresses || [];
