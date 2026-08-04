@@ -475,6 +475,13 @@ def hs_create_service():
         if not deal_id:
             return jsonify({'error': 'deal_id is required'}), 400
 
+        stage_map = {
+            'new': '8e2b21d0-7a90-4968-8f8c-a8525cc49c70',
+            'in_progress': '600b692d-a3fe-4052-9cd7-278b134d7941',
+            'closed': 'de53e7d9-6b57-4701-b576-92de01c9ed65',
+        }
+        stage_id = stage_map.get(data.get('stage', 'new'), '8e2b21d0-7a90-4968-8f8c-a8525cc49c70')
+        
         payload = {
             'properties': {
                 'hs_name': data.get('name', ''),
@@ -487,8 +494,12 @@ def hs_create_service():
                 'hs_total_cost': str(data.get('total_cost', '')),
             }
         }
+        if data.get('start_date'):
+            payload['properties']['hs_start_date'] = data['start_date']
+        if data.get('target_end_date'):
+            payload['properties']['hs_target_end_date'] = data['target_end_date']
         if data.get('team_id'):
-            payload['properties']['hs_shared_team_ids'] = str(data.get('team_id', ''))
+            payload['properties']['hs_shared_team_ids'] = str(data['team_id'])
         # Remove empty values
         payload['properties'] = {k: v for k, v in payload['properties'].items() if v}
 
