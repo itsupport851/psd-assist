@@ -32,6 +32,16 @@
     .tag-won { background: #0d3320; color: #25a35a; }
     .tag-lost { background: #3a1a1a; color: #e05252; }
     .tag-qualified { background: #2a1a3a; color: #a87af0; }
+    .svc-form { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; margin-top: 8px; }
+    .svc-form-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
+    .svc-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .svc-form-label { font-size: 11px; color: #6b8fa8; font-weight: 500; }
+    .svc-form-input { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-input:focus { border-color: #25a35a; }
+    .svc-form-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .svc-form-btn:hover { opacity: 0.9; }
+    .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
     .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
     .map-btn:hover { opacity: 0.9; }
     .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; animation: fadeIn 0.3s ease; }
@@ -127,6 +137,7 @@
         "DEALS_TABLE:{\"deals\":[{\"id\":\"123\",\"name\":\"Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
         "LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
         "TEAMS_SELECTOR:{\"teams\":[{\"id\":\"123\",\"name\":\"Team Name\",\"userIds\":[]}]}",
+        "SERVICE_FORM:{\"deal_id\":\"123\",\"deal_name\":\"Farm\",\"team_id\":\"456\",\"team_name\":\"Boxy Services\",\"name\":\"Fan Motor Installation — Farm\",\"description\":\"Install 48 fans across 6 barns\",\"start_date\":\"2026-04-01\",\"target_end_date\":\"2026-04-30\",\"total_cost\":\"9600\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
         "MAP_LINK (at end of response after summarizing farms)",
         "SHOW_OPTIONS (when showing menu)",
         "STAGE_SELECTOR (when showing stage filter)",
@@ -304,6 +315,74 @@
       );
     }
 
+    function ServiceForm({ data, onSubmit, onCancel }) {
+      const [form, setForm] = React.useState({
+        name: data.name || "",
+        description: data.description || "",
+        start_date: data.start_date || "",
+        target_end_date: data.target_end_date || "",
+        total_cost: data.total_cost || "",
+        stage: data.stage || "new",
+        status: data.status || "ON_TRACK",
+      });
+
+      function update(field, value) {
+        setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
+      }
+
+      function handleSubmit() {
+        onSubmit(Object.assign({}, data, form));
+      }
+
+      return React.createElement("div", { className: "svc-form" },
+        React.createElement("div", { className: "svc-form-title" }, "🔧 New Service — " + (data.deal_name || "")),
+        React.createElement("div", { className: "svc-form-row" },
+          React.createElement("div", { className: "svc-form-label" }, "Service Name"),
+          React.createElement("input", { className: "svc-form-input", value: form.name, onChange: function(e) { update("name", e.target.value); } })
+        ),
+        React.createElement("div", { className: "svc-form-row" },
+          React.createElement("div", { className: "svc-form-label" }, "Description"),
+          React.createElement("textarea", { className: "svc-form-input", value: form.description, rows: 2, onChange: function(e) { update("description", e.target.value); }, style: { resize: "none" } })
+        ),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
+          React.createElement("div", { className: "svc-form-row" },
+            React.createElement("div", { className: "svc-form-label" }, "Start Date"),
+            React.createElement("input", { className: "svc-form-input", type: "date", value: form.start_date, onChange: function(e) { update("start_date", e.target.value); } })
+          ),
+          React.createElement("div", { className: "svc-form-row" },
+            React.createElement("div", { className: "svc-form-label" }, "Target End Date"),
+            React.createElement("input", { className: "svc-form-input", type: "date", value: form.target_end_date, onChange: function(e) { update("target_end_date", e.target.value); } })
+          )
+        ),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
+          React.createElement("div", { className: "svc-form-row" },
+            React.createElement("div", { className: "svc-form-label" }, "Total Cost ($)"),
+            React.createElement("input", { className: "svc-form-input", type: "number", value: form.total_cost, onChange: function(e) { update("total_cost", e.target.value); } })
+          ),
+          React.createElement("div", { className: "svc-form-row" },
+            React.createElement("div", { className: "svc-form-label" }, "Stage"),
+            React.createElement("select", { className: "svc-form-select", value: form.stage, onChange: function(e) { update("stage", e.target.value); } },
+              React.createElement("option", { value: "new" }, "New"),
+              React.createElement("option", { value: "in_progress" }, "In Progress"),
+              React.createElement("option", { value: "closed" }, "Closed")
+            )
+          ),
+          React.createElement("div", { className: "svc-form-row" },
+            React.createElement("div", { className: "svc-form-label" }, "Status"),
+            React.createElement("select", { className: "svc-form-select", value: form.status, onChange: function(e) { update("status", e.target.value); } },
+              React.createElement("option", { value: "ON_TRACK" }, "On Track"),
+              React.createElement("option", { value: "AT_RISK" }, "Delayed"),
+              React.createElement("option", { value: "BEHIND" }, "Failed"),
+              React.createElement("option", { value: "COMPLETE" }, "Completed")
+            )
+          )
+        ),
+        data.team_name && React.createElement("div", { style: { fontSize: 11, color: "#4a9a6b", marginBottom: 8 } }, "🏢 Team: " + data.team_name),
+        React.createElement("button", { className: "svc-form-btn", onClick: handleSubmit }, "✅ Create Service"),
+        React.createElement("button", { className: "svc-form-btn-cancel", onClick: onCancel }, "Cancel")
+      );
+    }
+
     function TeamsSelector({ teams, onAction }) {
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a team to assign:"),
@@ -361,6 +440,23 @@
     function MessageContent({ content, onAction, onUpload, onStageSelector, role }) {
       if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
+
+      if (content.includes("SERVICE_FORM:")) {
+        var sfParts = content.split("SERVICE_FORM:");
+        try {
+          var sfData = JSON.parse(sfParts[1].trim().split("\n")[0]);
+          return React.createElement("div", null,
+            sfParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, sfParts[0].trim()),
+            React.createElement(ServiceForm, {
+              data: sfData,
+              onSubmit: function(formData) {
+                onAction("SUBMIT_SERVICE:" + JSON.stringify(formData));
+              },
+              onCancel: function() { onAction("Cancel service creation"); }
+            })
+          );
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
+      }
 
       if (content.includes("TEAMS_SELECTOR:")) {
         var tsParts = content.split("TEAMS_SELECTOR:");
@@ -517,6 +613,13 @@
         var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
         setShowActions(false);
+
+        // Handle service form submission
+        var serviceData = null;
+        if (text.startsWith("SUBMIT_SERVICE:")) {
+          try { serviceData = JSON.parse(text.replace("SUBMIT_SERVICE:", "")); } catch(e) {}
+          text = "Create this service: " + JSON.stringify(serviceData);
+        }
 
         var userContent = uploadedFile
           ? (text ? text + " [Attached: " + uploadedFile.name + "]" : "I have a customer form to submit: " + uploadedFile.name)
