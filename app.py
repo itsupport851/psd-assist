@@ -217,7 +217,136 @@ def hs_deals_with_addresses():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ── Proxy to Make webhooks (write operations only) ───────────
+# ── HubSpot: Update line item ───────────────────────────────
+@app.route('/hubspot/line-items/<line_item_id>', methods=['PATCH'])
+def hs_update_line_item(line_item_id):
+    try:
+        data = request.get_json()
+        payload = {'properties': {}}
+        if 'unit_price' in data:
+            payload['properties']['price'] = str(data['unit_price'])
+        if 'quantity' in data:
+            payload['properties']['quantity'] = str(data['quantity'])
+        if 'name' in data:
+            payload['properties']['name'] = data['name']
+        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/line_items/{line_item_id}', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code not in [200, 204]:
+            return jsonify({'error': res.text}), res.status_code
+        return jsonify({'success': True, 'line_item_id': line_item_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Update deal ─────────────────────────────────────
+@app.route('/hubspot/deals/<deal_id>', methods=['PATCH'])
+def hs_update_deal(deal_id):
+    try:
+        data = request.get_json()
+        payload = {'properties': {}}
+        if 'amount' in data:
+            payload['properties']['amount'] = str(data['amount'])
+        if 'dealstage' in data:
+            payload['properties']['dealstage'] = data['dealstage']
+        if 'dealname' in data:
+            payload['properties']['dealname'] = data['dealname']
+        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code not in [200, 204]:
+            return jsonify({'error': res.text}), res.status_code
+        return jsonify({'success': True, 'deal_id': deal_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Add line item to deal ──────────────────────────
+@app.route('/hubspot/line-items', methods=['POST'])
+def hs_create_line_item():
+    try:
+        data = request.get_json()
+        deal_id = data.get('deal_id')
+        if not deal_id:
+            return jsonify({'error': 'deal_id is required'}), 400
+        payload = {
+            'properties': {
+                'name': data.get('name', 'Fan Motor'),
+                'price': str(data.get('unit_price', 0)),
+                'quantity': str(data.get('quantity', 1)),
+                'description': data.get('description', ''),
+                'fan_brand': data.get('fan_brand', ''),
+                'fan_size': str(data.get('fan_size', '')),
+                'motor_size': str(data.get('motor_size', '')),
+            }
+        }
+        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code != 201:
+            return jsonify({'error': res.text}), res.status_code
+        line_item_id = res.json()['id']
+        assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': line_item_id}, 'type': 'deal_to_line_item'}]}
+        requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
+        return jsonify({'success': True, 'line_item_id': line_item_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Create new deal ─────────────────────────────────
+@app.route('/hubspot/deals', methods=['POST'])
+def hs_create_deal():
+    try:
+        data = request.get_json()
+        payload = {
+            'properties': {
+                'dealname': data.get('dealname', ''),
+                'dealstage': data.get('dealstage', 'appointmentscheduled'),
+                'pipeline': 'default',
+                'amount': str(data.get('amount', 0)),
+                'psd_gp_account_name': data.get('gp_account_name', ''),
+                'psd_gp_account_number': data.get('gp_account_number', ''),
+                'psd_owner_name': data.get('owner_name', ''),
+                'psd_farm_address': data.get('farm_address', ''),
+                'psd_city': data.get('city', ''),
+                'psd_state': data.get('state', ''),
+                'psd_zip': data.get('zip', ''),
+                'total_fans': str(data.get('total_fans', '')),
+                'total_barns': str(data.get('total_barns', '')),
+            }
+        }
+        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code != 201:
+            return jsonify({'error': res.text}), res.status_code
+        deal = res.json()
+        return jsonify({'success': True, 'deal_id': deal['id'], 'dealname': deal['properties'].get('dealname')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Create new contact ──────────────────────────────
+@app.route('/hubspot/contacts', methods=['POST'])
+def hs_create_contact():
+    try:
+        data = request.get_json()
+        payload = {
+            'properties': {
+                'email': data.get('email', ''),
+                'firstname': data.get('firstname', ''),
+                'lastname': data.get('lastname', ''),
+                'phone': data.get('phone', ''),
+                'company': data.get('company', ''),
+                'address': data.get('address', ''),
+                'city': data.get('city', ''),
+                'state': data.get('state', ''),
+                'zip': data.get('zip', ''),
+                'ower_name': data.get('owner_name', ''),
+                'georgia_power_account': str(data.get('gp_account_number', '')),
+            }
+        }
+        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code != 201:
+            return jsonify({'error': res.text}), res.status_code
+        contact = res.json()
+        deal_id = data.get('deal_id')
+        if deal_id:
+            assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': contact['id']}, 'type': 'deal_to_contact'}]}
+            requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/contacts/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
+        return jsonify({'success': True, 'contact_id': contact['id'], 'email': contact['properties'].get('email')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── Proxy to Make webhooks (intake pipeline only) ───────────
 @app.route('/proxy', methods=['POST'])
 def proxy():
     try:
