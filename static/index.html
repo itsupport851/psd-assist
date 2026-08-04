@@ -63,7 +63,7 @@
       { icon: "💰", label: "Update Pricing", desc: "Edit line item prices", message: "I want to update line item pricing for a deal" },
       { icon: "📤", label: "Submit Form", desc: "Upload customer PDF", message: null, isUpload: true },
       { icon: "📍", label: "Farm Clusters", desc: "Find nearby farms", message: "Show me farm clusters to plan installer routes" },
-      { icon: "📊", label: "Deal Summary", desc: "Pipeline overview", message: "Give me a full summary of all deals including fans, barns, operation type and amounts" },
+      { icon: "📊", label: "Deal Summary", desc: "Pipeline overview", message: null, isStageSelector: true },
     ];
 
     const SYSTEM_PROMPT = [
@@ -99,6 +99,8 @@
       "5. Confirm to sales person",
       "",
       "When the user asks for help, options, menu, or what you can do — respond with SHOW_OPTIONS and a brief intro.",
+      "When the user asks about deal summary, deal stages, or wants to filter deals by stage — respond with STAGE_SELECTOR and a brief intro.",
+      "When the user asks to show deals for a specific stage in natural language (e.g. show me scheduled deals, show won deals, qualified deals) — call get_open_deals then filter and display only deals matching that stage.",
       "",
       "When displaying deals use: DEALS_TABLE:{\"deals\":[{\"id\":\"339921027805\",\"name\":\"Henderson Broiler Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
       "When displaying line items use: LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
@@ -107,6 +109,7 @@
       "CRITICAL TOOL CALL RULE: When you need to call a tool, your ENTIRE response must be ONLY the JSON object. Zero text before it. Zero text after it. No explanation. No confirmation. Just the raw JSON and nothing else.",
       "",
       "{\"tool\": \"get_open_deals\", \"params\": {}}",
+      "{\"tool\": \"get_open_deals\", \"params\": {\"stage\": \"appointmentscheduled\"}}", // optional stage filter: appointmentscheduled, closedwon, closedlost, qualifiedtobuy, presentationscheduled
       "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
       "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
       "{\"tool\": \"update_deal_amount\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
@@ -135,8 +138,10 @@
 
     async function executeTool(tool, params) {
       // Read operations → direct HubSpot via Railway (free, no Make credits)
-      if (tool === "get_open_deals")
-        return await callRailway("/hubspot/deals");
+      if (tool === "get_open_deals") {
+        var stage = params && params.stage ? "?stage=" + params.stage : "";
+        return await callRailway("/hubspot/deals" + stage);
+      }
       if (tool === "get_line_items")
         return await callRailway("/hubspot/line-items/" + params.deal_id);
       if (tool === "get_deals_with_addresses")
@@ -256,7 +261,36 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload }) {
+    const STAGE_BUTTONS = [
+      { icon: "📋", label: "All Deals", stage: null, message: "Show me all deals with fans, barns, operation type and amounts" },
+      { icon: "📅", label: "Scheduled", stage: "appointmentscheduled", message: "Show me all appointment scheduled deals with fans, barns, operation type and amounts" },
+      { icon: "🎯", label: "Qualified", stage: "qualifiedtobuy", message: "Show me all qualified to buy deals with fans, barns, operation type and amounts" },
+      { icon: "🏆", label: "Won", stage: "closedwon", message: "Show me all closed won deals with fans, barns, operation type and amounts" },
+      { icon: "❌", label: "Lost", stage: "closedlost", message: "Show me all closed lost deals with fans, barns, operation type and amounts" },
+    ];
+
+    function StageSelector({ onAction }) {
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which deals do you want to see?"),
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+          STAGE_BUTTONS.map(function(s, i) {
+            return React.createElement("button", {
+              key: i,
+              className: "qa-btn",
+              style: { flex: "0 0 auto" },
+              onClick: function() { onAction(s.message); }
+            },
+              React.createElement("span", { className: "qa-icon" }, s.icon),
+              React.createElement("div", null,
+                React.createElement("div", { className: "qa-label" }, s.label)
+              )
+            );
+          })
+        )
+      );
+    }
+
+    function QuickActions({ onAction, onUpload, onStageSelector }) {
       return React.createElement("div", { className: "quick-actions" },
         QUICK_ACTIONS.map(function(a, i) {
           return React.createElement("button", {
@@ -265,6 +299,7 @@
             onClick: function() {
               if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
               if (a.isUpload) { onUpload(); return; }
+              if (a.isStageSelector) { onStageSelector(); return; }
               onAction(a.message);
             }
           },
@@ -278,12 +313,21 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload }) {
+    function MessageContent({ content, onAction, onUpload, onStageSelector }) {
+      if (content.includes("STAGE_SELECTOR")) {
+        var ssParts = content.split("STAGE_SELECTOR");
+        return React.createElement("div", null,
+          ssParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, ssParts[0].trim()),
+          React.createElement(StageSelector, { onAction: onAction }),
+          ssParts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, ssParts[1].trim())
+        );
+      }
+
       if (content.includes("SHOW_OPTIONS")) {
         var parts = content.split("SHOW_OPTIONS");
         return React.createElement("div", null,
           parts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, parts[0].trim()),
-          React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload }),
+          React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector }),
           parts[1] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, parts[1].trim())
         );
       }
@@ -358,6 +402,15 @@
 
       function triggerUpload() {
         fileRef.current && fileRef.current.click();
+      }
+
+      function triggerStageSelector() {
+        setShowStageSelector(true);
+        setShowActions(false);
+        setShowStageSelector(false);
+        setMessages(function(prev) {
+          return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]);
+        });
       }
 
       async function sendMessage(overrideText) {
@@ -485,13 +538,13 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", marginRight: 10, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "80%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 14, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector })
                 )
               ),
               // Show quick actions below welcome or when triggered
               msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
                 React.createElement("div", { style: { marginLeft: 38, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector })
                 )
             );
           }),
