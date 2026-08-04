@@ -346,6 +346,66 @@ def hs_create_contact():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── HubSpot: Get services for a deal ────────────────────────
+@app.route('/hubspot/services/<deal_id>', methods=['GET'])
+def hs_get_services(deal_id):
+    try:
+        # Get associated service IDs
+        assoc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}/associations/services', headers=HUBSPOT_HEADERS())
+        if assoc_res.status_code != 200:
+            return jsonify({'services': []})
+        service_ids = [r['id'] for r in assoc_res.json().get('results', [])]
+        if not service_ids:
+            return jsonify({'services': []})
+        props = 'hs_service_name,description,hs_pipeline,hs_pipeline_stage,hs_service_status,start_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount'
+        services = []
+        for sid in service_ids:
+            res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}?properties={props}', headers=HUBSPOT_HEADERS())
+            if res.status_code == 200:
+                s = res.json()
+                services.append({'id': s['id'], 'properties': s.get('properties', {})})
+        return jsonify({'services': services})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Create service for a deal ──────────────────────
+@app.route('/hubspot/services', methods=['POST'])
+def hs_create_service():
+    try:
+        data = request.get_json()
+        deal_id = data.get('deal_id')
+        if not deal_id:
+            return jsonify({'error': 'deal_id is required'}), 400
+
+        payload = {
+            'properties': {
+                'hs_service_name': data.get('name', ''),
+                'description': data.get('description', ''),
+                'hs_pipeline': 'default',
+                'hs_pipeline_stage': data.get('stage', 'new'),
+                'hs_service_status': data.get('status', 'ON_TRACK'),
+                'start_date': data.get('start_date', ''),
+                'target_end_date': data.get('target_end_date', ''),
+                'hs_total_cost': str(data.get('total_cost', '')),
+            }
+        }
+        # Remove empty values
+        payload['properties'] = {k: v for k, v in payload['properties'].items() if v}
+
+        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/services', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code != 201:
+            return jsonify({'error': res.text}), res.status_code
+
+        service_id = res.json()['id']
+
+        # Associate service to deal
+        assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': service_id}, 'type': 'deal_to_service'}]}
+        requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/services/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
+
+        return jsonify({'success': True, 'service_id': service_id, 'name': data.get('name', '')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ── Proxy to Make webhooks (intake pipeline only) ───────────
 @app.route('/proxy', methods=['POST'])
 def proxy():
