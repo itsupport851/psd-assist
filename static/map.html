@@ -267,14 +267,8 @@
         zoom: 7,
         center: { lat: 32.1656, lng: -82.9001 }, // Georgia center
         styles: [
-          { elementType: "geometry", stylers: [{ color: "#0f1923" }] },
-          { elementType: "labels.text.fill", stylers: [{ color: "#8ab4cc" }] },
-          { elementType: "labels.text.stroke", stylers: [{ color: "#0d1520" }] },
-          { featureType: "road", elementType: "geometry", stylers: [{ color: "#1e2d3d" }] },
-          { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1520" }] },
           { featureType: "poi", stylers: [{ visibility: "off" }] },
-          { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#1e2d3d" }] },
-          { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#1e2d3d" }] },
+          { featureType: "transit", stylers: [{ visibility: "off" }] }
         ]
       });
       loadDeals();
