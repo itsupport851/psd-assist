@@ -66,6 +66,7 @@
       { icon: "➕", label: "Add Line Item", desc: "Add fan to a deal", message: "I want to add a new line item to a deal" },
       { icon: "📝", label: "New Deal", desc: "Create a deal", message: "I want to create a new deal in HubSpot" },
       { icon: "👤", label: "New Contact", desc: "Add a contact", message: "I want to create a new contact in HubSpot" },
+      { icon: "🔧", label: "New Service", desc: "Create service for deal", message: "I want to create a new service for an appointment scheduled deal" },
       { icon: "📤", label: "Submit Form", desc: "Upload customer PDF", message: null, isUpload: true },
     ];
 
@@ -85,10 +86,12 @@
       "- submit_form: submit a customer PDF form (requires file_data as base64, file_name, customer_name, email)",
       "- get_deals_with_addresses: fetch all appointmentscheduled deals with farm addresses — use when asked about farm locations, clusters, distance, scheduling routes, or map",
       "- update_line_item: update unit price on a line item via Railway (requires line_item_id, unit_price)",
-      "- update_deal_amount: update deal amount via Railway (requires deal_id, amount)",
+      "- update_deal: update deal properties via Railway — can update amount, dealstage, or dealname (requires deal_id, plus any of: amount, dealstage, dealname). Valid stages: appointmentscheduled, qualifiedtobuy, presentationscheduled, closedwon, closedlost",
       "- add_line_item: add a new fan motor line item to a deal (requires deal_id, name, fan_brand, fan_size, motor_size, quantity, unit_price)",
       "- create_deal: create a new HubSpot deal (requires dealname, gp_account_name, gp_account_number, owner_name, farm_address, city, state, zip, total_fans, total_barns)",
       "- create_contact: create a new HubSpot contact (requires email, firstname, company, phone, address, city, state, zip, owner_name, gp_account_number, optional: deal_id to associate)",
+      "- get_services: get services associated to a deal (requires deal_id) — only for appointmentscheduled deals",
+      "- create_service: create a new service and associate to a deal (requires deal_id, name, description, optional: stage [new/in_progress/closed], status [ON_TRACK/DELAYED/FAILED/SUCCEEDED], start_date [YYYY-MM-DD], target_end_date [YYYY-MM-DD], total_cost) — only for appointmentscheduled deals",
       "",
       "CRITICAL ID RULES:",
       "The HubSpot data returns deals like: {id: 339921027805, properties: {dealname: 'Henderson Broiler Farm - GP 4423019876'}}",
@@ -120,12 +123,16 @@
       "{\"tool\": \"get_open_deals\", \"params\": {\"stage\": \"appointmentscheduled\"}}", // optional stage filter: appointmentscheduled, closedwon, closedlost, qualifiedtobuy, presentationscheduled
       "{\"tool\": \"get_line_items\", \"params\": {\"deal_id\": \"339921027805\"}}",
       "{\"tool\": \"update_line_item\", \"params\": {\"line_item_id\": \"335654673094\", \"unit_price\": 450}}",
+      "{\"tool\": \"update_deal\", \"params\": {\"deal_id\": \"339921027805\", \"dealstage\": \"closedwon\"}}",
+      "{\"tool\": \"update_deal\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
       "{\"tool\": \"update_deal_amount\", \"params\": {\"deal_id\": \"339921027805\", \"amount\": 9000}}",
       "{\"tool\": \"submit_form\", \"params\": {\"file_data\": \"base64\", \"file_name\": \"form.pdf\", \"customer_name\": \"Farm\", \"email\": \"email@farm.com\"}}",
       "{\"tool\": \"get_deals_with_addresses\", \"params\": {}}",
       "{\"tool\": \"add_line_item\", \"params\": {\"deal_id\": \"123\", \"name\": \"Chore-Time 48in 2HP\", \"fan_brand\": \"Chore-Time\", \"fan_size\": 48, \"motor_size\": 2, \"quantity\": 12, \"unit_price\": 450}}",
       "{\"tool\": \"create_deal\", \"params\": {\"dealname\": \"Farm Name - GP 1234\", \"gp_account_name\": \"Farm Name\", \"gp_account_number\": \"1234\", \"owner_name\": \"John\", \"farm_address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"total_fans\": 48, \"total_barns\": 6}}",
       "{\"tool\": \"create_contact\", \"params\": {\"email\": \"john@farm.com\", \"firstname\": \"John Smith\", \"company\": \"Farm LLC\", \"phone\": \"555-1234\", \"address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"owner_name\": \"John Smith\", \"gp_account_number\": \"1234\", \"deal_id\": \"optional\"}}",
+      "{\"tool\": \"get_services\", \"params\": {\"deal_id\": \"339921027805\"}}",
+      "{\"tool\": \"create_service\", \"params\": {\"deal_id\": \"339921027805\", \"name\": \"Fan Motor Installation\", \"description\": \"Install 48 exhaust fan motors\", \"stage\": \"new\", \"status\": \"ON_TRACK\", \"start_date\": \"2026-04-01\", \"target_end_date\": \"2026-04-30\", \"total_cost\": \"9600\"}}",
       "",
       "After tool result, respond naturally. For get_deals_with_addresses, summarize farms found then end with exactly: MAP_LINK",
       "Always be concise and professional. Speak like a helpful colleague."
@@ -166,11 +173,11 @@
         });
         return await res.json();
       }
-      if (tool === "update_deal_amount") {
+      if (tool === "update_deal_amount" || tool === "update_deal") {
         const res = await fetch("/hubspot/deals/" + params.deal_id, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: params.amount })
+          body: JSON.stringify(params)
         });
         return await res.json();
       }
@@ -192,6 +199,21 @@
       }
       if (tool === "create_contact") {
         const res = await fetch("/hubspot/contacts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(params)
+        });
+        return await res.json();
+      }
+      if (tool === "get_services") {
+        const res = await fetch("/hubspot/services/" + params.deal_id, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" }
+        });
+        return await res.json();
+      }
+      if (tool === "create_service") {
+        const res = await fetch("/hubspot/services", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(params)
