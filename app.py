@@ -487,7 +487,7 @@ def hs_create_service():
                 'hs_name': data.get('name', ''),
                 'hs_description': data.get('description', ''),
                 'hs_pipeline': 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6',
-                'hs_pipeline_stage': data.get('stage_id', '8e2b21d0-7a90-4968-8f8c-a8525cc49c70'),
+                'hs_pipeline_stage': stage_id,
                 'hs_status': data.get('status', 'on_track').lower(),
                 'hs_start_date': data.get('start_date', ''),
                 'hs_target_end_date': data.get('target_end_date', ''),
