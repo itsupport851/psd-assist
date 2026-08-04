@@ -522,7 +522,12 @@
           ),
           React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 8 } },
             React.createElement("button", {
-              onClick: function() { setShowActions(true); },
+              onClick: function() {
+                setShowActions(true);
+                setMessages(function(prev) {
+                  return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]);
+                });
+              },
               style: { padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, cursor: "pointer" }
             }, "⚡ Options"),
             React.createElement("a", { href: "/map", target: "_blank", style: { padding: "7px 14px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 12, textDecoration: "none" } }, "🗺 Map")
