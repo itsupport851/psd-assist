@@ -134,6 +134,10 @@ def proxy():
             timeout=30
         )
 
+        content_type = response.headers.get('Content-Type', '')
+        if 'text/html' in content_type or response.text.strip().startswith('<'):
+            return jsonify({'error': 'Make returned an error', 'status': response.status_code}), 500
+
         try:
             return jsonify(response.json()), response.status_code
         except Exception:
