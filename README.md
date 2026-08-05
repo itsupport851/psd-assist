@@ -23,10 +23,11 @@ Required values are typically set in Railway or your deployment environment.
 - `DROPBOX_APP_SECRET`: Dropbox app secret
 - `TEMPLATE_PATH`: path to workbook template in Dropbox
 - `HUBSPOT_API_KEY`: HubSpot private app access token
+- `SERVICE_PIPELINE_ID`: HubSpot service pipeline ID to use for service creation
 - `GOOGLE_MAPS_API_KEY`: optional for map page support
 - `PIN_ADMIN`: admin PIN for portal access
 - `PIN_SALES`: sales PIN
-- `PIN_ANALYST`: analyst PIN
+- `PIN_ANALYST`: analyst PIN for portal access
 - `PIN_OPERATIONS`: operations PIN
 - `PIN_INSTALLER_{team_id}`: installer PIN for each HubSpot team ID
 

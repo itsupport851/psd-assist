@@ -19,8 +19,8 @@ ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 HUBSPOT_API_KEY = os.environ.get('HUBSPOT_API_KEY', '')
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
-PORTAL_ID = '246901747'
-SERVICE_PIPELINE_ID = 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6'
+PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
+SERVICE_PIPELINE_ID = os.environ.get('SERVICE_PIPELINE_ID', 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6')
 SERVICE_STAGE_MAP = {
     'new': '8e2b21d0-7a90-4968-8f8c-a8525cc49c70',
     'in_progress': '600b692d-a3fe-4052-9cd7-278b134d7941',
