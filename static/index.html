@@ -130,7 +130,8 @@
         "- get_line_items: fetch line items for a specific deal (requires deal_id)",
         "- get_deals_with_addresses: fetch appointmentscheduled deals with farm addresses for map",
         "- get_services: get services for a specific deal (requires deal_id)",
-        "- get_all_services: fetch ALL services across all deals (no params needed). Use this for Open Services and Services Summary requests.",
+        "- get_all_services: fetch ALL services across all deals (no params needed).",
+        "- inspect_service: fetch ALL raw HubSpot properties for one service (requires service_id). Use this when name/team/status are blank to find correct field names.",
         "- get_teams: fetch all HubSpot teams",
       ];
       const salesTools = [
@@ -144,16 +145,29 @@
         "- submit_form: submit customer PDF form (requires file_data as base64, file_name, customer_name, email)",
       ];
 
-      var tools = (role === "sales" || role === "admin") ? baseTools.concat(salesTools) : baseTools;
-      var roleDesc = role === "admin"
-        ? "You are helping the PSD admin. You have full access to all records, deals, services, pricing, and operations."
+      var portalPath = window.location.pathname;
+      if (portalPath.length > 1 && portalPath.endsWith('/')) portalPath = portalPath.slice(0, -1);
+      var isOpPortal  = portalPath === '/operations';
+      var isSalePortal = portalPath === '/sales';
+      var isSvcPortal  = portalPath === '/service';
+
+      var tools = (role === "sales" || role === "admin") && !isOpPortal && !isSvcPortal
+        ? baseTools.concat(salesTools)
+        : baseTools;
+
+      var roleDesc = isOpPortal
+        ? "You are helping the PSD operations team. You can view deals, services, and farm map. You cannot create or update deals, contacts, or pricing."
+        : isSvcPortal
+        ? "You are helping a PSD field installer from team ID " + teamId + ". Show only services/deals assigned to team ID " + teamId + ". No create or update operations."
+        : role === "admin"
+        ? "You are helping the PSD admin. Full access to all records, deals, services, pricing, and operations."
         : role === "sales"
-        ? "You are helping the PSD sales team. You have full access to view and create/update all HubSpot records."
+        ? "You are helping the PSD sales team. Full access to view and create/update all HubSpot records."
         : role === "operations"
-        ? "You are helping the PSD operations team. You can view deals, services, farm map, and summaries. You cannot create or update deals, contacts, or pricing."
+        ? "You are helping the PSD operations team. You can view deals, services, and farm map. You cannot create or update deals, contacts, or pricing."
         : role === "analyst"
-        ? "You are helping a PSD analyst. You can view deals, line items, map, and farm data. Do NOT show or mention pricing, amounts, or unit prices. Hide all financial data."
-        : "You are helping a PSD field installer from team ID " + teamId + ". Only show deals that have a service associated with team ID " + teamId + ". Show line items for those deals only. Do NOT show pricing, amounts, or financial data. Do NOT allow any create or update operations.";
+        ? "You are helping a PSD analyst. View-only. Do NOT show pricing, amounts, or unit prices."
+        : "You are helping a PSD field installer from team ID " + teamId + ". Show only services/deals for team ID " + teamId + ". No create or update operations.";
 
       return [
         "You are PSD Sales Assistant for Precision Systems Development (PSD).",
@@ -177,11 +191,13 @@
         "- closedlost = Closed Lost / Lost",
         "",
         "When updating prices: fetch line items → update each → calculate total (sum qty x unit_price) → update deal amount → confirm.",
-        "When creating a service: call get_teams first, show TEAMS_SELECTOR, wait for team selection, then create.",
+        "When creating a service: STEP 1 — call get_open_deals to find the deal if not known, STEP 2 — call get_teams, STEP 3 — respond with TEAMS_SELECTOR JSON, STEP 4 — when user picks a team, immediately respond with SERVICE_FORM JSON (pre-fill name and description from the deal). Do NOT ask for details in plain text — always use SERVICE_FORM token.",
+        "SERVICE_FORM must include deal_id, deal_name, team_id, team_name, and pre-filled name/description. Example after user picks team:",
+        "SERVICE_FORM:{\"deal_id\":\"339921027805\",\"deal_name\":\"Henderson Broiler Farm\",\"team_id\":\"369709672\",\"team_name\":\"Tony Services\",\"name\":\"Fan Motor Installation — Henderson Broiler Farm\",\"description\":\"Install fans across barns\",\"start_date\":\"\",\"target_end_date\":\"\",\"total_cost\":\"\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
         "When showing map: call get_deals_with_addresses then end response with MAP_LINK.",
         "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
         "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
-        "When showing services: if a service has name '—' or blank, check _raw_props in the data and mention which fields are populated so we can identify where HubSpot stores the name.",
+        "When showing services: if any service has a blank name, team, or status, call inspect_service for that service_id to find the correct field names, then report what fields hold the data.",
         "When user asks for service summary by stage/status: respond with SERVICE_STAGE_SELECTOR.",
         "",
         "Display formats:",
@@ -208,6 +224,7 @@
         "{\"tool\": \"create_contact\", \"params\": {\"email\": \"john@farm.com\", \"firstname\": \"John Smith\", \"company\": \"Farm LLC\", \"phone\": \"555-1234\", \"address\": \"123 Rd\", \"city\": \"Athens\", \"state\": \"GA\", \"zip\": \"30601\", \"owner_name\": \"John Smith\", \"gp_account_number\": \"1234\"}}",
         "{\"tool\": \"get_services\", \"params\": {\"deal_id\": \"339921027805\"}}",
         "{\"tool\": \"get_all_services\", \"params\": {}}",
+        "{\"tool\": \"inspect_service\", \"params\": {\"service_id\": \"825721437925\"}}",
         "{\"tool\": \"get_teams\", \"params\": {}}",
         
         "{\"tool\": \"create_service\", \"params\": {\"deal_id\": \"339921027805\", \"name\": \"Fan Motor Installation\", \"description\": \"Install fans\", \"stage\": \"new\", \"status\": \"ON_TRACK\", \"start_date\": \"2026-04-01\", \"target_end_date\": \"2026-04-30\", \"total_cost\": \"9600\", \"team_id\": \"369709672\"}}",
@@ -239,6 +256,7 @@
       if (tool === "get_deals_with_addresses") return await callRailway("/hubspot/deals-with-addresses");
       if (tool === "get_services") return await callRailway("/hubspot/services/" + params.deal_id);
       if (tool === "get_all_services") return await callRailway("/hubspot/all-services");
+      if (tool === "inspect_service") return await callRailway("/hubspot/service-inspect/" + params.service_id);
       if (tool === "get_teams") return await callRailway("/hubspot/teams");
       if (tool === "update_line_item") {
         const res = await fetch("/hubspot/line-items/" + params.line_item_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit_price: params.unit_price }) });
@@ -396,26 +414,22 @@
       function statusLabel(s) {
         if (!s) return "—";
         var map = {
-          'ON_TRACK': 'On Track',
-          'AT_RISK':  'At Risk',
-          'BEHIND':   'Behind',
-          'COMPLETE': 'Completed',
-          // also handle if hs_object_status values come through
-          'open':     'Open',
-          'closed':   'Closed',
+          'ON_TRACK': 'On Track',  'on_track': 'On Track',  'On Track': 'On Track',
+          'AT_RISK':  'At Risk',   'at_risk':  'At Risk',   'At Risk':  'At Risk',
+          'BEHIND':   'Behind',    'Behind':   'Behind',
+          'COMPLETE': 'Completed', 'Complete': 'Completed', 'Completed': 'Completed',
+          'open':     'Open',      'closed':   'Closed',
         };
         return map[s] || s;
       }
       function statusClass(s) {
-        var map = {
-          'ON_TRACK': 'tag tag-svc-ontrack',
-          'AT_RISK':  'tag tag-svc-atrisk',
-          'BEHIND':   'tag tag-svc-behind',
-          'COMPLETE': 'tag tag-svc-complete',
-          'open':     'tag tag-svc-new',
-          'closed':   'tag tag-svc-closed',
-        };
-        return map[s] || 'tag tag-svc-new';
+        if (!s) return 'tag tag-svc-new';
+        var norm = (s || '').replace(/[\s_]/g, '').toLowerCase();
+        if (norm === 'ontrack')   return 'tag tag-svc-ontrack';
+        if (norm === 'atrisk')    return 'tag tag-svc-atrisk';
+        if (norm === 'behind')    return 'tag tag-svc-behind';
+        if (norm === 'complete' || norm === 'completed') return 'tag tag-svc-complete';
+        return 'tag tag-svc-new';
       }
 
       function fmtDate(d) {
@@ -603,10 +617,24 @@
       var SALES_LABELS = ["Deal Summary","Open Deals","Add Line Item","Update Pricing","New Deal","New Contact","Submit Form"];
       var OPS_LABELS   = ["Services Summary","Open Services","New Service","Farm Map"];
 
-      var salesActions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && SALES_LABELS.includes(a.label); });
-      var opsActions   = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && OPS_LABELS.includes(a.label); });
+      // Determine which sections this portal allows
+      var path = window.location.pathname;
+      if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+      var portalShowSales = path !== '/operations' && path !== '/service';
+      var portalShowOps   = path !== '/sales';
 
-      // Operations-only role: skip sales section header entirely
+      var salesActions = portalShowSales
+        ? ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && SALES_LABELS.includes(a.label); })
+        : [];
+      var opsActions = portalShowOps
+        ? ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && OPS_LABELS.includes(a.label); })
+        : [];
+
+      // Also apply role filter — operations role only sees ops actions even on root
+      if (role === 'operations') {
+        salesActions = [];
+      }
+
       var showSales = salesActions.length > 0;
       var showOps   = opsActions.length > 0;
 
@@ -732,8 +760,26 @@
     };
 
     function getPortalConfig() {
-      var path = window.location.pathname.replace(/\/$/, '') || '/';
-      return PORTAL_CONFIG[path] || PORTAL_CONFIG['/'];
+      var path = window.location.pathname;
+      // Normalize: remove trailing slash unless it's just '/'
+      if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+      // Exact match first
+      if (PORTAL_CONFIG[path]) return PORTAL_CONFIG[path];
+      // Fallback to root
+      return PORTAL_CONFIG['/'];
+    }
+
+    // Portal also restricts which role is used even for admin —
+    // admin logging into /operations gets capped to operations capabilities
+    function getEffectiveRole(authRole, portalPath) {
+      // Admin on a specific portal gets that portal's primary role for UI purposes
+      if (authRole === 'admin') {
+        if (portalPath === '/sales')      return 'admin'; // admin sees everything on sales portal
+        if (portalPath === '/operations') return 'admin'; // admin sees everything on ops portal
+        if (portalPath === '/service')    return 'installer';
+        return 'admin';
+      }
+      return authRole;
     }
 
     // ── PIN Screen ──────────────────────────────────────────────
@@ -889,6 +935,8 @@
             && m.content !== "STAGE_SELECTOR"
             && m.content !== "SERVICE_STAGE_SELECTOR"
             && m.content !== "MAP_STAGE_SELECTOR"
+            && m.content !== "ADD_LINE_ITEM_FORM"
+            && !m.content.startsWith("SERVICE_FORM:")
             && !m.isToolCall
             && !m.isToolResult;
         }).map(function(m) { return { role: m.role, content: m.content }; });
@@ -976,7 +1024,8 @@
           displayMessages.map(function(msg, i) {
             var isLast = i === displayMessages.length - 1;
             var lastContent = displayMessages[displayMessages.length - 1] && displayMessages[displayMessages.length - 1].content;
-            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM"].indexOf(lastContent) !== -1;
+            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM"].indexOf(lastContent) !== -1
+              || (lastContent && lastContent.startsWith("SERVICE_FORM:"));
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
