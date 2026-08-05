@@ -1167,7 +1167,7 @@
           done >= progress.length && React.createElement("button", {
             className: "svc-form-btn", style: { width: "auto", padding: "6px 18px" },
             onClick: function() { onDone(true, progress.length - errors, errors); }
-          }, "Done — Show Services")
+          }, "Done")
         );
       }
 
@@ -1362,7 +1362,7 @@
           if (!success) { onAction("Service creation failed: " + countOrErr); return; }
           var msg = countOrErr + " service" + (countOrErr !== 1 ? "s" : "") + " created";
           if (errors > 0) msg += " (" + errors + " failed)";
-          onAction(msg + ". Show updated open services.");
+          onAction(msg + ".");
         },
         onCancel: function() { onAction("Cancelled new service"); }
       });
@@ -2045,7 +2045,7 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
