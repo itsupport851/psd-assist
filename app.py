@@ -498,8 +498,8 @@ def hs_get_all_services():
         stage_map.setdefault('2',           'In Progress')
         stage_map.setdefault('3',           'Closed')
 
-        # 3. Get all services directly — include all name candidate fields + correct date fields
-        svc_props = 'subject,hs_ticket_name,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        # 3. Get all services — fetch broad property set to catch name wherever HubSpot stores it
+        svc_props = 'subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
@@ -528,8 +528,19 @@ def hs_get_all_services():
             team_id = sp.get('hubspot_team_id', '')
             team_name = team_id  # fallback to ID; enriched below if possible
 
-            # Resolve name — HubSpot services may store in subject, hs_ticket_name, or content
-            raw_name = (sp.get('subject') or sp.get('hs_ticket_name') or sp.get('content') or '').strip()
+            # Resolve name — try every field HubSpot might store it in
+            raw_name = (
+                sp.get('subject') or
+                sp.get('hs_ticket_name') or
+                sp.get('content') or
+                sp.get('title') or
+                sp.get('name') or
+                ''
+            ).strip()
+            # If still empty, build a name from category + deal
+            if not raw_name:
+                cat = (sp.get('hs_ticket_category') or '').strip()
+                raw_name = cat if cat else ''
 
             # Resolve pipeline stage ID → label
             raw_stage = sp.get('hs_pipeline_stage', '') or ''
@@ -569,6 +580,8 @@ def hs_get_all_services():
                 'total_cost': sp.get('hs_total_cost', ''),
                 'amount_paid': sp.get('hs_amount_paid', ''),
                 'remaining': sp.get('hs_remaining_amount', ''),
+                # Debug: expose all non-null props so we can find the name field
+                '_raw_props': {k: v for k, v in sp.items() if v and k not in ('hs_pipeline',)},
             })
 
         # 5. Enrich team names in one call
