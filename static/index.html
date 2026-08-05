@@ -91,7 +91,7 @@
       // ── Operations ──
       { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["admin"] },
+      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
       { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["analyst","admin","operations"] },
     ];
 
@@ -191,13 +191,10 @@
         "- closedlost = Closed Lost / Lost",
         "",
         "When updating prices: fetch line items → update each → calculate total (sum qty x unit_price) → update deal amount → confirm.",
-        "When creating a service: STEP 1 — call get_open_deals to find the deal if not known, STEP 2 — call get_teams, STEP 3 — respond with TEAMS_SELECTOR JSON, STEP 4 — when user picks a team, immediately respond with SERVICE_FORM JSON (pre-fill name and description from the deal). Do NOT ask for details in plain text — always use SERVICE_FORM token.",
-        "SERVICE_FORM must include deal_id, deal_name, team_id, team_name, and pre-filled name/description. Example after user picks team:",
-        "SERVICE_FORM:{\"deal_id\":\"339921027805\",\"deal_name\":\"Henderson Broiler Farm\",\"team_id\":\"369709672\",\"team_name\":\"Tony Services\",\"name\":\"Fan Motor Installation — Henderson Broiler Farm\",\"description\":\"Install fans across barns\",\"start_date\":\"\",\"target_end_date\":\"\",\"total_cost\":\"\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
         "When showing map: call get_deals_with_addresses then end response with MAP_LINK.",
         "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
         "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
-        "When showing services: if any service has a blank name, team, or status, call inspect_service for that service_id to find the correct field names, then report what fields hold the data.",
+        "When user asks for open services or services summary: call get_all_services then respond with SERVICES_TABLE.",
         "When user asks for service summary by stage/status: respond with SERVICE_STAGE_SELECTOR.",
         "",
         "Display formats:",
@@ -514,34 +511,145 @@
     }
 
     function ServiceForm({ data, onSubmit, onCancel }) {
+      const [deals, setDeals]   = React.useState([]);
+      const [teams, setTeams]   = React.useState([]);
+      const [loadingData, setLoadingData] = React.useState(true);
+      const [submitting, setSubmitting]   = React.useState(false);
+
       const [form, setForm] = React.useState({
-        name: data.name || "",
-        description: data.description || "",
-        start_date: data.start_date || "",
+        deal_id:        data.deal_id        || "",
+        team_id:        data.team_id        || "",
+        name:           data.name           || "",
+        description:    data.description    || "",
+        start_date:     data.start_date     || "",
         target_end_date: data.target_end_date || "",
-        total_cost: data.total_cost || "",
-        stage: data.stage || "new",
-        status: data.status || "ON_TRACK",
+        total_cost:     data.total_cost     || "",
+        stage:          data.stage          || "new",
+        status:         data.status         || "ON_TRACK",
       });
+
+      React.useEffect(function() {
+        Promise.all([
+          fetch("/hubspot/deals?limit=100&properties=dealname,dealstage,total_fans,total_barns")
+            .then(function(r) { return r.json(); }),
+          fetch("/hubspot/teams")
+            .then(function(r) { return r.json(); })
+        ]).then(function(results) {
+          var dealsData = results[0];
+          var teamsData = results[1];
+          var openDeals = (dealsData.deals || []).filter(function(d) {
+            var s = (d.properties || {}).dealstage || "";
+            return s !== "closedwon" && s !== "closedlost";
+          });
+          setDeals(openDeals);
+          setTeams(teamsData.teams || []);
+          // Pre-select if only one deal
+          if (openDeals.length === 1 && !form.deal_id) {
+            setForm(function(prev) { return Object.assign({}, prev, { deal_id: openDeals[0].id }); });
+          }
+        }).catch(function() {}).finally(function() { setLoadingData(false); });
+      }, []);
 
       function update(field, value) {
         setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
       }
 
-      function handleSubmit() {
-        onSubmit(Object.assign({}, data, form));
+      // Auto-generate name when deal is selected
+      function handleDealChange(dealId) {
+        update("deal_id", dealId);
+        if (dealId && !form.name) {
+          var d = deals.find(function(x) { return x.id === dealId; });
+          if (d) {
+            var dn = (d.properties || {}).dealname || "";
+            update("name", "Fan Motor Installation — " + dn);
+          }
+        }
       }
 
+      async function handleSubmit() {
+        if (!form.deal_id) return;
+        setSubmitting(true);
+        try {
+          var deal = deals.find(function(d) { return d.id === form.deal_id; });
+          var team = teams.find(function(t) { return t.id === form.team_id; });
+          var res = await fetch("/hubspot/services", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              deal_id:        form.deal_id,
+              name:           form.name,
+              description:    form.description,
+              stage:          form.stage,
+              status:         form.status,
+              start_date:     form.start_date,
+              target_end_date: form.target_end_date,
+              total_cost:     form.total_cost,
+              team_id:        form.team_id,
+            })
+          });
+          var data = await res.json();
+          if (data.success) {
+            onSubmit(form.deal_id, form.name, deal, team);
+          } else {
+            onSubmit(null, null, null, null, data.error || "Failed to create service");
+          }
+        } catch(e) {
+          onSubmit(null, null, null, null, e.message);
+        }
+        setSubmitting(false);
+      }
+
+      var isValid = !!form.deal_id;
+
       return React.createElement("div", { className: "svc-form" },
-        React.createElement("div", { className: "svc-form-title" }, "🔧 New Service — " + (data.deal_name || "")),
+        React.createElement("div", { className: "svc-form-title" }, "🔧 New Service"),
+
+        // Deal selector
+        React.createElement("div", { className: "svc-form-row" },
+          React.createElement("div", { className: "svc-form-label" }, "Deal *" + (loadingData ? " (loading…)" : " (" + deals.length + " open)")),
+          React.createElement("select", {
+            className: "svc-form-select", style: { width: "100%" },
+            value: form.deal_id,
+            onChange: function(e) { handleDealChange(e.target.value); }
+          },
+            React.createElement("option", { value: "" }, "— select a deal —"),
+            deals.map(function(d) {
+              var dp = d.properties || {};
+              return React.createElement("option", { key: d.id, value: d.id },
+                (dp.dealname || d.id) + (dp.total_fans ? " · " + dp.total_fans + " fans" : "")
+              );
+            })
+          )
+        ),
+
+        // Team selector
+        React.createElement("div", { className: "svc-form-row" },
+          React.createElement("div", { className: "svc-form-label" }, "Team" + (loadingData ? " (loading…)" : "")),
+          React.createElement("select", {
+            className: "svc-form-select", style: { width: "100%" },
+            value: form.team_id,
+            onChange: function(e) { update("team_id", e.target.value); }
+          },
+            React.createElement("option", { value: "" }, "— unassigned —"),
+            teams.map(function(t) {
+              return React.createElement("option", { key: t.id, value: t.id }, t.name);
+            })
+          )
+        ),
+
+        // Service name
         React.createElement("div", { className: "svc-form-row" },
           React.createElement("div", { className: "svc-form-label" }, "Service Name"),
-          React.createElement("input", { className: "svc-form-input", value: form.name, onChange: function(e) { update("name", e.target.value); } })
+          React.createElement("input", { className: "svc-form-input", value: form.name, placeholder: "e.g. Fan Motor Installation — Farm Name", onChange: function(e) { update("name", e.target.value); } })
         ),
+
+        // Description
         React.createElement("div", { className: "svc-form-row" },
           React.createElement("div", { className: "svc-form-label" }, "Description"),
-          React.createElement("textarea", { className: "svc-form-input", value: form.description, rows: 2, onChange: function(e) { update("description", e.target.value); }, style: { resize: "none" } })
+          React.createElement("textarea", { className: "svc-form-input", value: form.description, rows: 2, placeholder: "e.g. Install 48 fans across 6 barns", onChange: function(e) { update("description", e.target.value); }, style: { resize: "none" } })
         ),
+
+        // Dates
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
           React.createElement("div", { className: "svc-form-row" },
             React.createElement("div", { className: "svc-form-label" }, "Start Date"),
@@ -552,10 +660,12 @@
             React.createElement("input", { className: "svc-form-input", type: "date", value: form.target_end_date, onChange: function(e) { update("target_end_date", e.target.value); } })
           )
         ),
+
+        // Cost + Stage + Status
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
           React.createElement("div", { className: "svc-form-row" },
             React.createElement("div", { className: "svc-form-label" }, "Total Cost ($)"),
-            React.createElement("input", { className: "svc-form-input", type: "number", value: form.total_cost, onChange: function(e) { update("total_cost", e.target.value); } })
+            React.createElement("input", { className: "svc-form-input", type: "number", value: form.total_cost, placeholder: "0.00", onChange: function(e) { update("total_cost", e.target.value); } })
           ),
           React.createElement("div", { className: "svc-form-row" },
             React.createElement("div", { className: "svc-form-label" }, "Stage"),
@@ -569,14 +679,18 @@
             React.createElement("div", { className: "svc-form-label" }, "Status"),
             React.createElement("select", { className: "svc-form-select", value: form.status, onChange: function(e) { update("status", e.target.value); } },
               React.createElement("option", { value: "ON_TRACK" }, "On Track"),
-              React.createElement("option", { value: "AT_RISK" }, "Delayed"),
-              React.createElement("option", { value: "BEHIND" }, "Failed"),
+              React.createElement("option", { value: "AT_RISK" }, "At Risk"),
+              React.createElement("option", { value: "BEHIND" }, "Behind"),
               React.createElement("option", { value: "COMPLETE" }, "Completed")
             )
           )
         ),
-        data.team_name && React.createElement("div", { style: { fontSize: 11, color: "#4a9a6b", marginBottom: 8 } }, "🏢 Team: " + data.team_name),
-        React.createElement("button", { className: "svc-form-btn", onClick: handleSubmit }, "✅ Create Service"),
+
+        React.createElement("button", {
+          className: "svc-form-btn",
+          onClick: handleSubmit,
+          disabled: !isValid || submitting || loadingData
+        }, submitting ? "Creating…" : "✅ Create Service"),
         React.createElement("button", { className: "svc-form-btn-cancel", onClick: onCancel }, "Cancel")
       );
     }
@@ -613,7 +727,7 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, role }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, role }) {
       var SALES_LABELS = ["Deal Summary","Open Deals","Add Line Item","Update Pricing","New Deal","New Contact","Submit Form"];
       var OPS_LABELS   = ["Services Summary","Open Services","New Service","Farm Map"];
 
@@ -641,9 +755,10 @@
       function renderBtn(a, i) {
         return React.createElement("button", { key: i, className: "qa-btn",
           onClick: function() {
-            if (a.isMapSelector) { onMapSelector(); return; }
-            if (a.isUpload) { onUpload(); return; }
-            if (a.isStageSelector) { onStageSelector(); return; }
+            if (a.isMapSelector)      { onMapSelector(); return; }
+            if (a.isNewServiceForm)   { onNewServiceForm(); return; }
+            if (a.isUpload)           { onUpload(); return; }
+            if (a.isStageSelector)    { onStageSelector(); return; }
             if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
             onAction(a.message);
           }
@@ -668,11 +783,18 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, role: role });
+    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
       if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
-      if (content === "MAP_STAGE_SELECTOR") return React.createElement(MapStageSelector, {});
+      if (content === "NEW_SERVICE_FORM") return React.createElement(ServiceForm, {
+        data: {},
+        onSubmit: function(dealId, name, deal, team, err) {
+          if (err) { onAction("Service creation failed: " + err); return; }
+          onAction("Service created: " + name + " for deal " + dealId + ". Please confirm and show updated services.");
+        },
+        onCancel: function() { onAction("Cancelled new service"); }
+      });
 
       if (content.includes("SERVICES_TABLE:")) {
         var svParts = content.split("SERVICES_TABLE:");
@@ -907,6 +1029,11 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "MAP_STAGE_SELECTOR", display: true }]); });
       }
 
+      function triggerNewServiceForm() {
+        setShowActions(false);
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "NEW_SERVICE_FORM", display: true }]); });
+      }
+
       async function sendMessage(overrideText) {
         var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
@@ -936,6 +1063,7 @@
             && m.content !== "SERVICE_STAGE_SELECTOR"
             && m.content !== "MAP_STAGE_SELECTOR"
             && m.content !== "ADD_LINE_ITEM_FORM"
+            && m.content !== "NEW_SERVICE_FORM"
             && !m.content.startsWith("SERVICE_FORM:")
             && !m.isToolCall
             && !m.isToolResult;
@@ -1024,18 +1152,18 @@
           displayMessages.map(function(msg, i) {
             var isLast = i === displayMessages.length - 1;
             var lastContent = displayMessages[displayMessages.length - 1] && displayMessages[displayMessages.length - 1].content;
-            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM"].indexOf(lastContent) !== -1
+            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM","NEW_SERVICE_FORM"].indexOf(lastContent) !== -1
               || (lastContent && lastContent.startsWith("SERVICE_FORM:"));
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, role: auth.role })
                 )
             );
           }),
