@@ -970,6 +970,8 @@
         React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14 } },
           displayMessages.map(function(msg, i) {
             var isLast = i === displayMessages.length - 1;
+            var lastContent = displayMessages[displayMessages.length - 1] && displayMessages[displayMessages.length - 1].content;
+            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM"].indexOf(lastContent) !== -1;
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
@@ -977,7 +979,7 @@
                   msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, role: auth.role })
                 )
               ),
-              msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
+              msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
                   React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, role: auth.role })
                 )
