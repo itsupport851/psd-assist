@@ -673,33 +673,6 @@ def hs_get_all_services():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ── HubSpot: Update a service ───────────────────────────────
-@app.route('/hubspot/services/<service_id>', methods=['PATCH'])
-def hs_update_service(service_id):
-    try:
-        data = request.get_json()
-        payload = {'properties': {}}
-        if 'status' in data:
-            status_map = {
-                'ON_TRACK': 'ON_TRACK', 'AT_RISK': 'AT_RISK',
-                'BEHIND': 'BEHIND', 'COMPLETE': 'COMPLETE'
-            }
-            payload['properties']['hs_ticket_priority'] = status_map.get(data['status'], data['status'])
-        if 'target_end_date' in data:
-            payload['properties']['target_end_date'] = data['target_end_date']
-            payload['properties']['hs_due_date']     = data['target_end_date']
-        if 'stage' in data:
-            payload['properties']['hs_pipeline_stage'] = data['stage']
-        if not payload['properties']:
-            return jsonify({'error': 'Nothing to update'}), 400
-        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}',
-                             json=payload, headers=HUBSPOT_HEADERS())
-        if res.status_code not in [200, 204]:
-            return jsonify({'error': res.text}), res.status_code
-        return jsonify({'success': True, 'service_id': service_id})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 # ── HubSpot: Repair service names (backfill from category/description) ──
 @app.route('/hubspot/services/<service_id>/repair', methods=['PATCH'])
 def hs_repair_service(service_id):
