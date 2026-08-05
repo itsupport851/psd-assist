@@ -641,7 +641,7 @@
             body: JSON.stringify({
               deal_id:         form.deal_id,
               name:            form.name,
-              description:     form.description,
+              task_details:    form.description,
               stage:           form.stage,
               status:          form.status,
               start_date:      form.start_date,
@@ -727,14 +727,14 @@
           React.createElement("input", { className: "svc-form-input", value: form.name, placeholder: "e.g. Fan Motor Installation — Farm Name", onChange: function(e) { update("name", e.target.value); } })
         ),
 
-        // Description — pre-filled from line items, fully editable
+        // Task Details — pre-filled from line items, fully editable
         React.createElement("div", { className: "svc-form-row" },
-          React.createElement("div", { className: "svc-form-label" }, "Description" + (loadingItems ? " (building from line items…)" : "")),
+          React.createElement("div", { className: "svc-form-label" }, "Task Details" + (loadingItems ? " (building from line items…)" : "")),
           React.createElement("textarea", {
             className: "svc-form-input",
             value: form.description,
             rows: 3,
-            placeholder: "Select a deal to auto-fill from fan inventory…",
+            placeholder: "Select a deal to auto-fill task details…",
             onChange: function(e) { update("description", e.target.value); },
             style: { resize: "vertical", minHeight: 64 }
           })
@@ -1122,7 +1122,7 @@
               body: JSON.stringify({
                 deal_id:         d.id,
                 name:            name,
-                description:     sharedForm.description,
+                task_details:    sharedForm.description,
                 stage:           sharedForm.stage,
                 status:          sharedForm.status,
                 start_date:      sharedForm.start_date,

@@ -28,7 +28,6 @@ SERVICE_STAGE_MAP = {
 }
 SERVICE_PROPERTY_ALIASES = {
     'name': 'hs_name',
-    'description': 'hs_description',
     'status': 'hs_status',
     'start_date': 'hs_start_date',
     'target_end_date': 'hs_target_end_date',
@@ -455,11 +454,21 @@ def resolve_service_stage(stage_value):
     return SERVICE_STAGE_MAP['new']
 
 
+def normalize_service_name(name):
+    if not name:
+        return name
+    name = re.sub(r'\b(?:GP\s+)+GP\b', 'GP', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
+
+
 def build_service_properties(data, include_pipeline=False):
     properties = {}
     for key, hs_name in SERVICE_PROPERTY_ALIASES.items():
         if key in data and data.get(key) is not None and data.get(key) != "":
-            if key == 'status':
+            if key == 'name':
+                properties[hs_name] = normalize_service_name(str(data[key]))
+            elif key == 'status':
                 raw_status = str(data[key]).strip()
                 normalized_status = raw_status.lower().replace('-', '_').replace(' ', '_')
                 properties[hs_name] = SERVICE_STATUS_MAP.get(normalized_status, SERVICE_STATUS_MAP.get(raw_status, raw_status))
@@ -469,6 +478,62 @@ def build_service_properties(data, include_pipeline=False):
         properties['hs_pipeline'] = SERVICE_PIPELINE_ID
         properties['hs_pipeline_stage'] = resolve_service_stage(data.get('stage', 'new'))
     return properties
+
+
+def get_deal_contact_ids(deal_id):
+    try:
+        res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}/associations/contacts', headers=HUBSPOT_HEADERS())
+        if res.status_code == 200:
+            return [r['id'] for r in res.json().get('results', []) if r.get('id')]
+    except:
+        pass
+    return []
+
+
+def associate_service_contacts(service_id, contact_ids):
+    if not contact_ids:
+        return
+    payload = {
+        'inputs': [
+            {'from': {'id': service_id}, 'to': {'id': cid}, 'type': 'service_to_contact'}
+            for cid in contact_ids
+        ]
+    }
+    try:
+        requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/services/contacts/batch/create', json=payload, headers=HUBSPOT_HEADERS())
+    except:
+        pass
+
+
+def create_service_task(service_id, task_details, contact_ids=None):
+    if not task_details:
+        return None
+    payload = {
+        'properties': {
+            'subject': 'Service Task',
+            'hs_task_body': str(task_details),
+        }
+    }
+    try:
+        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/tasks', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code != 201:
+            return None
+        task_id = res.json().get('id')
+        if task_id:
+            requests.post(
+                f'{HUBSPOT_BASE}/crm/v3/associations/services/tasks/batch/create',
+                json={'inputs': [{'from': {'id': service_id}, 'to': {'id': task_id}, 'type': 'service_to_task'}]},
+                headers=HUBSPOT_HEADERS()
+            )
+            if contact_ids:
+                requests.post(
+                    f'{HUBSPOT_BASE}/crm/v3/associations/tasks/contacts/batch/create',
+                    json={'inputs': [{'from': {'id': task_id}, 'to': {'id': cid}, 'type': 'task_to_contact'} for cid in contact_ids]},
+                    headers=HUBSPOT_HEADERS()
+                )
+        return task_id
+    except:
+        return None
 
 
 @app.route('/hubspot/service-stages', methods=['GET'])
@@ -746,6 +811,7 @@ def hs_create_service():
         if not deal_id:
             return jsonify({'error': 'deal_id is required'}), 400
 
+        task_details = data.get('task_details') or data.get('description', '')
         payload = {'properties': build_service_properties(data, include_pipeline=True)}
 
         res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/services', json=payload, headers=HUBSPOT_HEADERS())
@@ -758,6 +824,10 @@ def hs_create_service():
         assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': service_id}, 'type': 'deal_to_service'}]}
         requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/services/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
 
+        contact_ids = get_deal_contact_ids(deal_id)
+        associate_service_contacts(service_id, contact_ids)
+        create_service_task(service_id, task_details, contact_ids=contact_ids)
+
         return jsonify({'success': True, 'service_id': service_id, 'name': data.get('name', '')})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -767,13 +837,19 @@ def hs_create_service():
 def hs_update_service(service_id):
     try:
         data = request.get_json()
+        task_details = data.get('task_details') or data.get('description', '')
         payload = {'properties': build_service_properties(data, include_pipeline=False)}
-        if not payload['properties']:
+        if not payload['properties'] and not task_details:
             return jsonify({'error': 'No updatable service properties provided'}), 400
 
-        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}', json=payload, headers=HUBSPOT_HEADERS())
-        if res.status_code not in [200, 204]:
-            return jsonify({'error': res.text}), res.status_code
+        if payload['properties']:
+            res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}', json=payload, headers=HUBSPOT_HEADERS())
+            if res.status_code not in [200, 204]:
+                return jsonify({'error': res.text}), res.status_code
+
+        if task_details:
+            create_service_task(service_id, task_details)
+
         return jsonify({'success': True, 'service_id': service_id})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
