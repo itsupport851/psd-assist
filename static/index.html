@@ -519,21 +519,23 @@
     }
 
     function ServiceForm({ data, onSubmit, onCancel }) {
-      const [deals, setDeals]   = React.useState([]);
-      const [teams, setTeams]   = React.useState([]);
-      const [loadingData, setLoadingData] = React.useState(true);
-      const [submitting, setSubmitting]   = React.useState(false);
+      const [deals, setDeals]         = React.useState([]);
+      const [teams, setTeams]         = React.useState([]);
+      const [lineItems, setLineItems] = React.useState([]);
+      const [loadingData, setLoadingData]     = React.useState(true);
+      const [loadingItems, setLoadingItems]   = React.useState(false);
+      const [submitting, setSubmitting]       = React.useState(false);
 
       const [form, setForm] = React.useState({
-        deal_id:        data.deal_id        || "",
-        team_id:        data.team_id        || "",
-        name:           data.name           || "",
-        description:    data.description    || "",
-        start_date:     data.start_date     || "",
+        deal_id:         data.deal_id         || "",
+        team_id:         data.team_id         || "",
+        name:            data.name            || "",
+        description:     data.description     || "",
+        start_date:      data.start_date      || "",
         target_end_date: data.target_end_date || "",
-        total_cost:     data.total_cost     || "",
-        stage:          data.stage          || "new",
-        status:         data.status         || "ON_TRACK",
+        total_cost:      data.total_cost      || "",
+        stage:           data.stage           || "new",
+        status:          data.status          || "ON_TRACK",
       });
 
       React.useEffect(function() {
@@ -543,35 +545,72 @@
           fetch("/hubspot/teams")
             .then(function(r) { return r.json(); })
         ]).then(function(results) {
-          var dealsData = results[0];
-          var teamsData = results[1];
-          var openDeals = (dealsData.deals || []).filter(function(d) {
+          var openDeals = (results[0].deals || []).filter(function(d) {
             var s = (d.properties || {}).dealstage || "";
             return s !== "closedwon" && s !== "closedlost";
           });
           setDeals(openDeals);
-          setTeams(teamsData.teams || []);
-          // Pre-select if only one deal
-          if (openDeals.length === 1 && !form.deal_id) {
+          setTeams(results[1].teams || []);
+          // If deal pre-selected (e.g. from wizard), fetch its line items immediately
+          if (data.deal_id) {
+            fetchLineItems(data.deal_id, openDeals);
+          } else if (openDeals.length === 1) {
             setForm(function(prev) { return Object.assign({}, prev, { deal_id: openDeals[0].id }); });
+            fetchLineItems(openDeals[0].id, openDeals);
           }
         }).catch(function() {}).finally(function() { setLoadingData(false); });
       }, []);
+
+      function fetchLineItems(dealId, dealsList) {
+        if (!dealId) return;
+        setLoadingItems(true);
+        var src = dealsList || deals;
+        fetch("/hubspot/line-items/" + dealId)
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var items = data.line_items || [];
+            setLineItems(items);
+            // Build description from line items
+            if (items.length > 0) {
+              var deal = src.find(function(d) { return d.id === dealId; });
+              var dp = deal ? (deal.properties || {}) : {};
+              var lines = items.map(function(li) {
+                var lp = li.properties || {};
+                var qty  = lp.quantity || lp.number_of_fans || "?";
+                var name = lp.name || (lp.fan_brand + " " + lp.fan_size + '"') || "Fan";
+                return qty + "x " + name;
+              });
+              var barns = dp.total_barns || "?";
+              var desc = "Fans to service: " + lines.join(", ") + ". Total barns: " + barns + ".";
+              setForm(function(prev) {
+                // Only auto-fill if description is still empty or was auto-generated
+                if (!prev.description || prev.description.startsWith("Fans to service:") || prev.description.startsWith("Install fans")) {
+                  return Object.assign({}, prev, { description: desc });
+                }
+                return prev;
+              });
+            }
+          })
+          .catch(function() { setLineItems([]); })
+          .finally(function() { setLoadingItems(false); });
+      }
 
       function update(field, value) {
         setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
       }
 
-      // Auto-generate name when deal is selected
       function handleDealChange(dealId) {
-        update("deal_id", dealId);
-        if (dealId && !form.name) {
-          var d = deals.find(function(x) { return x.id === dealId; });
-          if (d) {
-            var dn = (d.properties || {}).dealname || "";
-            update("name", "Fan Motor Installation — " + dn);
+        setLineItems([]);
+        setForm(function(prev) {
+          var next = Object.assign({}, prev, { deal_id: dealId, description: "" });
+          // Auto-generate name
+          if (dealId && !prev.name) {
+            var d = deals.find(function(x) { return x.id === dealId; });
+            if (d) next.name = "Fan Motor Installation — " + ((d.properties || {}).dealname || "");
           }
-        }
+          return next;
+        });
+        if (dealId) fetchLineItems(dealId, deals);
       }
 
       async function handleSubmit() {
@@ -584,22 +623,22 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              deal_id:        form.deal_id,
-              name:           form.name,
-              description:    form.description,
-              stage:          form.stage,
-              status:         form.status,
-              start_date:     form.start_date,
+              deal_id:         form.deal_id,
+              name:            form.name,
+              description:     form.description,
+              stage:           form.stage,
+              status:          form.status,
+              start_date:      form.start_date,
               target_end_date: form.target_end_date,
-              total_cost:     form.total_cost,
-              team_id:        form.team_id,
+              total_cost:      form.total_cost,
+              team_id:         form.team_id,
             })
           });
-          var data = await res.json();
-          if (data.success) {
+          var result = await res.json();
+          if (result.success) {
             onSubmit(form.deal_id, form.name, deal, team);
           } else {
-            onSubmit(null, null, null, null, data.error || "Failed to create service");
+            onSubmit(null, null, null, null, result.error || "Failed to create service");
           }
         } catch(e) {
           onSubmit(null, null, null, null, e.message);
@@ -608,6 +647,24 @@
       }
 
       var isValid = !!form.deal_id;
+
+      // Line items summary panel
+      var lineItemSummary = lineItems.length > 0
+        ? React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
+            React.createElement("div", { style: { color: "#6b8fa8", marginBottom: 4, fontWeight: 600 } }, "📦 Fan Inventory (" + lineItems.length + " line items)"),
+            lineItems.map(function(li, i) {
+              var lp = li.properties || {};
+              var qty  = lp.quantity || lp.number_of_fans || "?";
+              var name = lp.name || ((lp.fan_brand || "") + " " + (lp.fan_size ? lp.fan_size + '"' : "")) || "Fan";
+              var hp   = lp.motor_size ? " · " + lp.motor_size + " HP" : "";
+              return React.createElement("div", { key: li.id || i, style: { color: "#e8edf2", padding: "2px 0" } },
+                "• " + qty + "x " + name.trim() + hp
+              );
+            })
+          )
+        : loadingItems
+          ? React.createElement("div", { style: { fontSize: 11, color: "#6b8fa8", marginBottom: 10, fontStyle: "italic" } }, "Loading fan inventory…")
+          : null;
 
       return React.createElement("div", { className: "svc-form" },
         React.createElement("div", { className: "svc-form-title" }, "🔧 New Service"),
@@ -630,6 +687,9 @@
           )
         ),
 
+        // Fan inventory summary (auto-loads when deal selected)
+        lineItemSummary,
+
         // Team selector
         React.createElement("div", { className: "svc-form-row" },
           React.createElement("div", { className: "svc-form-label" }, "Team" + (loadingData ? " (loading…)" : "")),
@@ -651,10 +711,17 @@
           React.createElement("input", { className: "svc-form-input", value: form.name, placeholder: "e.g. Fan Motor Installation — Farm Name", onChange: function(e) { update("name", e.target.value); } })
         ),
 
-        // Description
+        // Description — pre-filled from line items, fully editable
         React.createElement("div", { className: "svc-form-row" },
-          React.createElement("div", { className: "svc-form-label" }, "Description"),
-          React.createElement("textarea", { className: "svc-form-input", value: form.description, rows: 2, placeholder: "e.g. Install 48 fans across 6 barns", onChange: function(e) { update("description", e.target.value); }, style: { resize: "none" } })
+          React.createElement("div", { className: "svc-form-label" }, "Description" + (loadingItems ? " (building from line items…)" : "")),
+          React.createElement("textarea", {
+            className: "svc-form-input",
+            value: form.description,
+            rows: 3,
+            placeholder: "Select a deal to auto-fill from fan inventory…",
+            onChange: function(e) { update("description", e.target.value); },
+            style: { resize: "vertical", minHeight: 64 }
+          })
         ),
 
         // Dates
