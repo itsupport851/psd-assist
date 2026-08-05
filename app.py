@@ -201,21 +201,25 @@ def hs_get_line_items(deal_id):
 @app.route('/hubspot/deals-with-addresses', methods=['GET'])
 def hs_deals_with_addresses():
     try:
-        # Get appointmentscheduled deals
+        stage_filter = request.args.get('stage', None)  # None = all deals
         props = 'dealname,amount,dealstage,total_fans,total_barns,hs_object_id'
-        url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=50&properties={props}'
+        url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=100&properties={props}'
         res = requests.get(url, headers=HUBSPOT_HEADERS())
         if res.status_code != 200:
             return jsonify({'error': res.text}), res.status_code
 
-        deals = [d for d in res.json().get('results', []) if d.get('properties', {}).get('dealstage') == 'appointmentscheduled']
+        all_deals = res.json().get('results', [])
+        if stage_filter:
+            all_deals = [d for d in all_deals if d.get('properties', {}).get('dealstage') == stage_filter]
+        else:
+            # Exclude closed lost by default; include everything else
+            all_deals = [d for d in all_deals if d.get('properties', {}).get('dealstage') != 'closedlost']
 
         result = []
         contact_props = 'address,city,state,zip,company,firstname,ower_name,email,phone,georgia_power_account'
 
-        for deal in deals:
+        for deal in all_deals:
             deal_id = deal['id']
-            # Get associated contact
             assoc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}/associations/contacts', headers=HUBSPOT_HEADERS())
             if assoc_res.status_code != 200:
                 continue
@@ -234,6 +238,7 @@ def hs_deals_with_addresses():
             result.append({
                 'deal_id': deal_id,
                 'deal_name': dp.get('dealname', ''),
+                'dealstage': dp.get('dealstage', ''),
                 'amount': dp.get('amount', ''),
                 'total_fans': dp.get('total_fans', ''),
                 'total_barns': dp.get('total_barns', ''),
