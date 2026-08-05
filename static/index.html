@@ -92,8 +92,7 @@
       { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["sales","analyst","installer"] },
       { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["sales","analyst","installer"] },
       { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["sales"] },
-      { icon: "📍", label: "Farm Clusters",  desc: "Find nearby farms",        message: "Show me farm clusters to plan installer routes", roles: ["sales","analyst"] },
-      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms on map",        message: "Show scheduled farms on the map", isMap: true, roles: ["sales","analyst"] },
+      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["sales","analyst"] },
     ];
 
     const STAGE_BUTTONS = [
@@ -114,6 +113,17 @@
       { icon: "🔴", label: "Behind", message: "Show me all services with status behind" },
     ];
 
+    const MAP_STAGE_BUTTONS = [
+      { icon: "🗺",  label: "All Deals",    stage: "",                     color: "#6366f1" },
+      { icon: "📅", label: "Scheduled",    stage: "appointmentscheduled",  color: "#25a35a" },
+      { icon: "🎯", label: "Qualified",    stage: "qualifiedtobuy",        color: "#f59e0b" },
+      { icon: "📊", label: "Presentation", stage: "presentationscheduled", color: "#3b82f6" },
+      { icon: "🤝", label: "Decision",     stage: "decisionmakerboughtin", color: "#a855f7" },
+      { icon: "📄", label: "Contract",     stage: "contractsent",          color: "#06b6d4" },
+      { icon: "🏆", label: "Won",          stage: "closedwon",             color: "#10b981" },
+    ]; // end MAP_STAGE_BUTTONS
+
+    // ── System Prompt ────────────────────────────────────────
     function getSystemPrompt(role, teamId) {
       const baseTools = [
         "- get_open_deals: fetch all open deals (optional stage filter)",
@@ -445,6 +455,27 @@
       );
     }
 
+    function MapStageSelector({ }) {
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Open Farm Map — which deals to show?"),
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+          MAP_STAGE_BUTTONS.map(function(s, i) {
+            var url = MAP_URL + (s.stage ? "?stage=" + s.stage : "");
+            return React.createElement("a", {
+              key: i,
+              href: url,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              style: { display: "flex", alignItems: "center", gap: 7, padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, color: "#e8edf2", textDecoration: "none", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 0.15s" }
+            },
+              React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0, display: "inline-block" } }),
+              s.label
+            );
+          })
+        )
+      );
+    }
+
     function ServiceStageSelector({ onAction }) {
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Filter services by:"),
@@ -559,9 +590,9 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, role }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, role }) {
       var SALES_LABELS = ["Deal Summary","Open Deals","Add Line Item","Update Pricing","New Deal","New Contact","Submit Form"];
-      var OPS_LABELS   = ["Services Summary","Open Services","New Service","Farm Clusters","Farm Map"];
+      var OPS_LABELS   = ["Services Summary","Open Services","New Service","Farm Map"];
 
       var salesActions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && SALES_LABELS.includes(a.label); });
       var opsActions   = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && OPS_LABELS.includes(a.label); });
@@ -569,7 +600,7 @@
       function renderBtn(a, i) {
         return React.createElement("button", { key: i, className: "qa-btn",
           onClick: function() {
-            if (a.isMap) { window.open(MAP_URL, "_blank"); return; }
+            if (a.isMapSelector) { onMapSelector(); return; }
             if (a.isUpload) { onUpload(); return; }
             if (a.isStageSelector) { onStageSelector(); return; }
             if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
@@ -596,10 +627,11 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, role: role });
+    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
       if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
+      if (content === "MAP_STAGE_SELECTOR") return React.createElement(MapStageSelector, {});
 
       if (content.includes("SERVICES_TABLE:")) {
         var svParts = content.split("SERVICES_TABLE:");
@@ -786,6 +818,11 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SERVICE_STAGE_SELECTOR", display: true }]); });
       }
 
+      function triggerMapSelector() {
+        setShowActions(false);
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "MAP_STAGE_SELECTOR", display: true }]); });
+      }
+
       async function sendMessage(overrideText) {
         var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
@@ -813,6 +850,7 @@
             && m.content !== "SHOW_OPTIONS"
             && m.content !== "STAGE_SELECTOR"
             && m.content !== "SERVICE_STAGE_SELECTOR"
+            && m.content !== "MAP_STAGE_SELECTOR"
             && !m.isToolCall
             && !m.isToolResult;
         }).map(function(m) { return { role: m.role, content: m.content }; });
@@ -903,12 +941,12 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, role: auth.role })
                 )
             );
           }),
