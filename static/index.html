@@ -420,7 +420,12 @@
 
       function fmtDate(d) {
         if (!d) return "—";
-        try { return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return d; }
+        try {
+          // Handle numeric timestamp strings (ms)
+          var val = /^\d{10,}$/.test(String(d)) ? new Date(Number(d)) : new Date(d);
+          if (isNaN(val.getTime())) return String(d).slice(0, 10) || "—";
+          return val.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        } catch(e) { return String(d).slice(0, 10) || "—"; }
       }
 
       var svcs = data.services || [];
