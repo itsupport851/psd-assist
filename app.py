@@ -499,7 +499,7 @@ def hs_get_all_services():
         stage_map.setdefault('3',           'Closed')
 
         # 3. Get all services — fetch broad property set to catch name wherever HubSpot stores it
-        svc_props = 'subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        svc_props = 'subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id,hs_shared_team_ids'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
@@ -524,9 +524,10 @@ def hs_get_all_services():
             except:
                 pass
 
-            # Get team name
-            team_id = sp.get('hubspot_team_id', '')
-            team_name = team_id  # fallback to ID; enriched below if possible
+            # Team: HubSpot Services stores team in hs_shared_team_ids (shared teams)
+            # also check hubspot_team_id (assigned team) as fallback
+            team_id = sp.get('hs_shared_team_ids', '') or sp.get('hubspot_team_id', '') or ''
+            team_name = team_id  # enriched below from teams API
 
             # Resolve name — try every field HubSpot might store it in
             raw_name = (
@@ -537,7 +538,6 @@ def hs_get_all_services():
                 sp.get('name') or
                 ''
             ).strip()
-            # If still empty, build a name from category + deal
             if not raw_name:
                 cat = (sp.get('hs_ticket_category') or '').strip()
                 raw_name = cat if cat else ''
@@ -546,24 +546,39 @@ def hs_get_all_services():
             raw_stage = sp.get('hs_pipeline_stage', '') or ''
             stage_label = stage_map.get(raw_stage, raw_stage)
 
-            # Status: stored in hs_ticket_priority by hs_create_service; hs_object_status is fallback
-            raw_status = sp.get('hs_ticket_priority', '') or sp.get('hs_object_status', '') or ''
+            # Status: HubSpot Services uses 'hs_pipeline_stage' label as status display,
+            # but the actual status field is stored in 'hs_ticket_priority' (ON_TRACK etc.)
+            # The label shown in HubSpot UI as "Status" maps to hs_ticket_priority values
+            raw_status = (
+                sp.get('hs_ticket_priority') or
+                sp.get('hs_object_status') or
+                ''
+            )
+            # Normalize: HubSpot sometimes returns the label directly e.g. "On Track"
+            status_map = {
+                'ON_TRACK': 'ON_TRACK', 'on_track': 'ON_TRACK',
+                'On Track': 'ON_TRACK', 'on track': 'ON_TRACK',
+                'AT_RISK': 'AT_RISK', 'at_risk': 'AT_RISK',
+                'At Risk': 'AT_RISK', 'at risk': 'AT_RISK',
+                'BEHIND': 'BEHIND', 'Behind': 'BEHIND',
+                'COMPLETE': 'COMPLETE', 'Complete': 'COMPLETE', 'Completed': 'COMPLETE',
+            }
+            raw_status = status_map.get(raw_status, raw_status)
 
             def normalize_date(val):
                 """Convert HubSpot date value to ISO date string regardless of format."""
                 if not val:
                     return ''
                 try:
-                    # If it's a numeric timestamp (ms), convert to ISO
                     ts = float(val)
                     from datetime import datetime, timezone
                     return datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime('%Y-%m-%d')
                 except (ValueError, TypeError):
-                    # Already a string like '2026-04-01' or ISO datetime
                     return str(val)[:10]
 
             start_raw = sp.get('start_date') or sp.get('hs_start_date') or sp.get('createdate') or ''
-            due_raw   = sp.get('hs_due_date') or sp.get('target_end_date') or ''
+            # Due date: "Target End Date" field in HubSpot UI = target_end_date property
+            due_raw = sp.get('target_end_date') or sp.get('hs_due_date') or ''
 
             services.append({
                 'id': sid,
@@ -590,12 +605,39 @@ def hs_get_all_services():
             if teams_res.status_code == 200:
                 team_map = {str(t['id']): t['name'] for t in teams_res.json().get('results', [])}
                 for svc in services:
-                    if svc['team_id']:
-                        svc['team'] = team_map.get(str(svc['team_id']), svc['team_id'])
+                    raw_tid = svc['team_id']
+                    if raw_tid:
+                        # hs_shared_team_ids may be semicolon-separated list of IDs
+                        ids = [x.strip() for x in str(raw_tid).split(';') if x.strip()]
+                        names = [team_map.get(i, i) for i in ids]
+                        svc['team'] = ', '.join(names) if names else raw_tid
         except:
             pass
 
         return jsonify({'services': services, 'count': len(services)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── HubSpot: Inspect a service — fetch every non-null property ──
+@app.route('/hubspot/service-inspect/<service_id>', methods=['GET'])
+def hs_service_inspect(service_id):
+    try:
+        # Get all available property names for services
+        props_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/properties/services', headers=HUBSPOT_HEADERS())
+        all_prop_names = [p['name'] for p in props_res.json().get('results', [])]
+
+        # Fetch the service in batches of 50 props
+        all_values = {}
+        for i in range(0, len(all_prop_names), 50):
+            batch = all_prop_names[i:i+50]
+            prop_str = ','.join(batch)
+            res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}?properties={prop_str}', headers=HUBSPOT_HEADERS())
+            if res.status_code == 200:
+                for k, v in res.json().get('properties', {}).items():
+                    if v is not None and v != '':
+                        all_values[k] = v
+
+        return jsonify({'service_id': service_id, 'properties': all_values})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -646,6 +688,7 @@ def hs_create_service():
         }
         if data.get('team_id'):
             payload['properties']['hubspot_team_id'] = str(data.get('team_id', ''))
+            payload['properties']['hs_shared_team_ids'] = str(data.get('team_id', ''))
         # Remove empty values
         payload['properties'] = {k: v for k, v in payload['properties'].items() if v}
 
