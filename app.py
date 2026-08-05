@@ -20,6 +20,31 @@ HUBSPOT_API_KEY = os.environ.get('HUBSPOT_API_KEY', '')
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = '246901747'
+SERVICE_PIPELINE_ID = 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6'
+SERVICE_STAGE_MAP = {
+    'new': '8e2b21d0-7a90-4968-8f8c-a8525cc49c70',
+    'in_progress': '600b692d-a3fe-4052-9cd7-278b134d7941',
+    'closed': 'de53e7d9-6b57-4701-b576-92de01c9ed65',
+}
+SERVICE_PROPERTY_ALIASES = {
+    'name': 'hs_name',
+    'description': 'hs_description',
+    'status': 'hs_status',
+    'start_date': 'hs_start_date',
+    'target_end_date': 'hs_target_end_date',
+    'total_cost': 'hs_total_cost',
+    'team_id': 'hs_shared_team_ids',
+}
+SERVICE_STATUS_MAP = {
+    'on_track': 'ON_TRACK',
+    'at_risk': 'AT_RISK',
+    'behind': 'BEHIND',
+    'complete': 'COMPLETE',
+    'ON_TRACK': 'ON_TRACK',
+    'AT_RISK': 'AT_RISK',
+    'BEHIND': 'BEHIND',
+    'COMPLETE': 'COMPLETE',
+}
 
 def get_dropbox_access_token():
     response = requests.post(
@@ -423,11 +448,35 @@ def hs_get_teams():
         return jsonify({'error': str(e)}), 500
 
 # ── HubSpot: Get service pipeline stages ────────────────────
+def resolve_service_stage(stage_value):
+    if not stage_value:
+        return SERVICE_STAGE_MAP['new']
+    if stage_value in SERVICE_STAGE_MAP:
+        return SERVICE_STAGE_MAP[stage_value]
+    if stage_value in SERVICE_STAGE_MAP.values():
+        return stage_value
+    return SERVICE_STAGE_MAP['new']
+
+
+def build_service_properties(data, include_pipeline=False):
+    properties = {}
+    for key, hs_name in SERVICE_PROPERTY_ALIASES.items():
+        if key in data and data.get(key) is not None and data.get(key) != "":
+            if key == 'status':
+                status_value = str(data[key]).upper()
+                properties[hs_name] = SERVICE_STATUS_MAP.get(status_value, status_value)
+            else:
+                properties[hs_name] = str(data[key])
+    if include_pipeline:
+        properties['hs_pipeline'] = SERVICE_PIPELINE_ID
+        properties['hs_pipeline_stage'] = resolve_service_stage(data.get('stage', 'new'))
+    return properties
+
+
 @app.route('/hubspot/service-stages', methods=['GET'])
 def hs_service_stages():
     try:
-        pipeline_id = 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6'
-        res = requests.get(f'{HUBSPOT_BASE}/crm/v3/pipelines/services/{pipeline_id}/stages', headers=HUBSPOT_HEADERS())
+        res = requests.get(f'{HUBSPOT_BASE}/crm/v3/pipelines/services/{SERVICE_PIPELINE_ID}/stages', headers=HUBSPOT_HEADERS())
         if res.status_code != 200:
             return jsonify({'error': res.text}), res.status_code
         stages = [{'id': s['id'], 'label': s['label']} for s in res.json().get('results', [])]
@@ -709,7 +758,7 @@ def hs_get_services(deal_id):
         service_ids = [r['id'] for r in assoc_res.json().get('results', [])]
         if not service_ids:
             return jsonify({'services': []})
-        props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_shared_team_ids'
         services = []
         for sid in service_ids:
             res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}?properties={props}', headers=HUBSPOT_HEADERS())
@@ -729,28 +778,7 @@ def hs_create_service():
         if not deal_id:
             return jsonify({'error': 'deal_id is required'}), 400
 
-        payload = {
-            'properties': {
-                'hs_name':           data.get('name', ''),
-                'hs_object_name':    data.get('name', ''),
-                'subject':           data.get('name', ''),
-                'hs_ticket_name':    data.get('name', ''),
-                'content':           data.get('name', ''),
-                'description':       data.get('description', ''),
-                'hs_pipeline':       'default',
-                'hs_pipeline_stage': data.get('stage', 'new'),
-                'hs_ticket_priority': data.get('status', 'ON_TRACK'),
-                'start_date':        data.get('start_date', ''),
-                'target_end_date':   data.get('target_end_date', ''),
-                'hs_due_date':       data.get('target_end_date', ''),
-                'hs_ticket_category': 'Fan Motor Installation',
-            }
-        }
-        if data.get('team_id'):
-            payload['properties']['hubspot_team_id'] = str(data.get('team_id', ''))
-            payload['properties']['hs_shared_team_ids'] = str(data.get('team_id', ''))
-        # Remove empty values
-        payload['properties'] = {k: v for k, v in payload['properties'].items() if v}
+        payload = {'properties': build_service_properties(data, include_pipeline=True)}
 
         res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/services', json=payload, headers=HUBSPOT_HEADERS())
         if res.status_code != 201:
@@ -763,6 +791,22 @@ def hs_create_service():
         requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/services/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
 
         return jsonify({'success': True, 'service_id': service_id, 'name': data.get('name', '')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/hubspot/services/<service_id>', methods=['PATCH'])
+def hs_update_service(service_id):
+    try:
+        data = request.get_json()
+        payload = {'properties': build_service_properties(data, include_pipeline=False)}
+        if not payload['properties']:
+            return jsonify({'error': 'No updatable service properties provided'}), 400
+
+        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code not in [200, 204]:
+            return jsonify({'error': res.text}), res.status_code
+        return jsonify({'success': True, 'service_id': service_id})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
