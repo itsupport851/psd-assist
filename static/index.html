@@ -44,6 +44,12 @@
     .svc-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; vertical-align: middle; }
     .svc-table tr:last-child td { border-bottom: none; }
     .svc-table tr:hover td { background: #1a2535; }
+    .md-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+    .md-table th, .md-table td { padding: 8px 10px; border: 1px solid #1a2535; }
+    .md-table th { background: #1e2d3d; color: #8ab4cc; text-align: left; }
+    .md-table td { color: #e8edf2; }
+    .md-table tr:nth-child(even) td { background: #121b24; }
+    .md-table tr:hover td { background: #1a2535; }
     .svc-form-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
     .svc-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
     .svc-form-label { font-size: 11px; color: #6b8fa8; font-weight: 500; }
@@ -1381,9 +1387,9 @@
         try {
           var svData = JSON.parse(svParts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            svParts[0] && React.createElement("div", { style: { marginBottom: 8 } }, svParts[0].trim()),
+            svParts[0] && MarkdownBlock(svParts[0].trim(), { marginBottom: 8 }),
             React.createElement(ServicesTable, { data: svData, role: role }),
-            svParts[2] && React.createElement("div", { style: { marginTop: 8 } }, svParts[2].trim())
+            svParts[2] && MarkdownBlock(svParts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1393,9 +1399,9 @@
         try {
           var sdData = JSON.parse(sdParts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            sdParts[0] && React.createElement("div", { style: { marginBottom: 8 } }, sdParts[0].trim()),
+            sdParts[0] && MarkdownBlock(sdParts[0].trim(), { marginBottom: 8 }),
             React.createElement(ServiceDetails, { data: sdData }),
-            sdParts[2] && React.createElement("div", { style: { marginTop: 8 } }, sdParts[2].trim())
+            sdParts[2] && MarkdownBlock(sdParts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1405,7 +1411,7 @@
         try {
           var sfData = JSON.parse(sfParts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            sfParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, sfParts[0].trim()),
+            sfParts[0] && MarkdownBlock(sfParts[0].trim(), { marginBottom: 8 }),
             React.createElement(ServiceForm, {
               data: sfData,
               onSubmit: function(formData) {
@@ -1422,9 +1428,9 @@
         try {
           var teamsData = JSON.parse(tsParts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            tsParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, tsParts[0].trim()),
+            tsParts[0] && MarkdownBlock(tsParts[0].trim(), { marginBottom: 8 }),
             React.createElement(TeamsSelector, { teams: teamsData.teams, onAction: onAction }),
-            tsParts[2] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, tsParts[2].trim())
+            tsParts[2] && MarkdownBlock(tsParts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1434,9 +1440,9 @@
         try {
           var payload = JSON.parse(tsParts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            tsParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, tsParts[0].trim()),
+            tsParts[0] && MarkdownBlock(tsParts[0].trim(), { marginBottom: 8 }),
             React.createElement(TeamServicesSelector, { team: payload.team, services: payload.services, onAction: onAction }),
-            tsParts[2] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, tsParts[2].trim())
+            tsParts[2] && MarkdownBlock(tsParts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1446,9 +1452,9 @@
         try {
           var data = JSON.parse(parts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            parts[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts[0].trim()),
+            parts[0] && MarkdownBlock(parts[0].trim(), { marginBottom: 8 }),
             React.createElement(DealsTable, { data: data, role: role }),
-            parts[2] && React.createElement("div", { style: { marginTop: 8 } }, parts[2].trim())
+            parts[2] && MarkdownBlock(parts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1458,9 +1464,9 @@
         try {
           var data2 = JSON.parse(parts2[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            parts2[0] && React.createElement("div", { style: { marginBottom: 8 } }, parts2[0].trim()),
+            parts2[0] && MarkdownBlock(parts2[0].trim(), { marginBottom: 8 }),
             React.createElement(LineItemsTable, { data: data2, role: role }),
-            parts2[2] && React.createElement("div", { style: { marginTop: 8 } }, parts2[2].trim())
+            parts2[2] && MarkdownBlock(parts2[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1474,7 +1480,98 @@
         );
       }
 
-      return React.createElement("div", { style: { whiteSpace: "pre-wrap", wordBreak: "break-word" } }, content);
+      return React.createElement("div", { dangerouslySetInnerHTML: { __html: renderMarkdown(content) }, style: { wordBreak: "break-word" } });
+    }
+
+    function MarkdownBlock(text, style) {
+      return React.createElement("div", { style: Object.assign({ wordBreak: 'break-word' }, style), dangerouslySetInnerHTML: { __html: renderMarkdown(text) } });
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderMarkdown(content) {
+      if (content == null) return '';
+      var text = String(content).replace(/\r\n/g, '\n');
+      var lines = text.split('\n');
+      var html = [];
+      var inList = false;
+      var inTable = false;
+      var tableRows = [];
+
+      function flushList() {
+        if (inList) { html.push('</ul>'); inList = false; }
+      }
+      function flushTable() {
+        if (inTable) { html.push('<table class="md-table">' + tableRows.join('') + '</table>'); tableRows = []; inTable = false; }
+      }
+      function parseInline(line) {
+        var escaped = escapeHtml(line);
+        escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        return escaped;
+      }
+
+      lines.forEach(function(rawLine) {
+        var line = rawLine.trim();
+        if (!line) {
+          flushList();
+          flushTable();
+          html.push('');
+          return;
+        }
+
+        var headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+        if (headingMatch) {
+          flushList();
+          flushTable();
+          var level = headingMatch[1].length;
+          html.push('<h' + level + ' style="margin:8px 0 6px;font-size:' + (18 - level * 1) + 'px;color:#e8edf2;">' + parseInline(headingMatch[2]) + '</h' + level + '>');
+          return;
+        }
+
+        if (/^(-|\*|\+)\s+/.test(line)) {
+          flushTable();
+          if (!inList) { html.push('<ul style="padding-left:18px;margin:8px 0;">'); inList = true; }
+          html.push('<li style="margin-bottom:4px;">' + parseInline(line.replace(/^(-|\*|\+)\s+/, '')) + '</li>');
+          return;
+        }
+
+        if (/^\|.*\|$/.test(line)) {
+          if (!inTable) { inTable = true; tableRows = []; }
+          if (/^\|\s*[-:]+\s*\|/.test(line)) {
+            return; // skip separator row
+          }
+          var cells = line.split('|').slice(1, -1).map(function(cell) {
+            return '<td>' + parseInline(cell.trim()) + '</td>';
+          });
+          if (cells.length) {
+            tableRows.push('<tr>' + cells.join('') + '</tr>');
+          }
+          return;
+        }
+
+        flushTable();
+        if (inList) { html.push('</ul>'); inList = false; }
+        if (/^---+$/.test(line)) {
+          html.push('<hr style="border-color:#1a2535;margin:12px 0;">');
+          return;
+        }
+
+        html.push('<p style="margin:8px 0;line-height:1.6;color:#e8edf2;">' + parseInline(rawLine) + '</p>');
+      });
+
+      flushList();
+      flushTable();
+      return html.join('');
     }
 
     // ── Portal config by URL path ────────────────────────────
