@@ -107,7 +107,8 @@
       // ── Operations ──
       { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
+      { icon: "�️", label: "Display Service", desc: "Select a team and view service details", message: null, isDisplayService: true, roles: ["analyst","admin","operations","installer"] },
+      { icon: "�🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
       { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMap: true, roles: ["analyst","admin","operations"] },
     ];
 
@@ -147,6 +148,8 @@
         "- get_deals_with_addresses: fetch appointmentscheduled deals with farm addresses for map",
         "- get_services: get services for a specific deal (requires deal_id)",
         "- get_all_services: fetch ALL services across all deals (no params needed).",
+        "- get_team_services: fetch services for a specific team (requires team_id).",
+        "- get_service_details: fetch one service and its contacts, tasks, and deals (requires service_id).",
         "- inspect_service: fetch ALL raw HubSpot properties for one service (requires service_id). Use this when name/team/status are blank to find correct field names.",
         "- get_teams: fetch all HubSpot teams",
       ];
@@ -270,6 +273,8 @@
       if (tool === "get_deals_with_addresses") return await callRailway("/hubspot/deals-with-addresses");
       if (tool === "get_services") return await callRailway("/hubspot/services/" + params.deal_id);
       if (tool === "get_all_services") return await callRailway("/hubspot/all-services");
+      if (tool === "get_team_services") return await callRailway("/hubspot/team-services/" + params.team_id);
+      if (tool === "get_service_details") return await callRailway("/hubspot/service-details/" + params.service_id);
       if (tool === "inspect_service") return await callRailway("/hubspot/service-inspect/" + params.service_id);
       if (tool === "repair_service") {
         var res = await fetch("/hubspot/services/" + params.service_id + "/repair", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: params.name }) });
@@ -492,6 +497,68 @@
               );
             })
           )
+        )
+      );
+    }
+
+    function ServiceDetails({ data }) {
+      var svc = data.service || {};
+      var contacts = data.contacts || [];
+      var tasks = data.tasks || [];
+      var deals = data.deals || [];
+      function fmtDate(d) {
+        if (!d) return '—';
+        try {
+          var val = /^\d{10,}$/.test(String(d)) ? new Date(Number(d)) : new Date(d);
+          if (isNaN(val.getTime())) return String(d).slice(0, 10) || '—';
+          return val.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch(e) { return String(d).slice(0, 10) || '—'; }
+      }
+      return React.createElement("div", null,
+        React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 14, fontWeight: 700, marginBottom: 8 } }, svc.name || 'Service Detail'),
+          React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, svc.deal_name ? 'Deal: ' + svc.deal_name : 'Deal: —'),
+          React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, svc.team ? 'Team: ' + svc.team : 'Team: —'),
+          React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 12 } },
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Stage'), React.createElement("div", { style: { marginTop: 4 } }, svc.stage || '—')),
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Status'), React.createElement("div", { style: { marginTop: 4 } }, svc.status || '—')),
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Start Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.start_date))),
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Due Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.due_date)))
+          ),
+          React.createElement("div", { style: { marginTop: 12, fontSize: 12, color: '#e8edf2' } }, svc.description || 'No service description available.')
+        ),
+        contacts.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Contacts"),
+          contacts.map(function(c) {
+            return React.createElement("div", { key: c.id, style: { marginBottom: 10, fontSize: 12 } },
+              React.createElement("div", { style: { fontWeight: 600 } }, c.name || '—'),
+              React.createElement("div", null, c.company || '—'),
+              React.createElement("div", null, c.email || '—'),
+              React.createElement("div", null, c.phone || '—')
+            );
+          })
+        ),
+        tasks.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Tasks"),
+          tasks.map(function(t) {
+            return React.createElement("div", { key: t.id, style: { marginBottom: 10, fontSize: 12 } },
+              React.createElement("div", { style: { fontWeight: 600 } }, t.subject || '—'),
+              React.createElement("div", null, t.body || 'No details'),
+              React.createElement("div", { style: { color: '#8ab4cc' } }, (t.status ? 'Status: ' + t.status : 'Status: —') + (t.priority ? ' • Priority: ' + t.priority : '') ),
+              React.createElement("div", null, 'Created: ' + fmtDate(t.created_date))
+            );
+          })
+        ),
+        deals.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
+          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Deals"),
+          deals.map(function(d) {
+            return React.createElement("div", { key: d.id, style: { marginBottom: 10, fontSize: 12 } },
+              React.createElement("div", { style: { fontWeight: 600 } }, d.name || '—'),
+              React.createElement("div", null, 'Stage: ' + (d.stage || '—')),
+              React.createElement("div", null, 'Amount: ' + (d.amount || '—')),
+              React.createElement("div", null, 'Close date: ' + fmtDate(d.close_date))
+            );
+          })
         )
       );
     }
@@ -1158,6 +1225,60 @@
       );
     }
 
+    function TeamsSelectorWrapper({ onAction }) {
+      const [teams, setTeams] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState('');
+
+      useEffect(function() {
+        fetch('/hubspot/teams')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            setTeams(data.teams || []);
+          })
+          .catch(function(err) {
+            setError('Unable to load teams.');
+          })
+          .finally(function() { setLoading(false); });
+      }, []);
+
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which team should I display services for?"),
+        loading && React.createElement("div", { style: { color: "#8ab4cc", fontSize: 12 } }, "Loading teams..."),
+        error && React.createElement("div", { style: { color: "#e05252", fontSize: 12 } }, error),
+        !loading && !error && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+          teams.map(function(t, i) {
+            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('SHOW_TEAM_SERVICES:' + JSON.stringify({ team_id: t.id, team_name: t.name })); } },
+              React.createElement("span", { className: "qa-icon" }, "🏢"),
+              React.createElement("div", null,
+                React.createElement("div", { className: "qa-label" }, t.name),
+                React.createElement("div", { className: "qa-desc" }, t.userIds ? t.userIds.length + " members" : "")
+              )
+            );
+          })
+        )
+      );
+    }
+
+    function TeamServicesSelector({ team, services, onAction }) {
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a service for " + (team.name || 'this team') + ":"),
+        services.length === 0
+          ? React.createElement("div", { style: { color: "#8ab4cc", fontSize: 12 } }, "No services found for this team.")
+          : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+              services.map(function(s, i) {
+                return React.createElement("button", { key: s.id || i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('DISPLAY_SERVICE_BY_ID:' + JSON.stringify({ service_id: s.id, service_name: s.name })); } },
+                  React.createElement("span", { className: "qa-icon" }, "🔧"),
+                  React.createElement("div", null,
+                    React.createElement("div", { className: "qa-label" }, s.name || ('Service ' + (i + 1))),
+                    React.createElement("div", { className: "qa-desc" }, s.deal_name ? 'Deal: ' + s.deal_name : '')
+                  )
+                );
+              })
+            )
+      );
+    }
+
     function StageSelector({ onAction }) {
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which deals do you want to see?"),
@@ -1172,9 +1293,9 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, role }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, role }) {
       var SALES_LABELS = ["Deal Summary","Open Deals","Add Line Item","Update Pricing","New Deal","New Contact","Submit Form"];
-      var OPS_LABELS   = ["Services Summary","Open Services","New Service","Farm Map"];
+      var OPS_LABELS   = ["Services Summary","Open Services","Display Service","New Service","Farm Map"];
 
       // Determine which sections this portal allows
       var path = window.location.pathname;
@@ -1203,6 +1324,7 @@
             if (a.isMap)            { window.open(MAP_URL, "_blank"); return; }
             if (a.isMapSelector)    { onMapSelector(); return; }
             if (a.isNewServiceForm) { onNewServiceForm(); return; }
+            if (a.isDisplayService) { onDisplayService(); return; }
             if (a.isUpload)         { onUpload(); return; }
             if (a.isStageSelector)  { onStageSelector(); return; }
             if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
@@ -1229,8 +1351,9 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, role: role });
+    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, onDisplayService: onDisplayService, role: role });
+      if (content === "DISPLAY_SERVICE") return React.createElement(TeamsSelectorWrapper, { onAction: onAction });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
       if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
       if (content === "MAP_STAGE_SELECTOR") return React.createElement(MapStageSelector, {});
@@ -1252,6 +1375,18 @@
             svParts[0] && React.createElement("div", { style: { marginBottom: 8 } }, svParts[0].trim()),
             React.createElement(ServicesTable, { data: svData, role: role }),
             svParts[2] && React.createElement("div", { style: { marginTop: 8 } }, svParts[2].trim())
+          );
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
+      }
+
+      if (content.includes("SERVICE_DETAILS:")) {
+        var sdParts = content.split("SERVICE_DETAILS:");
+        try {
+          var sdData = JSON.parse(sdParts[1].trim().split("\n")[0]);
+          return React.createElement("div", null,
+            sdParts[0] && React.createElement("div", { style: { marginBottom: 8 } }, sdParts[0].trim()),
+            React.createElement(ServiceDetails, { data: sdData }),
+            sdParts[2] && React.createElement("div", { style: { marginTop: 8 } }, sdParts[2].trim())
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1280,6 +1415,18 @@
           return React.createElement("div", null,
             tsParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, tsParts[0].trim()),
             React.createElement(TeamsSelector, { teams: teamsData.teams, onAction: onAction }),
+            tsParts[2] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, tsParts[2].trim())
+          );
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
+      }
+
+      if (content.includes("TEAM_SERVICES_SELECTOR:")) {
+        var tsParts = content.split("TEAM_SERVICES_SELECTOR:");
+        try {
+          var payload = JSON.parse(tsParts[1].trim().split("\n")[0]);
+          return React.createElement("div", null,
+            tsParts[0] && React.createElement("div", { style: { marginBottom: 8, whiteSpace: "pre-wrap" } }, tsParts[0].trim()),
+            React.createElement(TeamServicesSelector, { team: payload.team, services: payload.services, onAction: onAction }),
             tsParts[2] && React.createElement("div", { style: { marginTop: 8, whiteSpace: "pre-wrap" } }, tsParts[2].trim())
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
@@ -1716,10 +1863,51 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "NEW_SERVICE_FORM", display: true }]); });
       }
 
+      function triggerDisplayService() {
+        setShowActions(false);
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "DISPLAY_SERVICE", display: true }]); });
+      }
+
       async function sendMessage(overrideText) {
         var text = (overrideText || input).trim();
         if (!text && !uploadedFile) return;
         setShowActions(false);
+
+        // Handle direct selection actions for display service flow
+        if (text.startsWith("SHOW_TEAM_SERVICES:")) {
+          var payload = JSON.parse(text.replace("SHOW_TEAM_SERVICES:", ""));
+          var userMsg = { role: "user", content: "Show services for team: " + payload.team_name, display: true };
+          setMessages(function(prev) { return prev.concat([userMsg]); });
+          setInput("");
+          setLoading(true);
+          try {
+            var teamServices = await executeTool("get_team_services", { team_id: payload.team_id });
+            var services = teamServices.services || [];
+            var assistantContent = "Found " + services.length + " service" + (services.length !== 1 ? "s" : "") + " for " + payload.team_name + ". Select the service you want to display.\nTEAM_SERVICES_SELECTOR:" + JSON.stringify({ team: payload, services: services });
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: assistantContent, display: true }]); });
+          } catch(err) {
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load services for " + payload.team_name + ". " + err.message, display: true }]); });
+          }
+          setLoading(false);
+          return;
+        }
+
+        if (text.startsWith("DISPLAY_SERVICE_BY_ID:")) {
+          var payload = JSON.parse(text.replace("DISPLAY_SERVICE_BY_ID:", ""));
+          var userMsg2 = { role: "user", content: "Display service: " + payload.service_name, display: true };
+          setMessages(function(prev) { return prev.concat([userMsg2]); });
+          setInput("");
+          setLoading(true);
+          try {
+            var serviceDetails = await executeTool("get_service_details", { service_id: payload.service_id });
+            var assistantContent2 = "Displaying service " + payload.service_name + ".\nSERVICE_DETAILS:" + JSON.stringify(serviceDetails);
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: assistantContent2, display: true }]); });
+          } catch(err) {
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load service details for " + payload.service_name + ". " + err.message, display: true }]); });
+          }
+          setLoading(false);
+          return;
+        }
 
         // Handle service form submission
         var serviceData = null;
@@ -1744,6 +1932,7 @@
             && m.content !== "STAGE_SELECTOR"
             && m.content !== "SERVICE_STAGE_SELECTOR"
             && m.content !== "MAP_STAGE_SELECTOR"
+            && m.content !== "DISPLAY_SERVICE"
             && m.content !== "ADD_LINE_ITEM_FORM"
             && m.content !== "NEW_SERVICE_FORM"
             && !m.content.startsWith("SERVICE_FORM:")
@@ -1861,7 +2050,7 @@
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, role: auth.role })
                 )
             );
           }),

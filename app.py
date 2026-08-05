@@ -520,11 +520,21 @@ def create_service_task(service_id, task_details, contact_ids=None):
             return None
         task_id = res.json().get('id')
         if task_id:
-            requests.post(
+            # Attach the created task to the service. Try both directions to handle HubSpot association expectations.
+            assoc_inputs = [
+                {'from': {'id': service_id}, 'to': {'id': task_id}, 'type': 'service_to_task'}
+            ]
+            assoc_res = requests.post(
                 f'{HUBSPOT_BASE}/crm/v3/associations/services/tasks/batch/create',
-                json={'inputs': [{'from': {'id': service_id}, 'to': {'id': task_id}, 'type': 'service_to_task'}]},
+                json={'inputs': assoc_inputs},
                 headers=HUBSPOT_HEADERS()
             )
+            if assoc_res.status_code not in [200, 201]:
+                requests.post(
+                    f'{HUBSPOT_BASE}/crm/v3/associations/tasks/services/batch/create',
+                    json={'inputs': [{'from': {'id': task_id}, 'to': {'id': service_id}, 'type': 'task_to_service'}]},
+                    headers=HUBSPOT_HEADERS()
+                )
             if contact_ids:
                 requests.post(
                     f'{HUBSPOT_BASE}/crm/v3/associations/tasks/contacts/batch/create',
@@ -593,7 +603,7 @@ def hs_get_all_services():
                 deal_map[d['id']] = d.get('properties', {}).get('dealname', '')
 
         # 2. Fetch pipeline stage labels so we can map IDs → names
-        pipeline_id = 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6'
+        pipeline_id = SERVICE_PIPELINE_ID
         stage_map = {}  # id -> label
         try:
             stages_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/pipelines/services/{pipeline_id}/stages', headers=HUBSPOT_HEADERS())
