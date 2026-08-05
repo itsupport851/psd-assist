@@ -789,11 +789,11 @@
       // Shared form settings applied to all selected deals
       const [sharedForm, setSharedForm] = React.useState({
         team_id: '', start_date: '', target_end_date: '',
-        total_cost: '', stage: 'new', status: 'ON_TRACK',
+        total_cost: '', stage: 'new', status: 'ON_TRACK', description: '',
       });
       const [teams, setTeams]           = React.useState([]);
-      // Progress tracking for step 4
-      const [progress, setProgress]     = React.useState([]);  // [{deal, status, error}]
+      const [lineItemsByDeal, setLineItemsByDeal] = React.useState({});  // { dealId: [items] }
+      const [loadingLineItems, setLoadingLineItems] = React.useState(false);
 
       function updateShared(field, value) {
         setSharedForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
@@ -839,7 +839,37 @@
         }
       }
 
-      var selectedCount = Object.keys(selectedIds).length;
+      async function goToStep3() {
+        setLoadingLineItems(true);
+        setStep(3);
+        var byDeal = {};
+        for (var i = 0; i < selectedDeals.length; i++) {
+          try {
+            var res = await fetch("/hubspot/line-items/" + selectedDeals[i].id);
+            var data = await res.json();
+            byDeal[selectedDeals[i].id] = data.line_items || [];
+          } catch(e) {
+            byDeal[selectedDeals[i].id] = [];
+          }
+        }
+        setLineItemsByDeal(byDeal);
+        setLoadingLineItems(false);
+
+        // Build shared description from all unique fan configs
+        var allItems = Object.values(byDeal).flat();
+        if (allItems.length > 0) {
+          var lines = allItems.map(function(li) {
+            var lp = li.properties || {};
+            var qty  = lp.quantity || lp.number_of_fans || "?";
+            var name = lp.name || ((lp.fan_brand || "") + (lp.fan_size ? " " + lp.fan_size + '"' : "")).trim() || "Fan";
+            var hp   = lp.motor_size ? " " + lp.motor_size + " HP" : "";
+            return qty + "x " + name + hp;
+          });
+          setSharedForm(function(prev) {
+            return Object.assign({}, prev, { description: "Fans to service: " + lines.join(", ") + "." });
+          });
+        }
+      }
       var selectedDeals = filteredDeals.filter(function(d) { return selectedIds[d.id]; });
 
       const STAGE_LABELS = { appointmentscheduled: "Scheduled", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation", decisionmakerboughtin: "Decision", contractsent: "Contract", closedwon: "Won" };
@@ -914,7 +944,7 @@
             selectedCount > 0 && React.createElement("button", {
               className: "svc-form-btn",
               style: { width: "auto", padding: "6px 18px", marginLeft: "auto" },
-              onClick: function() { setStep(3); }
+              onClick: function() { goToStep3(); }
             }, "Continue with " + selectedCount + " deal" + (selectedCount !== 1 ? "s" : "") + " →")
           )
         );
@@ -922,15 +952,42 @@
 
       // ── Step 3: Shared service settings ──────────────────────
       if (step === 3) {
+        // Build fan inventory display across all selected deals
+        var inventoryPanel = loadingLineItems
+          ? React.createElement("div", { style: { fontSize: 11, color: "#6b8fa8", fontStyle: "italic", marginBottom: 10 } }, "Loading fan inventory…")
+          : Object.keys(lineItemsByDeal).length > 0
+            ? React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
+                React.createElement("div", { style: { color: "#6b8fa8", marginBottom: 6, fontWeight: 600 } }, "📦 Fan Inventory"),
+                selectedDeals.map(function(d) {
+                  var dp    = d.properties || {};
+                  var items = lineItemsByDeal[d.id] || [];
+                  return React.createElement("div", { key: d.id, style: { marginBottom: 6 } },
+                    React.createElement("div", { style: { color: "#8ab4cc", fontWeight: 600, marginBottom: 2 } }, dp.dealname || d.id),
+                    items.length === 0
+                      ? React.createElement("div", { style: { color: "#3a5a70", fontStyle: "italic" } }, "No line items")
+                      : items.map(function(li, j) {
+                          var lp = li.properties || {};
+                          var qty  = lp.quantity || lp.number_of_fans || "?";
+                          var name = lp.name || ((lp.fan_brand || "") + (lp.fan_size ? " " + lp.fan_size + '"' : "")).trim() || "Fan";
+                          var hp   = lp.motor_size ? " · " + lp.motor_size + " HP" : "";
+                          return React.createElement("div", { key: j, style: { color: "#e8edf2", paddingLeft: 8 } }, "• " + qty + "x " + name + hp);
+                        })
+                  );
+                })
+              )
+            : null;
+
         return React.createElement("div", null,
           React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 4, fontWeight: 600 } }, "🔧 New Service — Step 3 of 3"),
           React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 10 } },
             "Set service details for " + selectedCount + " deal" + (selectedCount !== 1 ? "s" : "") + ":"
           ),
           // Selected deals summary
-          React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 11, color: "#8ab4cc" } },
+          React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#8ab4cc" } },
             selectedDeals.map(function(d) { return (d.properties || {}).dealname || d.id; }).join(", ")
           ),
+          // Fan inventory
+          inventoryPanel,
           // Team
           React.createElement("div", { className: "svc-form-row" },
             React.createElement("div", { className: "svc-form-label" }, "Team"),
@@ -942,6 +999,18 @@
               React.createElement("option", { value: "" }, "— unassigned —"),
               teams.map(function(t) { return React.createElement("option", { key: t.id, value: t.id }, t.name); })
             )
+          ),
+          // Description — pre-filled from line items, editable
+          React.createElement("div", { className: "svc-form-row" },
+            React.createElement("div", { className: "svc-form-label" }, "Description" + (loadingLineItems ? " (building…)" : "")),
+            React.createElement("textarea", {
+              className: "svc-form-input",
+              value: sharedForm.description,
+              rows: 3,
+              placeholder: "e.g. Install motors, Inspect fans…",
+              onChange: function(e) { updateShared("description", e.target.value); },
+              style: { resize: "vertical", minHeight: 60 }
+            })
           ),
           // Dates
           React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
@@ -1033,7 +1102,7 @@
               body: JSON.stringify({
                 deal_id:         d.id,
                 name:            name,
-                description:     "Install fans across " + (dp.total_barns || "?") + " barns",
+                description:     sharedForm.description,
                 stage:           sharedForm.stage,
                 status:          sharedForm.status,
                 start_date:      sharedForm.start_date,
