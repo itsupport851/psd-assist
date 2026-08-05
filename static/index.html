@@ -514,10 +514,15 @@
           return val.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         } catch(e) { return String(d).slice(0, 10) || '—'; }
       }
+      function stripHtml(text) {
+        if (!text) return '';
+        return String(text).replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').trim();
+      }
+
       return React.createElement("div", null,
         React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
           React.createElement("div", { style: { fontSize: 14, fontWeight: 700, marginBottom: 8 } }, svc.name || 'Service Detail'),
-          React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, svc.deal_name ? 'Deal: ' + svc.deal_name : 'Deal: —'),
+          svc.deal_name && React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, 'Deal: ' + svc.deal_name),
           React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, svc.team ? 'Team: ' + svc.team : 'Team: —'),
           React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 12 } },
             React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Stage'), React.createElement("div", { style: { marginTop: 4 } }, svc.stage || '—')),
@@ -541,11 +546,15 @@
         tasks.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
           React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Tasks"),
           tasks.map(function(t) {
-            return React.createElement("div", { key: t.id, style: { marginBottom: 10, fontSize: 12 } },
-              React.createElement("div", { style: { fontWeight: 600 } }, t.subject || '—'),
-              React.createElement("div", null, t.body || 'No details'),
-              React.createElement("div", { style: { color: '#8ab4cc' } }, (t.status ? 'Status: ' + t.status : 'Status: —') + (t.priority ? ' • Priority: ' + t.priority : '') ),
-              React.createElement("div", null, 'Created: ' + fmtDate(t.created_date))
+            return React.createElement("div", { key: t.id, style: { marginBottom: 20, fontSize: 12 } },
+              React.createElement("div", { style: { fontWeight: 600, marginBottom: 6 } }, t.subject || '—'),
+              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 4 } }, 'Status: ' + (t.status || '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 4 } }, 'Priority: ' + (t.priority || '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 4 } }, 'Start: ' + (t.start_date ? fmtDate(t.start_date) : '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 8 } }, 'Due: ' + (t.due_date ? fmtDate(t.due_date) : '—')),
+              React.createElement("div", { style: { fontWeight: 600, marginBottom: 4 } }, 'Notes'),
+              React.createElement("div", { style: { marginBottom: 8, whiteSpace: 'pre-wrap', color: '#e8edf2' } }, stripHtml(t.body) || 'No details'),
+              React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Created: ' + fmtDate(t.created_date))
             );
           })
         ),

@@ -671,7 +671,10 @@ def hs_service_details(service_id):
 
         tasks = []
         for task_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/tasks'):
-            task_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/tasks/{task_id}?properties=subject,hs_task_body,hs_task_status,hs_task_priority,hs_task_due_date', headers=HUBSPOT_HEADERS())
+            task_res = requests.get(
+                f'{HUBSPOT_BASE}/crm/v3/objects/tasks/{task_id}?properties=subject,hs_task_body,hs_task_status,hs_task_priority,hs_task_start_date,hs_task_due_date,createdate',
+                headers=HUBSPOT_HEADERS()
+            )
             if task_res.status_code == 200:
                 tp = task_res.json().get('properties', {})
                 tasks.append({
@@ -680,7 +683,9 @@ def hs_service_details(service_id):
                     'body': tp.get('hs_task_body', ''),
                     'status': tp.get('hs_task_status', ''),
                     'priority': tp.get('hs_task_priority', ''),
-                    'due_date': tp.get('hs_task_due_date', '')
+                    'start_date': tp.get('hs_task_start_date', tp.get('createdate', '')),
+                    'due_date': tp.get('hs_task_due_date', ''),
+                    'created_date': tp.get('createdate', '')
                 })
 
         deals = []
