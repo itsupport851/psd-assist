@@ -36,14 +36,11 @@ SERVICE_PROPERTY_ALIASES = {
     'team_id': 'hs_shared_team_ids',
 }
 SERVICE_STATUS_MAP = {
-    'on_track': 'ON_TRACK',
-    'at_risk': 'AT_RISK',
-    'behind': 'BEHIND',
-    'complete': 'COMPLETE',
-    'ON_TRACK': 'ON_TRACK',
-    'AT_RISK': 'AT_RISK',
-    'BEHIND': 'BEHIND',
-    'COMPLETE': 'COMPLETE',
+    'on_track': 'on_track', 'on-track': 'on_track', 'on track': 'on_track', 'ontrack': 'on_track',
+    'at_risk': 'delayed', 'at-risk': 'delayed', 'at risk': 'delayed', 'atrisk': 'delayed', 'at risk': 'delayed',
+    'behind': 'failed', 'failed': 'failed',
+    'complete': 'succeeded_completed', 'completed': 'succeeded_completed', 'succeeded_completed': 'succeeded_completed', 'success': 'succeeded_completed',
+    'delayed': 'delayed',
 }
 
 def get_dropbox_access_token():
@@ -463,8 +460,9 @@ def build_service_properties(data, include_pipeline=False):
     for key, hs_name in SERVICE_PROPERTY_ALIASES.items():
         if key in data and data.get(key) is not None and data.get(key) != "":
             if key == 'status':
-                status_value = str(data[key]).upper()
-                properties[hs_name] = SERVICE_STATUS_MAP.get(status_value, status_value)
+                raw_status = str(data[key]).strip()
+                normalized_status = raw_status.lower().replace('-', '_').replace(' ', '_')
+                properties[hs_name] = SERVICE_STATUS_MAP.get(normalized_status, SERVICE_STATUS_MAP.get(raw_status, raw_status))
             else:
                 properties[hs_name] = str(data[key])
     if include_pipeline:
@@ -548,7 +546,7 @@ def hs_get_all_services():
         stage_map.setdefault('3',           'Closed')
 
         # 3. Get all services — fetch broad property set including hs_object_name
-        svc_props = 'hs_name,hs_object_name,subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id,hs_shared_team_ids'
+        svc_props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_target_end_date,hs_start_date,hs_total_cost,hs_amount_paid,hs_amount_remaining,hs_shared_team_ids,hubspot_team_id,hs_object_name,subject,hs_ticket_name,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
@@ -603,22 +601,19 @@ def hs_get_all_services():
             raw_stage = sp.get('hs_pipeline_stage', '') or ''
             stage_label = stage_map.get(raw_stage, raw_stage)
 
-            # Status: HubSpot Services uses 'hs_pipeline_stage' label as status display,
-            # but the actual status field is stored in 'hs_ticket_priority' (ON_TRACK etc.)
-            # The label shown in HubSpot UI as "Status" maps to hs_ticket_priority values
+            # Status: use the service-specific status field first, with fallbacks
             raw_status = (
+                sp.get('hs_status') or
                 sp.get('hs_ticket_priority') or
                 sp.get('hs_object_status') or
                 ''
             )
-            # Normalize: HubSpot sometimes returns the label directly e.g. "On Track"
+            # Normalize HubSpot values into the app's internal status labels
             status_map = {
-                'ON_TRACK': 'ON_TRACK', 'on_track': 'ON_TRACK',
-                'On Track': 'ON_TRACK', 'on track': 'ON_TRACK',
-                'AT_RISK': 'AT_RISK', 'at_risk': 'AT_RISK',
-                'At Risk': 'AT_RISK', 'at risk': 'AT_RISK',
-                'BEHIND': 'BEHIND', 'Behind': 'BEHIND',
-                'COMPLETE': 'COMPLETE', 'Complete': 'COMPLETE', 'Completed': 'COMPLETE',
+                'on_track': 'ON_TRACK', 'ON TRACK': 'ON_TRACK', 'On Track': 'ON_TRACK', 'on track': 'ON_TRACK', 'ON_TRACK': 'ON_TRACK',
+                'delayed': 'AT_RISK', 'At Risk': 'AT_RISK', 'at_risk': 'AT_RISK', 'AT_RISK': 'AT_RISK', 'at risk': 'AT_RISK',
+                'failed': 'BEHIND', 'Behind': 'BEHIND', 'BEHIND': 'BEHIND',
+                'succeeded_completed': 'COMPLETE', 'Completed': 'COMPLETE', 'COMPLETE': 'COMPLETE',
             }
             raw_status = status_map.get(raw_status, raw_status)
 
