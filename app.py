@@ -79,6 +79,10 @@ def auth():
         if not pin:
             return jsonify({'error': 'PIN required'}), 400
 
+        # Check Admin PIN
+        if pin == os.environ.get('PIN_ADMIN', ''):
+            return jsonify({'success': True, 'role': 'admin', 'name': 'Admin'})
+
         # Check Sales PIN
         if pin == os.environ.get('PIN_SALES', ''):
             return jsonify({'success': True, 'role': 'sales', 'name': 'Sales'})
@@ -87,11 +91,14 @@ def auth():
         if pin == os.environ.get('PIN_ANALYST', ''):
             return jsonify({'success': True, 'role': 'analyst', 'name': 'Analyst'})
 
+        # Check Operations PIN
+        if pin == os.environ.get('PIN_OPERATIONS', ''):
+            return jsonify({'success': True, 'role': 'operations', 'name': 'Operations'})
+
         # Check Installer PINs (PIN_INSTALLER_{team_id})
         for key, value in os.environ.items():
             if key.startswith('PIN_INSTALLER_') and pin == value:
                 team_id = key.replace('PIN_INSTALLER_', '')
-                # Get team name
                 try:
                     res = requests.get(f'{HUBSPOT_BASE}/settings/v3/users/teams', headers=HUBSPOT_HEADERS())
                     teams = res.json().get('results', [])
@@ -107,6 +114,18 @@ def auth():
 # ── Serve frontend ──────────────────────────────────────────
 @app.route('/', methods=['GET'])
 def index():
+    return app.send_static_file('index.html')
+
+@app.route('/sales', methods=['GET'])
+def sales_portal():
+    return app.send_static_file('index.html')
+
+@app.route('/operations', methods=['GET'])
+def operations_portal():
+    return app.send_static_file('index.html')
+
+@app.route('/service', methods=['GET'])
+def service_portal():
     return app.send_static_file('index.html')
 
 @app.route('/map', methods=['GET'])
