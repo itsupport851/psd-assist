@@ -498,8 +498,8 @@ def hs_get_all_services():
         stage_map.setdefault('2',           'In Progress')
         stage_map.setdefault('3',           'Closed')
 
-        # 3. Get all services — fetch broad property set to catch name wherever HubSpot stores it
-        svc_props = 'subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id,hs_shared_team_ids'
+        # 3. Get all services — fetch broad property set including hs_object_name
+        svc_props = 'hs_object_name,subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id,hs_shared_team_ids'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
@@ -536,8 +536,9 @@ def hs_get_all_services():
             team_id = sp.get('hs_shared_team_ids', '') or sp.get('hubspot_team_id', '') or ''
             team_name = team_id  # enriched below from teams API
 
-            # Resolve name — try every field HubSpot might store it in
+            # Resolve name — try every known field HubSpot might store service name in
             raw_name = (
+                sp.get('hs_object_name') or
                 sp.get('subject') or
                 sp.get('hs_ticket_name') or
                 sp.get('content') or
@@ -546,8 +547,7 @@ def hs_get_all_services():
                 ''
             ).strip()
             if not raw_name:
-                cat = (sp.get('hs_ticket_category') or '').strip()
-                raw_name = cat if cat else ''
+                raw_name = (sp.get('hs_ticket_category') or '').strip()
 
             # Resolve pipeline stage ID → label
             raw_stage = sp.get('hs_pipeline_stage', '') or ''
@@ -623,6 +623,29 @@ def hs_get_all_services():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── HubSpot: Repair service names (backfill from category/description) ──
+@app.route('/hubspot/services/<service_id>/repair', methods=['PATCH'])
+def hs_repair_service(service_id):
+    try:
+        data = request.get_json()
+        name = data.get('name', '')
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+        payload = {
+            'properties': {
+                'hs_object_name': name,
+                'subject':        name,
+                'hs_ticket_name': name,
+                'content':        name,
+            }
+        }
+        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}', json=payload, headers=HUBSPOT_HEADERS())
+        if res.status_code not in [200, 204]:
+            return jsonify({'error': res.text}), res.status_code
+        return jsonify({'success': True, 'service_id': service_id, 'name': name})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ── HubSpot: Inspect a service — fetch every non-null property ──
 @app.route('/hubspot/service-inspect/<service_id>', methods=['GET'])
 def hs_service_inspect(service_id):
@@ -679,15 +702,17 @@ def hs_create_service():
 
         payload = {
             'properties': {
-                'subject':          data.get('name', ''),
-                'hs_ticket_name':   data.get('name', ''),
-                'content':          data.get('name', ''),
-                'description':      data.get('description', ''),
-                'hs_pipeline':      'default',
+                'hs_object_name':    data.get('name', ''),
+                'subject':           data.get('name', ''),
+                'hs_ticket_name':    data.get('name', ''),
+                'content':           data.get('name', ''),
+                'description':       data.get('description', ''),
+                'hs_pipeline':       'default',
                 'hs_pipeline_stage': data.get('stage', 'new'),
                 'hs_ticket_priority': data.get('status', 'ON_TRACK'),
-                'start_date':       data.get('start_date', ''),
-                'hs_due_date':      data.get('target_end_date', ''),
+                'start_date':        data.get('start_date', ''),
+                'target_end_date':   data.get('target_end_date', ''),
+                'hs_due_date':       data.get('target_end_date', ''),
                 'hs_ticket_category': 'Fan Motor Installation',
             }
         }
