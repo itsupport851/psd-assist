@@ -498,8 +498,8 @@ def hs_get_all_services():
         stage_map.setdefault('2',           'In Progress')
         stage_map.setdefault('3',           'Closed')
 
-        # 3. Get all services directly
-        svc_props = 'subject,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,start_date,hs_start_date,target_end_date,hs_due_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
+        # 3. Get all services directly — include all name candidate fields + correct date fields
+        svc_props = 'subject,hs_ticket_name,content,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
@@ -528,6 +528,9 @@ def hs_get_all_services():
             team_id = sp.get('hubspot_team_id', '')
             team_name = team_id  # fallback to ID; enriched below if possible
 
+            # Resolve name — HubSpot services may store in subject, hs_ticket_name, or content
+            raw_name = (sp.get('subject') or sp.get('hs_ticket_name') or sp.get('content') or '').strip()
+
             # Resolve pipeline stage ID → label
             raw_stage = sp.get('hs_pipeline_stage', '') or ''
             stage_label = stage_map.get(raw_stage, raw_stage)
@@ -535,9 +538,25 @@ def hs_get_all_services():
             # Status: stored in hs_ticket_priority by hs_create_service; hs_object_status is fallback
             raw_status = sp.get('hs_ticket_priority', '') or sp.get('hs_object_status', '') or ''
 
+            def normalize_date(val):
+                """Convert HubSpot date value to ISO date string regardless of format."""
+                if not val:
+                    return ''
+                try:
+                    # If it's a numeric timestamp (ms), convert to ISO
+                    ts = float(val)
+                    from datetime import datetime, timezone
+                    return datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime('%Y-%m-%d')
+                except (ValueError, TypeError):
+                    # Already a string like '2026-04-01' or ISO datetime
+                    return str(val)[:10]
+
+            start_raw = sp.get('start_date') or sp.get('hs_start_date') or sp.get('createdate') or ''
+            due_raw   = sp.get('hs_due_date') or sp.get('target_end_date') or ''
+
             services.append({
                 'id': sid,
-                'name': sp.get('subject', ''),
+                'name': raw_name,
                 'description': sp.get('description', ''),
                 'deal_name': deal_name,
                 'stage': stage_label,
@@ -545,8 +564,8 @@ def hs_get_all_services():
                 'status': raw_status,
                 'team': team_name,
                 'team_id': team_id,
-                'start_date': sp.get('start_date') or sp.get('hs_start_date', ''),
-                'due_date': sp.get('target_end_date') or sp.get('hs_due_date', ''),
+                'start_date': normalize_date(start_raw),
+                'due_date':   normalize_date(due_raw),
                 'total_cost': sp.get('hs_total_cost', ''),
                 'amount_paid': sp.get('hs_amount_paid', ''),
                 'remaining': sp.get('hs_remaining_amount', ''),
@@ -600,13 +619,15 @@ def hs_create_service():
 
         payload = {
             'properties': {
-                'subject': data.get('name', ''),
-                'description': data.get('description', ''),
-                'hs_pipeline': 'default',
+                'subject':          data.get('name', ''),
+                'hs_ticket_name':   data.get('name', ''),
+                'content':          data.get('name', ''),
+                'description':      data.get('description', ''),
+                'hs_pipeline':      'default',
                 'hs_pipeline_stage': data.get('stage', 'new'),
                 'hs_ticket_priority': data.get('status', 'ON_TRACK'),
-                'createdate': data.get('start_date', ''),
-                'hs_due_date': data.get('target_end_date', ''),
+                'start_date':       data.get('start_date', ''),
+                'hs_due_date':      data.get('target_end_date', ''),
                 'hs_ticket_category': 'Fan Motor Installation',
             }
         }
