@@ -61,6 +61,22 @@
     .qa-btn .qa-icon { font-size: 16px; flex-shrink: 0; }
     .qa-btn .qa-label { line-height: 1.3; }
     .qa-btn .qa-desc { font-size: 10px; color: #6b8fa8; margin-top: 1px; }
+    .svcd-card { background: #162130; border: 1px solid #1e2d3d; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; transition: border-color 0.15s; }
+    .svcd-card:hover { border-color: #2a3d52; }
+    .svcd-card.selected { border-color: #25a35a; background: #0d2218; }
+    .svcd-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .svcd-card-name { font-size: 14px; font-weight: 600; color: #e8edf2; flex: 1; }
+    .svcd-card-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
+    .svcd-card-meta span { background: #1e2d3d; padding: 2px 8px; border-radius: 8px; color: #8ab4cc; }
+    .svcd-edit-panel { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; margin-top: 10px; }
+    .svcd-edit-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
+    .svcd-filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .svcd-filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #1e2d3d; background: #162130; color: #8ab4cc; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+    .svcd-filter-btn:hover { border-color: #25a35a; color: #e8edf2; }
+    .svcd-filter-btn.active { background: #25a35a; border-color: #25a35a; color: #fff; }
+    .svcd-empty { text-align: center; padding: 40px 20px; color: #3a5a70; font-size: 13px; }
+    .svcd-spinner { width: 28px; height: 28px; border: 3px solid #1e2d3d; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .pin-key { width: 72px; height: 56px; background: #162130; border: 1px solid #1e2d3d; border-radius: 12px; color: #e8edf2; font-size: 20px; font-weight: 600; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; }
     .pin-key:hover { background: #1e2d3d; border-color: #25a35a; }
     .pin-key:active { transform: scale(0.95); }
@@ -794,6 +810,7 @@
       const [teams, setTeams]           = React.useState([]);
       const [lineItemsByDeal, setLineItemsByDeal] = React.useState({});  // { dealId: [items] }
       const [loadingLineItems, setLoadingLineItems] = React.useState(false);
+      const [progress, setProgress]           = React.useState([]);  // [{deal, status, error}]
 
       function updateShared(field, value) {
         setSharedForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
@@ -1335,6 +1352,240 @@
       return authRole;
     }
 
+    // ── Services Dashboard (installer /service portal) ───────────
+    function ServicesDashboard({ auth, onLock }) {
+      const [services, setServices]     = useState([]);
+      const [loading, setLoading]       = useState(true);
+      const [filter, setFilter]         = useState('all');   // all | ON_TRACK | AT_RISK | BEHIND | COMPLETE
+      const [selected, setSelected]     = useState(null);    // service object being edited
+      const [editForm, setEditForm]     = useState({});
+      const [saving, setSaving]         = useState(false);
+      const [toast, setToast]           = useState('');
+
+      const STATUS_FILTERS = [
+        { key: 'all',      label: 'All Services', color: '#6366f1' },
+        { key: 'ON_TRACK', label: 'On Track',      color: '#25a35a' },
+        { key: 'AT_RISK',  label: 'At Risk',        color: '#f59e0b' },
+        { key: 'BEHIND',   label: 'Behind',          color: '#ef4444' },
+        { key: 'COMPLETE', label: 'Completed',       color: '#5ab4f0' },
+      ];
+
+      const STATUS_LABELS = { ON_TRACK: 'On Track', AT_RISK: 'At Risk', BEHIND: 'Behind', COMPLETE: 'Completed' };
+      const STATUS_COLORS = { ON_TRACK: '#25a35a', AT_RISK: '#f59e0b', BEHIND: '#ef4444', COMPLETE: '#5ab4f0' };
+
+      function showToast(msg) {
+        setToast(msg);
+        setTimeout(function() { setToast(''); }, 2500);
+      }
+
+      function fmtDate(d) {
+        if (!d) return '—';
+        try {
+          var v = /^\d{10,}$/.test(String(d)) ? new Date(Number(d)) : new Date(d);
+          if (isNaN(v.getTime())) return String(d).slice(0, 10) || '—';
+          return v.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch(e) { return String(d).slice(0, 10) || '—'; }
+      }
+
+      function loadServices() {
+        setLoading(true);
+        fetch('/hubspot/all-services')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var all = data.services || [];
+            // Filter to this team's services
+            var mine = auth.teamId
+              ? all.filter(function(s) {
+                  var tid = String(s.team_id || '');
+                  return tid.split(';').map(function(x) { return x.trim(); }).includes(String(auth.teamId));
+                })
+              : all;
+            setServices(mine);
+          })
+          .catch(function() { setServices([]); })
+          .finally(function() { setLoading(false); });
+      }
+
+      useEffect(function() { loadServices(); }, []);
+
+      var filtered = filter === 'all' ? services : services.filter(function(s) { return s.status === filter; });
+
+      function openEdit(svc) {
+        setSelected(svc);
+        setEditForm({ status: svc.status || 'ON_TRACK', target_end_date: svc.due_date || '' });
+      }
+
+      function closeEdit() { setSelected(null); setEditForm({}); }
+
+      async function saveEdit() {
+        if (!selected) return;
+        setSaving(true);
+        try {
+          var res = await fetch('/hubspot/services/' + selected.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status:          editForm.status,
+              target_end_date: editForm.target_end_date,
+            })
+          });
+          var data = await res.json();
+          if (data.success) {
+            // Update locally
+            setServices(function(prev) {
+              return prev.map(function(s) {
+                if (s.id !== selected.id) return s;
+                return Object.assign({}, s, {
+                  status:   editForm.status,
+                  due_date: editForm.target_end_date,
+                });
+              });
+            });
+            showToast('✅ Service updated');
+            closeEdit();
+          } else {
+            showToast('❌ Update failed');
+          }
+        } catch(e) {
+          showToast('❌ ' + e.message);
+        }
+        setSaving(false);
+      }
+
+      return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f1923' } },
+
+        // Header
+        React.createElement("div", { style: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px', borderBottom: '1px solid #1e2d3d', background: '#0d1520', flexShrink: 0 } },
+          React.createElement("div", { style: { position: 'absolute', left: 12 } },
+            React.createElement("button", { onClick: onLock, style: { padding: '6px 12px', background: '#162130', border: '1px solid #1e2d3d', borderRadius: 8, color: '#6b8fa8', fontSize: 11, cursor: 'pointer' } }, "🔒")
+          ),
+          React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+            React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #1a3a6b, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#fff' } }, "P"),
+            React.createElement("div", { style: { textAlign: 'center' } },
+              React.createElement("div", { style: { fontWeight: 700, fontSize: 14 } }, "PSD Service Portal"),
+              React.createElement("div", { style: { fontSize: 10, color: '#4a7acc', marginTop: 2 } }, "● " + auth.name + " — Field Installer")
+            )
+          ),
+          React.createElement("div", { style: { position: 'absolute', right: 12 } },
+            React.createElement("button", { onClick: loadServices, style: { padding: '6px 12px', background: '#162130', border: '1px solid #1e2d3d', borderRadius: 8, color: '#8ab4cc', fontSize: 11, cursor: 'pointer' } }, "↻ Refresh")
+          )
+        ),
+
+        // Filter bar
+        React.createElement("div", { style: { padding: '12px 16px 0', background: '#0d1520', borderBottom: '1px solid #1e2d3d', flexShrink: 0 } },
+          React.createElement("div", { className: 'svcd-filter-bar' },
+            STATUS_FILTERS.map(function(f) {
+              return React.createElement("button", {
+                key: f.key,
+                className: 'svcd-filter-btn' + (filter === f.key ? ' active' : ''),
+                style: filter === f.key ? { background: f.color, borderColor: f.color } : {},
+                onClick: function() { setFilter(f.key); closeEdit(); }
+              },
+                f.label,
+                f.key !== 'all' && React.createElement("span", { style: { marginLeft: 4, opacity: 0.8 } },
+                  "(" + services.filter(function(s) { return s.status === f.key; }).length + ")"
+                )
+              );
+            })
+          )
+        ),
+
+        // Content
+        React.createElement("div", { style: { flex: 1, overflowY: 'auto', padding: '14px 16px' } },
+          loading
+            ? React.createElement("div", { className: 'svcd-spinner' })
+            : filtered.length === 0
+              ? React.createElement("div", { className: 'svcd-empty' },
+                  React.createElement("div", { style: { fontSize: 32, marginBottom: 10 } }, "🔧"),
+                  filter === 'all' ? "No services assigned to your team yet." : "No services with this status."
+                )
+              : filtered.map(function(svc) {
+                  var isSelected = selected && selected.id === svc.id;
+                  var statusColor = STATUS_COLORS[svc.status] || '#6b8fa8';
+                  var statusLabel = STATUS_LABELS[svc.status] || svc.status || '—';
+
+                  return React.createElement("div", { key: svc.id },
+                    React.createElement("div", {
+                      className: 'svcd-card' + (isSelected ? ' selected' : ''),
+                      onClick: function() { isSelected ? closeEdit() : openEdit(svc); }
+                    },
+                      React.createElement("div", { className: 'svcd-card-header' },
+                        React.createElement("div", { className: 'svcd-card-name' }, svc.name || '(Unnamed Service)'),
+                        React.createElement("span", { style: { background: statusColor + '22', color: statusColor, border: '1px solid ' + statusColor + '55', padding: '2px 9px', borderRadius: 8, fontSize: 11, fontWeight: 600, flexShrink: 0 } }, statusLabel)
+                      ),
+                      React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 6 } }, svc.deal_name || '—'),
+                      React.createElement("div", { className: 'svcd-card-meta' },
+                        React.createElement("span", null, "Stage: " + (svc.stage || '—')),
+                        svc.start_date && React.createElement("span", null, "Start: " + fmtDate(svc.start_date)),
+                        React.createElement("span", { style: { color: svc.due_date ? '#f59e0b' : '#6b8fa8' } }, "Due: " + fmtDate(svc.due_date)),
+                        svc.total_cost && React.createElement("span", null, "$" + Number(svc.total_cost).toLocaleString())
+                      ),
+                      svc.description && React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8', marginTop: 8, lineHeight: 1.5, borderTop: '1px solid #1e2d3d', paddingTop: 8 } }, svc.description),
+                      React.createElement("div", { style: { marginTop: 8, fontSize: 11, color: isSelected ? '#25a35a' : '#3a5a70' } }, isSelected ? "▲ Close" : "▼ Update status or due date")
+                    ),
+
+                    // Inline edit panel
+                    isSelected && React.createElement("div", { className: 'svcd-edit-panel' },
+                      React.createElement("div", { className: 'svcd-edit-title' }, "✏️ Update — " + (svc.name || 'Service')),
+
+                      // Status
+                      React.createElement("div", { className: 'svc-form-row' },
+                        React.createElement("div", { className: 'svc-form-label' }, "Status"),
+                        React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                          ['ON_TRACK','AT_RISK','BEHIND','COMPLETE'].map(function(st) {
+                            var active = editForm.status === st;
+                            var col = STATUS_COLORS[st];
+                            return React.createElement("button", {
+                              key: st,
+                              onClick: function() { setEditForm(function(prev) { return Object.assign({}, prev, { status: st }); }); },
+                              style: {
+                                padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                border: '1px solid ' + (active ? col : '#1e2d3d'),
+                                background: active ? col + '33' : '#162130',
+                                color: active ? col : '#6b8fa8',
+                                transition: 'all 0.15s'
+                              }
+                            }, STATUS_LABELS[st]);
+                          })
+                        )
+                      ),
+
+                      // Target end date
+                      React.createElement("div", { className: 'svc-form-row' },
+                        React.createElement("div", { className: 'svc-form-label' }, "Target End Date"),
+                        React.createElement("input", {
+                          className: 'svc-form-input',
+                          type: 'date',
+                          value: editForm.target_end_date || '',
+                          onChange: function(e) { setEditForm(function(prev) { return Object.assign({}, prev, { target_end_date: e.target.value }); }); }
+                        })
+                      ),
+
+                      React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 4 } },
+                        React.createElement("button", {
+                          className: 'svc-form-btn',
+                          style: { width: 'auto', padding: '7px 20px' },
+                          disabled: saving,
+                          onClick: saveEdit
+                        }, saving ? 'Saving…' : '✅ Save'),
+                        React.createElement("button", {
+                          className: 'svc-form-btn-cancel',
+                          style: { width: 'auto', padding: '7px 16px', marginTop: 0 },
+                          onClick: closeEdit
+                        }, 'Cancel')
+                      )
+                    )
+                  );
+                })
+        ),
+
+        // Toast
+        toast && React.createElement("div", {
+          style: { position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#162130', border: '1px solid #1e2d3d', color: '#e8edf2', padding: '9px 18px', borderRadius: 8, fontSize: 13, zIndex: 100, whiteSpace: 'nowrap' }
+        }, toast)
+      );
+    }
+
     // ── PIN Screen ──────────────────────────────────────────────
     function PinScreen({ onAuth }) {
       const [pin, setPin] = useState("");
@@ -1372,10 +1623,10 @@
         if (k === "del") { setPin(function(p) { return p.slice(0, -1); }); return; }
         var newPin = pin + k;
         setPin(newPin);
-        if (newPin.length >= 6) submitPin(newPin);
+        if (newPin.length >= 4) submitPin(newPin);
       }
 
-      var dots = [0,1,2,3,4,5].map(function(i) {
+      var dots = [0,1,2,3].map(function(i) {
         return React.createElement("div", { key: i, className: "pin-dot" + (i < pin.length ? (error ? " error" : " filled") : ""), style: error ? { animation: "shake 0.3s ease" } : {} });
       });
 
@@ -1550,6 +1801,16 @@
       function handleKey(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 
       if (!auth) return React.createElement(PinScreen, { onAuth: handleAuth });
+
+      // Installer on /service portal → dedicated services dashboard
+      var portalPath = window.location.pathname;
+      if (portalPath.length > 1 && portalPath.endsWith('/')) portalPath = portalPath.slice(0, -1);
+      if (auth.role === 'installer' || portalPath === '/service') {
+        return React.createElement(ServicesDashboard, {
+          auth: auth,
+          onLock: function() { setAuth(null); setMessages([]); }
+        });
+      }
 
       var displayMessages = messages.filter(function(m) { return m.display; });
 
