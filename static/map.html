@@ -7,278 +7,426 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', system-ui, sans-serif; background: #0f1923; color: #e8edf2; height: 100vh; display: flex; flex-direction: column; }
-    #header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: #0d1520; border-bottom: 1px solid #1e2d3d; }
-    #header-left { display: flex; align-items: center; gap: 12px; }
-    #logo { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, #1a6b3c, #25a35a); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; }
-    #title { font-weight: 600; font-size: 15px; }
+
+    /* ── Header ── */
+    #header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: #0d1520; border-bottom: 1px solid #1e2d3d; flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
+    #header-left { display: flex; align-items: center; gap: 10px; }
+    #logo { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #1a6b3c, #25a35a); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    #title { font-weight: 600; font-size: 14px; }
     #subtitle { font-size: 11px; color: #4a9a6b; margin-top: 1px; }
-    #back-btn { padding: 7px 16px; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; color: #8ab4cc; font-size: 13px; cursor: pointer; text-decoration: none; }
+    #back-btn { padding: 6px 14px; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; color: #8ab4cc; font-size: 12px; cursor: pointer; text-decoration: none; white-space: nowrap; }
     #back-btn:hover { background: #1e2d3d; }
-    #map-container { flex: 1; position: relative; }
+
+    /* ── Stage filter bar ── */
+    #filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #0d1520; border-bottom: 1px solid #1e2d3d; flex-shrink: 0; flex-wrap: wrap; }
+    #filter-bar .filter-label { font-size: 11px; color: #6b8fa8; margin-right: 4px; white-space: nowrap; }
+    .stage-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid #1e2d3d; background: #162130; color: #8ab4cc; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .stage-btn:hover { border-color: #25a35a; }
+    .stage-btn.active { color: #fff; border-color: transparent; }
+    .stage-btn .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* stage colors */
+    .color-all          { background: #6366f1; }
+    .color-scheduled    { background: #25a35a; }
+    .color-qualified    { background: #f59e0b; }
+    .color-presentation { background: #3b82f6; }
+    .color-decision     { background: #a855f7; }
+    .color-contract     { background: #06b6d4; }
+    .color-won          { background: #10b981; }
+
+    .stage-btn.active.btn-all          { background: #6366f1; }
+    .stage-btn.active.btn-scheduled    { background: #25a35a; }
+    .stage-btn.active.btn-qualified    { background: #f59e0b; }
+    .stage-btn.active.btn-presentation { background: #3b82f6; }
+    .stage-btn.active.btn-decision     { background: #a855f7; }
+    .stage-btn.active.btn-contract     { background: #06b6d4; }
+    .stage-btn.active.btn-won          { background: #10b981; }
+
+    /* ── Map container ── */
+    #map-container { flex: 1; position: relative; overflow: hidden; }
     #map { width: 100%; height: 100%; }
-    #sidebar { position: absolute; top: 16px; right: 16px; width: 300px; background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; overflow: hidden; max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
-    #sidebar-header { padding: 12px 16px; background: #162130; border-bottom: 1px solid #1e2d3d; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-    #deals-list { overflow-y: auto; flex: 1; }
-    .deal-card { padding: 12px 16px; border-bottom: 1px solid #1e2d3d; cursor: pointer; transition: background 0.15s; }
-    .deal-card:hover { background: #162130; }
-    .deal-card.active { background: #0d3320; border-left: 3px solid #25a35a; }
-    .deal-card-name { font-size: 13px; font-weight: 600; color: #e8edf2; margin-bottom: 4px; }
-    .deal-card-address { font-size: 11px; color: #6b8fa8; margin-bottom: 4px; }
-    .deal-card-meta { display: flex; gap: 8px; font-size: 11px; }
-    .meta-tag { background: #1e2d3d; padding: 2px 7px; border-radius: 10px; color: #8ab4cc; }
-    #detail-panel { position: absolute; bottom: 16px; left: 16px; width: 320px; background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; display: none; }
-    #detail-panel.visible { display: block; }
-    .detail-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: #e8edf2; }
-    .detail-address { font-size: 12px; color: #6b8fa8; margin-bottom: 12px; }
-    .detail-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #1a2535; }
-    .detail-row:last-child { border-bottom: none; }
-    .detail-label { color: #6b8fa8; }
-    .detail-value { color: #e8edf2; font-weight: 500; }
-    #close-detail { position: absolute; top: 12px; right: 12px; background: none; border: none; color: #6b8fa8; cursor: pointer; font-size: 16px; }
-    #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+
+    /* ── Loading ── */
+    #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 10; }
     #loading-text { color: #6b8fa8; font-size: 14px; margin-top: 12px; }
     .spinner { width: 36px; height: 36px; border: 3px solid #1e2d3d; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #assign-btn { width: 100%; margin-top: 12px; padding: 8px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
-    #assign-btn:hover { opacity: 0.9; }
-    #stats-bar { padding: 8px 16px; background: #162130; border-top: 1px solid #1e2d3d; font-size: 11px; color: #6b8fa8; display: flex; gap: 16px; }
-    .stat { display: flex; gap: 5px; }
+
+    /* ── Sidebar ── */
+    #sidebar { position: absolute; top: 12px; right: 12px; width: 290px; background: #0d1520ee; border: 1px solid #1e2d3d; border-radius: 12px; overflow: hidden; max-height: calc(100% - 24px); display: flex; flex-direction: column; backdrop-filter: blur(6px); }
+    #sidebar-header { padding: 10px 14px; background: #162130; border-bottom: 1px solid #1e2d3d; font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+    #deals-list { overflow-y: auto; flex: 1; }
+    #deals-list::-webkit-scrollbar { width: 4px; }
+    #deals-list::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 2px; }
+    .deal-card { padding: 10px 14px; border-bottom: 1px solid #1e2d3d; cursor: pointer; transition: background 0.12s; border-left: 3px solid transparent; }
+    .deal-card:hover { background: #162130; }
+    .deal-card.active { background: #0f2318; }
+    .deal-card-name { font-size: 12px; font-weight: 600; color: #e8edf2; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .deal-card-address { font-size: 11px; color: #6b8fa8; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .deal-card-meta { display: flex; gap: 6px; font-size: 10px; align-items: center; flex-wrap: wrap; }
+    .meta-tag { background: #1e2d3d; padding: 2px 6px; border-radius: 8px; color: #8ab4cc; }
+    .stage-pill { padding: 2px 7px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #fff; }
+
+    #stats-bar { padding: 8px 14px; background: #162130; border-top: 1px solid #1e2d3d; font-size: 11px; color: #6b8fa8; display: flex; gap: 14px; flex-wrap: wrap; }
+    .stat { display: flex; gap: 4px; }
     .stat-value { color: #25a35a; font-weight: 600; }
+
+    /* ── Detail panel ── */
+    #detail-panel { position: absolute; bottom: 12px; left: 12px; width: 300px; background: #0d1520ee; border: 1px solid #1e2d3d; border-radius: 12px; padding: 14px; display: none; backdrop-filter: blur(6px); }
+    #detail-panel.visible { display: block; }
+    .detail-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; color: #e8edf2; padding-right: 20px; }
+    .detail-stage { display: inline-block; margin-bottom: 10px; }
+    .detail-address { font-size: 11px; color: #6b8fa8; margin-bottom: 10px; }
+    .detail-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #1a2535; }
+    .detail-row:last-of-type { border-bottom: none; }
+    .detail-label { color: #6b8fa8; }
+    .detail-value { color: #e8edf2; font-weight: 500; }
+    #close-detail { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #6b8fa8; cursor: pointer; font-size: 16px; line-height: 1; }
+    #close-detail:hover { color: #e8edf2; }
+    #assign-btn { width: 100%; margin-top: 10px; padding: 7px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+    #assign-btn:hover { opacity: 0.9; }
+
+    /* ── Legend ── */
+    #legend { position: absolute; bottom: 12px; right: 12px; background: #0d1520ee; border: 1px solid #1e2d3d; border-radius: 10px; padding: 10px 14px; font-size: 11px; backdrop-filter: blur(6px); display: none; }
+    #legend.visible { display: block; }
+    .legend-title { color: #6b8fa8; font-weight: 600; margin-bottom: 6px; }
+    .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; color: #e8edf2; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   </style>
 </head>
 <body>
-  <div id="header">
-    <div id="header-left">
-      <div id="logo">P</div>
-      <div>
-        <div id="title">PSD Farm Map</div>
-        <div id="subtitle">● Active Deals — Georgia Power CEEP</div>
-      </div>
-    </div>
-    <a href="/" id="back-btn">← Back to Assistant</a>
-  </div>
 
-  <div id="map-container">
-    <div id="map"></div>
-
-    <div id="loading">
-      <div class="spinner"></div>
-      <div id="loading-text">Loading farm locations...</div>
-    </div>
-
-    <!-- Sidebar -->
-    <div id="sidebar">
-      <div id="sidebar-header">
-        <span>Open Deals</span>
-        <span id="deal-count" style="color:#25a35a">—</span>
-      </div>
-      <div id="deals-list"></div>
-      <div id="stats-bar">
-        <div class="stat">Total Fans: <span class="stat-value" id="total-fans">—</span></div>
-        <div class="stat">Total Barns: <span class="stat-value" id="total-barns">—</span></div>
-      </div>
-    </div>
-
-    <!-- Detail Panel -->
-    <div id="detail-panel">
-      <button id="close-detail" onclick="closeDetail()">×</button>
-      <div class="detail-title" id="detail-name"></div>
-      <div class="detail-address" id="detail-address"></div>
-      <div class="detail-row"><span class="detail-label">Owner</span><span class="detail-value" id="detail-owner"></span></div>
-      <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value" id="detail-phone"></span></div>
-      <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value" id="detail-email"></span></div>
-      <div class="detail-row"><span class="detail-label">Total Fans</span><span class="detail-value" id="detail-fans"></span></div>
-      <div class="detail-row"><span class="detail-label">Total Barns</span><span class="detail-value" id="detail-barns"></span></div>
-      <div class="detail-row"><span class="detail-label">Deal Amount</span><span class="detail-value" id="detail-amount"></span></div>
-      <button id="assign-btn" onclick="assignInstaller()">Assign Andy Nguyen as Installer</button>
+<div id="header">
+  <div id="header-left">
+    <div id="logo">P</div>
+    <div>
+      <div id="title">PSD Farm Map</div>
+      <div id="subtitle" id="subtitle">● Georgia Power CEEP</div>
     </div>
   </div>
+  <a href="/" id="back-btn">← Back to Assistant</a>
+</div>
 
-  <script>
-    let map, deals = [], markers = [], activeMarker = null;
-    let currentDeal = null;
+<!-- Stage filter bar -->
+<div id="filter-bar">
+  <span class="filter-label">Show:</span>
+  <button class="stage-btn btn-all active"          data-stage=""                    onclick="selectStage(this)"><span class="dot color-all"></span>All Deals</button>
+  <button class="stage-btn btn-scheduled"           data-stage="appointmentscheduled" onclick="selectStage(this)"><span class="dot color-scheduled"></span>Scheduled</button>
+  <button class="stage-btn btn-qualified"           data-stage="qualifiedtobuy"       onclick="selectStage(this)"><span class="dot color-qualified"></span>Qualified</button>
+  <button class="stage-btn btn-presentation"        data-stage="presentationscheduled" onclick="selectStage(this)"><span class="dot color-presentation"></span>Presentation</button>
+  <button class="stage-btn btn-decision"            data-stage="decisionmakerboughtin" onclick="selectStage(this)"><span class="dot color-decision"></span>Decision</button>
+  <button class="stage-btn btn-contract"            data-stage="contractsent"          onclick="selectStage(this)"><span class="dot color-contract"></span>Contract</button>
+  <button class="stage-btn btn-won"                 data-stage="closedwon"             onclick="selectStage(this)"><span class="dot color-won"></span>Won</button>
+</div>
 
-    async function loadDeals() {
-      try {
-        const res = await fetch('/hubspot/deals-with-addresses', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await res.json();
-        deals = data.deals_with_addresses || [];
-        document.getElementById('loading').style.display = 'none';
-        renderSidebar();
-        geocodeAndPlot();
-      } catch (err) {
-        document.getElementById('loading-text').textContent = 'Failed to load deals: ' + err.message;
-      }
+<div id="map-container">
+  <div id="map"></div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text">Loading farm locations...</div>
+  </div>
+
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <span id="sidebar-title">All Deals</span>
+      <span id="deal-count" style="color:#25a35a">—</span>
+    </div>
+    <div id="deals-list"></div>
+    <div id="stats-bar">
+      <div class="stat">Fans: <span class="stat-value" id="total-fans">—</span></div>
+      <div class="stat">Barns: <span class="stat-value" id="total-barns">—</span></div>
+      <div class="stat">Value: <span class="stat-value" id="total-amount">—</span></div>
+    </div>
+  </div>
+
+  <div id="detail-panel">
+    <button id="close-detail" onclick="closeDetail()">×</button>
+    <div class="detail-title" id="detail-name"></div>
+    <div class="detail-stage"><span class="stage-pill" id="detail-stage-pill"></span></div>
+    <div class="detail-address" id="detail-address"></div>
+    <div class="detail-row"><span class="detail-label">Owner</span><span class="detail-value" id="detail-owner"></span></div>
+    <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value" id="detail-phone"></span></div>
+    <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value" id="detail-email"></span></div>
+    <div class="detail-row"><span class="detail-label">Total Fans</span><span class="detail-value" id="detail-fans"></span></div>
+    <div class="detail-row"><span class="detail-label">Total Barns</span><span class="detail-value" id="detail-barns"></span></div>
+    <div class="detail-row"><span class="detail-label">Deal Amount</span><span class="detail-value" id="detail-amount"></span></div>
+    <button id="assign-btn" onclick="assignInstaller()">Assign Andy Nguyen as Installer</button>
+  </div>
+
+  <div id="legend"></div>
+</div>
+
+<script>
+  // ── Stage config ──────────────────────────────────────────
+  const STAGE_CONFIG = {
+    'appointmentscheduled':  { label: 'Scheduled',    color: '#25a35a', stroke: '#0d3320' },
+    'qualifiedtobuy':        { label: 'Qualified',    color: '#f59e0b', stroke: '#3a2000' },
+    'presentationscheduled': { label: 'Presentation', color: '#3b82f6', stroke: '#0d1f3a' },
+    'decisionmakerboughtin': { label: 'Decision',     color: '#a855f7', stroke: '#220d3a' },
+    'contractsent':          { label: 'Contract',     color: '#06b6d4', stroke: '#012530' },
+    'closedwon':             { label: 'Won',          color: '#10b981', stroke: '#003322' },
+  };
+
+  function stageColor(s) { return (STAGE_CONFIG[s] || {}).color || '#6366f1'; }
+  function stageStroke(s) { return (STAGE_CONFIG[s] || {}).stroke || '#1a1a3a'; }
+  function stageLabel(s) { return (STAGE_CONFIG[s] || {}).label || s || '—'; }
+
+  // ── State ─────────────────────────────────────────────────
+  let map, allDeals = [], visibleDeals = [], markers = [], activeMarker = null, currentDeal = null;
+  let currentStage = '';   // '' = all
+
+  // ── Load all deals on init ─────────────────────────────────
+  async function loadDeals() {
+    try {
+      const res = await fetch('/hubspot/deals-with-addresses');
+      const data = await res.json();
+      allDeals = data.deals_with_addresses || [];
+      document.getElementById('loading').style.display = 'none';
+      applyFilter('');
+    } catch (err) {
+      document.getElementById('loading-text').textContent = 'Failed to load: ' + err.message;
     }
+  }
 
-    function renderSidebar() {
-      const list = document.getElementById('deals-list');
-      document.getElementById('deal-count').textContent = deals.length + ' deals';
-      
-      let totalFans = 0, totalBarns = 0;
-      deals.forEach(d => {
-        totalFans += Number(d.total_fans || 0);
-        totalBarns += Number(d.total_barns || 0);
-      });
-      document.getElementById('total-fans').textContent = totalFans;
-      document.getElementById('total-barns').textContent = totalBarns;
+  // ── Filter by stage ───────────────────────────────────────
+  function selectStage(btn) {
+    document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilter(btn.dataset.stage);
+  }
 
-      list.innerHTML = deals.map((d, i) => `
-        <div class="deal-card" id="card-${i}" onclick="focusDeal(${i})">
+  function applyFilter(stage) {
+    currentStage = stage;
+    visibleDeals = stage ? allDeals.filter(d => d.dealstage === stage) : allDeals;
+
+    // Clear all existing markers
+    markers.forEach(m => { if (m) m.marker.setMap(null); });
+    markers = [];
+    activeMarker = null;
+    closeDetail();
+
+    // Update sidebar title
+    const cfg = STAGE_CONFIG[stage];
+    document.getElementById('sidebar-title').textContent = cfg ? cfg.label + ' Deals' : 'All Deals';
+
+    renderSidebar();
+    updateLegend();
+    geocodeAndPlot();
+  }
+
+  // ── Sidebar ───────────────────────────────────────────────
+  function renderSidebar() {
+    const list = document.getElementById('deals-list');
+    document.getElementById('deal-count').textContent = visibleDeals.length + ' deal' + (visibleDeals.length !== 1 ? 's' : '');
+
+    let totalFans = 0, totalBarns = 0, totalAmt = 0;
+    visibleDeals.forEach(d => {
+      totalFans  += Number(d.total_fans || 0);
+      totalBarns += Number(d.total_barns || 0);
+      totalAmt   += Number(d.amount || 0);
+    });
+    document.getElementById('total-fans').textContent   = totalFans;
+    document.getElementById('total-barns').textContent  = totalBarns;
+    document.getElementById('total-amount').textContent = totalAmt ? '$' + totalAmt.toLocaleString() : '—';
+
+    list.innerHTML = visibleDeals.map((d, i) => {
+      const color = stageColor(d.dealstage);
+      const label = stageLabel(d.dealstage);
+      return `
+        <div class="deal-card" id="card-${i}" onclick="focusDeal(${i})" style="border-left-color:${color}">
           <div class="deal-card-name">${d.company || d.deal_name}</div>
-          <div class="deal-card-address">${d.address}, ${d.city}, ${d.state}</div>
+          <div class="deal-card-address">${d.address || ''}, ${d.city || ''}, ${d.state || ''}</div>
           <div class="deal-card-meta">
+            <span class="stage-pill" style="background:${color}">${label}</span>
             <span class="meta-tag">${d.total_fans || 0} fans</span>
             <span class="meta-tag">${d.total_barns || 0} barns</span>
-            ${d.amount ? `<span class="meta-tag">$${Number(d.amount).toLocaleString()}</span>` : ''}
           </div>
-        </div>
-      `).join('');
-    }
+        </div>`;
+    }).join('');
+  }
 
-    async function geocodeAndPlot() {
-      const apiKey = await getMapKey();
-      for (let i = 0; i < deals.length; i++) {
-        const d = deals[i];
-        const address = `${d.address}, ${d.city}, ${d.state} ${d.zip}`;
-        try {
-          const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`);
-          const data = await res.json();
-          if (data.results && data.results[0]) {
-            const loc = data.results[0].geometry.location;
-            deals[i].lat = loc.lat;
-            deals[i].lng = loc.lng;
-            addMarker(i);
-          }
-        } catch (err) {
-          console.error('Geocoding error for', address, err);
+  // ── Legend (only shown when All Deals) ───────────────────
+  function updateLegend() {
+    const legend = document.getElementById('legend');
+    if (currentStage !== '') { legend.classList.remove('visible'); return; }
+
+    // Only show stages that are actually present
+    const presentStages = [...new Set(visibleDeals.map(d => d.dealstage).filter(Boolean))];
+    if (presentStages.length < 2) { legend.classList.remove('visible'); return; }
+
+    legend.innerHTML = '<div class="legend-title">Stage</div>' +
+      presentStages.map(s => `
+        <div class="legend-row">
+          <div class="legend-dot" style="background:${stageColor(s)}"></div>
+          ${stageLabel(s)}
+        </div>`).join('');
+    legend.classList.add('visible');
+  }
+
+  // ── Geocode + plot markers ────────────────────────────────
+  async function geocodeAndPlot() {
+    const apiKey = await getMapKey();
+    for (let i = 0; i < visibleDeals.length; i++) {
+      const d = visibleDeals[i];
+      if (d.lat && d.lng) { addMarker(i); continue; }   // reuse cached coords
+      const address = `${d.address}, ${d.city}, ${d.state} ${d.zip}`;
+      try {
+        const res  = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`);
+        const data = await res.json();
+        if (data.results && data.results[0]) {
+          const loc = data.results[0].geometry.location;
+          // Cache on the allDeals entry so switching filters doesn't re-geocode
+          const master = allDeals.find(x => x.deal_id === d.deal_id);
+          if (master) { master.lat = loc.lat; master.lng = loc.lng; }
+          visibleDeals[i].lat = loc.lat;
+          visibleDeals[i].lng = loc.lng;
+          addMarker(i);
         }
+      } catch (err) { console.error('Geocoding error', address, err); }
+    }
+    fitMapToBounds();
+  }
+
+  async function getMapKey() {
+    const res  = await fetch('/maps-key');
+    const data = await res.json();
+    return data.key;
+  }
+
+  // ── Add a single marker ───────────────────────────────────
+  function addMarker(i) {
+    const d = visibleDeals[i];
+    if (!d.lat || !d.lng) return;
+
+    const color  = stageColor(d.dealstage);
+    const stroke = stageStroke(d.dealstage);
+    const label  = stageLabel(d.dealstage);
+
+    const marker = new google.maps.Marker({
+      position: { lat: d.lat, lng: d.lng },
+      map: map,
+      title: d.company || d.deal_name,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 11,
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: stroke,
+        strokeWeight: 2
       }
-      fitMapToBounds();
-    }
+    });
 
-    async function getMapKey() {
-      const res = await fetch('/maps-key');
-      const data = await res.json();
-      return data.key;
-    }
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div style="font-family:Inter,sans-serif;padding:4px;min-width:180px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px">${d.company || d.deal_name}</div>
+          <div style="font-size:11px;color:#555;margin-bottom:4px">${d.address}, ${d.city}</div>
+          <span style="background:${color};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">${label}</span>
+          <div style="font-size:11px;color:#555;margin-top:6px">${d.total_fans || 0} fans · ${d.total_barns || 0} barns</div>
+        </div>`
+    });
 
-    function addMarker(i) {
-      const d = deals[i];
-      if (!d.lat || !d.lng) return;
-
-      const marker = new google.maps.Marker({
-        position: { lat: d.lat, lng: d.lng },
-        map: map,
-        title: d.company || d.deal_name,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: '#25a35a',
-          fillOpacity: 1,
-          strokeColor: '#0d3320',
-          strokeWeight: 2
-        }
-      });
-
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="font-family:Inter,sans-serif;padding:4px;min-width:180px">
-            <div style="font-weight:700;font-size:13px;margin-bottom:4px">${d.company || d.deal_name}</div>
-            <div style="font-size:11px;color:#555">${d.address}, ${d.city}</div>
-            <div style="font-size:11px;color:#555;margin-top:4px">${d.total_fans || 0} fans · ${d.total_barns || 0} barns</div>
-          </div>
-        `
-      });
-
-      marker.addListener('click', () => {
-        if (activeMarker) activeMarker.infoWindow.close();
-        infoWindow.open(map, marker);
-        activeMarker = { marker, infoWindow };
-        focusDeal(i);
-      });
-
-      markers[i] = { marker, infoWindow };
-    }
-
-    function focusDeal(i) {
-      const d = deals[i];
-      
-      // Update sidebar active state
-      document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
-      document.getElementById(`card-${i}`)?.classList.add('active');
-
-      // Show detail panel
-      currentDeal = d;
-      document.getElementById('detail-name').textContent = d.company || d.deal_name;
-      document.getElementById('detail-address').textContent = `${d.address}, ${d.city}, ${d.state} ${d.zip}`;
-      document.getElementById('detail-owner').textContent = d.owner || '—';
-      document.getElementById('detail-phone').textContent = d.phone || '—';
-      document.getElementById('detail-email').textContent = d.email || '—';
-      document.getElementById('detail-fans').textContent = d.total_fans || '—';
-      document.getElementById('detail-barns').textContent = d.total_barns || '—';
-      document.getElementById('detail-amount').textContent = d.amount ? '$' + Number(d.amount).toLocaleString() : '—';
-      document.getElementById('detail-panel').classList.add('visible');
-
-      // Pan map to marker
-      if (d.lat && d.lng) {
-        map.panTo({ lat: d.lat, lng: d.lng });
-        map.setZoom(12);
-        if (markers[i]) {
-          if (activeMarker) activeMarker.infoWindow.close();
-          markers[i].infoWindow.open(map, markers[i].marker);
-          activeMarker = markers[i];
-        }
-      }
-    }
-
-    function closeDetail() {
-      document.getElementById('detail-panel').classList.remove('visible');
+    marker.addListener('click', () => {
       if (activeMarker) activeMarker.infoWindow.close();
-      document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
-    }
+      infoWindow.open(map, marker);
+      activeMarker = { marker, infoWindow };
+      focusDeal(i);
+    });
 
-    function assignInstaller() {
-      if (!currentDeal) return;
-      alert(`Andy Nguyen assigned to ${currentDeal.company || currentDeal.deal_name}!\n\nThis will update HubSpot in a future update.`);
-    }
+    markers[i] = { marker, infoWindow };
+  }
 
-    function fitMapToBounds() {
-      const bounds = new google.maps.LatLngBounds();
-      let hasPoints = false;
-      deals.forEach(d => {
-        if (d.lat && d.lng) {
-          bounds.extend({ lat: d.lat, lng: d.lng });
-          hasPoints = true;
-        }
-      });
-      if (hasPoints) map.fitBounds(bounds);
-    }
+  // ── Focus a deal ──────────────────────────────────────────
+  function focusDeal(i) {
+    const d = visibleDeals[i];
+    const color = stageColor(d.dealstage);
+    const label = stageLabel(d.dealstage);
 
-    function initMap() {
-      map = new google.maps.Map(document.getElementById('map'), {
-        zoom: 7,
-        center: { lat: 32.1656, lng: -82.9001 }, // Georgia center
-        styles: [
-          { featureType: "poi", stylers: [{ visibility: "off" }] },
-          { featureType: "transit", stylers: [{ visibility: "off" }] }
-        ]
-      });
-      loadDeals();
-    }
+    document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
+    const card = document.getElementById(`card-${i}`);
+    if (card) card.classList.add('active');
 
-    // Load Google Maps script dynamically
-    fetch('/maps-key')
-      .then(r => r.json())
-      .then(data => {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.key}&callback=initMap`;
-        script.async = true;
-        document.head.appendChild(script);
-      });
-  </script>
+    currentDeal = d;
+    document.getElementById('detail-name').textContent    = d.company || d.deal_name;
+    document.getElementById('detail-address').textContent = `${d.address}, ${d.city}, ${d.state} ${d.zip}`;
+    document.getElementById('detail-owner').textContent   = d.owner || '—';
+    document.getElementById('detail-phone').textContent   = d.phone || '—';
+    document.getElementById('detail-email').textContent   = d.email || '—';
+    document.getElementById('detail-fans').textContent    = d.total_fans || '—';
+    document.getElementById('detail-barns').textContent   = d.total_barns || '—';
+    document.getElementById('detail-amount').textContent  = d.amount ? '$' + Number(d.amount).toLocaleString() : '—';
+
+    const pill = document.getElementById('detail-stage-pill');
+    pill.textContent         = label;
+    pill.style.background    = color;
+    pill.style.padding       = '2px 9px';
+    pill.style.borderRadius  = '8px';
+    pill.style.fontSize      = '11px';
+    pill.style.fontWeight    = '600';
+    pill.style.color         = '#fff';
+
+    document.getElementById('detail-panel').classList.add('visible');
+
+    if (d.lat && d.lng) {
+      map.panTo({ lat: d.lat, lng: d.lng });
+      map.setZoom(13);
+      if (markers[i]) {
+        if (activeMarker) activeMarker.infoWindow.close();
+        markers[i].infoWindow.open(map, markers[i].marker);
+        activeMarker = markers[i];
+      }
+    }
+  }
+
+  function closeDetail() {
+    document.getElementById('detail-panel').classList.remove('visible');
+    if (activeMarker) { activeMarker.infoWindow.close(); activeMarker = null; }
+    document.querySelectorAll('.deal-card').forEach(c => c.classList.remove('active'));
+  }
+
+  function assignInstaller() {
+    if (!currentDeal) return;
+    alert(`Andy Nguyen assigned to ${currentDeal.company || currentDeal.deal_name}!\n\nThis will update HubSpot in a future update.`);
+  }
+
+  function fitMapToBounds() {
+    const bounds = new google.maps.LatLngBounds();
+    let has = false;
+    visibleDeals.forEach(d => { if (d.lat && d.lng) { bounds.extend({ lat: d.lat, lng: d.lng }); has = true; } });
+    if (has) map.fitBounds(bounds);
+  }
+
+  // ── Init map ─────────────────────────────────────────────
+  function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+      zoom: 7,
+      center: { lat: 32.1656, lng: -82.9001 },
+      styles: [
+        { featureType: 'poi',     stylers: [{ visibility: 'off' }] },
+        { featureType: 'transit', stylers: [{ visibility: 'off' }] }
+      ]
+    });
+    loadDeals();
+  }
+
+  // Pre-select stage from URL param, e.g. /map?stage=qualifiedtobuy
+  const urlStage = new URLSearchParams(window.location.search).get('stage') || '';
+  if (urlStage) {
+    document.querySelectorAll('.stage-btn').forEach(b => {
+      b.classList.remove('active');
+      if (b.dataset.stage === urlStage) b.classList.add('active');
+    });
+  }
+
+  fetch('/maps-key')
+    .then(r => r.json())
+    .then(data => {
+      const script  = document.createElement('script');
+      script.src    = `https://maps.googleapis.com/maps/api/js?key=${data.key}&callback=initMap`;
+      script.async  = true;
+      document.head.appendChild(script);
+    });
+</script>
 </body>
 </html>
