@@ -546,6 +546,160 @@ def create_service_task(service_id, task_details, contact_ids=None):
         return None
 
 
+def _get_results_ids(path):
+    try:
+        res = requests.get(path, headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return []
+        return [r.get('id') for r in res.json().get('results', []) if r.get('id')]
+    except:
+        return []
+
+
+def _parse_team_ids(team_value):
+    if not team_value:
+        return []
+    if isinstance(team_value, list):
+        return [str(x).strip() for x in team_value if x]
+    return [x.strip() for x in str(team_value).split(';') if x.strip()]
+
+
+def _service_name_from_props(props):
+    raw_name = (
+        props.get('hs_name') or
+        props.get('hs_object_name') or
+        props.get('subject') or
+        props.get('hs_ticket_name') or
+        props.get('content') or
+        props.get('title') or
+        props.get('name') or
+        ''
+    ).strip()
+    if not raw_name:
+        raw_name = (props.get('hs_ticket_category') or '').strip()
+    return raw_name
+
+
+def _service_stage_label(stage_id):
+    if not stage_id:
+        return 'New'
+    stage_map = {
+        SERVICE_STAGE_MAP['new']: 'New',
+        SERVICE_STAGE_MAP['in_progress']: 'In Progress',
+        SERVICE_STAGE_MAP['closed']: 'Closed'
+    }
+    return stage_map.get(stage_id, stage_id)
+
+
+def _service_status_label(status):
+    if not status:
+        return ''
+    status_map = {
+        'ON_TRACK': 'On Track', 'on_track': 'On Track', 'On Track': 'On Track',
+        'AT_RISK': 'At Risk', 'at_risk': 'At Risk', 'At Risk': 'At Risk',
+        'BEHIND': 'Behind', 'Behind': 'Behind', 'COMPLETE': 'Completed', 'Completed': 'Completed',
+        'delayed': 'At Risk', 'failed': 'Behind', 'succeeded_completed': 'Completed'
+    }
+    return status_map.get(status, status)
+
+
+def _service_details_from_props(service_id, props):
+    team_id = props.get('hs_shared_team_ids') or props.get('hubspot_team_id') or ''
+    return {
+        'id': service_id,
+        'name': _service_name_from_props(props),
+        'description': props.get('hs_description', ''),
+        'deal_name': '',
+        'stage': _service_stage_label(props.get('hs_pipeline_stage', '')),
+        'stage_id': props.get('hs_pipeline_stage', ''),
+        'status': _service_status_label(props.get('hs_status') or props.get('hs_ticket_priority') or props.get('hs_object_status') or ''),
+        'team': team_id,
+        'team_id': team_id,
+        'start_date': props.get('hs_start_date', ''),
+        'due_date': props.get('hs_target_end_date', ''),
+        'total_cost': props.get('hs_total_cost', ''),
+        'amount_paid': props.get('hs_amount_paid', ''),
+        'remaining': props.get('hs_remaining_amount', '')
+    }
+
+
+@app.route('/hubspot/team-services/<team_id>', methods=['GET'])
+def hs_team_services(team_id):
+    try:
+        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_shared_team_ids,hubspot_team_id,hs_object_name,subject,hs_ticket_name,hs_ticket_category'
+        url = f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={props}'
+        res = requests.get(url, headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+
+        services = []
+        for raw in res.json().get('results', []):
+            props = raw.get('properties', {})
+            team_ids = _parse_team_ids(props.get('hs_shared_team_ids') or props.get('hubspot_team_id'))
+            if str(team_id) in team_ids:
+                services.append(_service_details_from_props(raw.get('id'), props))
+
+        return jsonify({'services': services})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/hubspot/service-details/<service_id>', methods=['GET'])
+def hs_service_details(service_id):
+    try:
+        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hs_shared_team_ids,hubspot_team_id,hs_object_name,subject,hs_ticket_name,hs_ticket_category,createdate'
+        url = f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}?properties={props}'
+        res = requests.get(url, headers=HUBSPOT_HEADERS())
+        if res.status_code != 200:
+            return jsonify({'error': res.text}), res.status_code
+
+        raw = res.json()
+        svc = _service_details_from_props(service_id, raw.get('properties', {}))
+
+        contacts = []
+        for contact_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/contacts'):
+            contact_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contact_id}?properties=firstname,lastname,company,email,phone', headers=HUBSPOT_HEADERS())
+            if contact_res.status_code == 200:
+                cp = contact_res.json().get('properties', {})
+                contacts.append({
+                    'id': contact_id,
+                    'name': ((cp.get('firstname') or '') + ' ' + (cp.get('lastname') or '')).strip() or cp.get('company') or 'Contact',
+                    'company': cp.get('company', ''),
+                    'email': cp.get('email', ''),
+                    'phone': cp.get('phone', '')
+                })
+
+        tasks = []
+        for task_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/tasks'):
+            task_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/tasks/{task_id}?properties=subject,hs_task_body,hs_task_status,hs_task_priority,hs_task_due_date', headers=HUBSPOT_HEADERS())
+            if task_res.status_code == 200:
+                tp = task_res.json().get('properties', {})
+                tasks.append({
+                    'id': task_id,
+                    'subject': tp.get('subject', ''),
+                    'body': tp.get('hs_task_body', ''),
+                    'status': tp.get('hs_task_status', ''),
+                    'priority': tp.get('hs_task_priority', ''),
+                    'due_date': tp.get('hs_task_due_date', '')
+                })
+
+        deals = []
+        for deal_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/deals'):
+            deal_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}?properties=dealname,amount,dealstage', headers=HUBSPOT_HEADERS())
+            if deal_res.status_code == 200:
+                dp = deal_res.json().get('properties', {})
+                deals.append({
+                    'id': deal_id,
+                    'name': dp.get('dealname', ''),
+                    'amount': dp.get('amount', ''),
+                    'stage': dp.get('dealstage', '')
+                })
+
+        return jsonify({'service': svc, 'contacts': contacts, 'tasks': tasks, 'deals': deals})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/hubspot/service-stages', methods=['GET'])
 def hs_service_stages():
     try:
