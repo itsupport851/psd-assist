@@ -506,23 +506,30 @@ def hs_get_all_services():
 
         services_raw = svc_res.json().get('results', [])
 
-        # 4. For each service, find the associated deal
+        # 4. Batch-fetch all deal associations in ONE call (avoids per-service rate limits)
+        service_ids = [s['id'] for s in services_raw]
+        service_to_deal = {}
+        try:
+            batch_payload = {'inputs': [{'id': sid} for sid in service_ids]}
+            batch_res = requests.post(
+                f'{HUBSPOT_BASE}/crm/v3/associations/services/deals/batch/read',
+                json=batch_payload, headers=HUBSPOT_HEADERS()
+            )
+            if batch_res.status_code == 200:
+                for result in batch_res.json().get('results', []):
+                    from_id = str(result.get('from', {}).get('id', ''))
+                    to_ids = [str(r['id']) for r in result.get('to', [])]
+                    if from_id and to_ids:
+                        service_to_deal[from_id] = to_ids[0]
+        except:
+            pass
+
+        # 5. Build service records
         services = []
         for s in services_raw:
             sid = s['id']
             sp = s.get('properties', {})
-
-            # Get associated deal for this service
-            deal_name = ''
-            try:
-                assoc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services/{sid}/associations/deals', headers=HUBSPOT_HEADERS())
-                if assoc_res.status_code == 200:
-                    assoc_deals = assoc_res.json().get('results', [])
-                    if assoc_deals:
-                        deal_id = assoc_deals[0]['id']
-                        deal_name = deal_map.get(deal_id, '')
-            except:
-                pass
+            deal_name = deal_map.get(service_to_deal.get(sid, ''), '')
 
             # Team: HubSpot Services stores team in hs_shared_team_ids (shared teams)
             # also check hubspot_team_id (assigned team) as fallback
@@ -595,8 +602,6 @@ def hs_get_all_services():
                 'total_cost': sp.get('hs_total_cost', ''),
                 'amount_paid': sp.get('hs_amount_paid', ''),
                 'remaining': sp.get('hs_remaining_amount', ''),
-                # Debug: expose all non-null props so we can find the name field
-                '_raw_props': {k: v for k, v in sp.items() if v and k not in ('hs_pipeline',)},
             })
 
         # 5. Enrich team names in one call
