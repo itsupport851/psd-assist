@@ -89,10 +89,10 @@
       { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales","admin"] },
       { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales","admin"] },
       // ── Operations ──
-      { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["sales","analyst","admin","operations","installer"] },
-      { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["sales","analyst","admin","operations","installer"] },
-      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["sales","admin"] },
-      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["sales","analyst","admin","operations"] },
+      { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
+      { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["analyst","admin","operations","installer"] },
+      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["admin"] },
+      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["analyst","admin","operations"] },
     ];
 
     const STAGE_BUTTONS = [
@@ -181,7 +181,7 @@
         "When showing map: call get_deals_with_addresses then end response with MAP_LINK.",
         "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
         "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
-        "When user asks for open services or services summary: call get_all_services then respond with SERVICES_TABLE.",
+        "When showing services: if a service has name '—' or blank, check _raw_props in the data and mention which fields are populated so we can identify where HubSpot stores the name.",
         "When user asks for service summary by stage/status: respond with SERVICE_STAGE_SELECTOR.",
         "",
         "Display formats:",
