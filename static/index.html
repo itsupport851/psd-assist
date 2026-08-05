@@ -839,23 +839,29 @@
         }
       }
 
+      var selectedDeals = filteredDeals.filter(function(d) { return selectedIds[d.id]; });
+      var selectedCount = selectedDeals.length;
+
+      const STAGE_LABELS = { appointmentscheduled: "Scheduled", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation", decisionmakerboughtin: "Decision", contractsent: "Contract", closedwon: "Won" };
+
       async function goToStep3() {
+        var dealsToProcess = filteredDeals.filter(function(d) { return selectedIds[d.id]; });
         setLoadingLineItems(true);
         setStep(3);
         var byDeal = {};
-        for (var i = 0; i < selectedDeals.length; i++) {
+        for (var i = 0; i < dealsToProcess.length; i++) {
           try {
-            var res = await fetch("/hubspot/line-items/" + selectedDeals[i].id);
+            var res = await fetch("/hubspot/line-items/" + dealsToProcess[i].id);
             var data = await res.json();
-            byDeal[selectedDeals[i].id] = data.line_items || [];
+            byDeal[dealsToProcess[i].id] = data.line_items || [];
           } catch(e) {
-            byDeal[selectedDeals[i].id] = [];
+            byDeal[dealsToProcess[i].id] = [];
           }
         }
         setLineItemsByDeal(byDeal);
         setLoadingLineItems(false);
 
-        // Build shared description from all unique fan configs
+        // Build shared description from all fan configs
         var allItems = Object.values(byDeal).flat();
         if (allItems.length > 0) {
           var lines = allItems.map(function(li) {
@@ -870,9 +876,6 @@
           });
         }
       }
-      var selectedDeals = filteredDeals.filter(function(d) { return selectedIds[d.id]; });
-
-      const STAGE_LABELS = { appointmentscheduled: "Scheduled", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation", decisionmakerboughtin: "Decision", contractsent: "Contract", closedwon: "Won" };
 
       // ── Step 1: Stage picker ──────────────────────────────────
       if (step === 1) {
