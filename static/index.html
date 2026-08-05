@@ -81,18 +81,18 @@
     // Role-based quick actions
     const ALL_ACTIONS = [
       // ── Sales ──
-      { icon: "📊", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst"] },
-      { icon: "📋", label: "Open Deals",     desc: "View all active deals",    message: "Show me all open deals",            roles: ["sales","analyst","installer"] },
-      { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        message: "I want to add a new line item to a deal", roles: ["sales"] },
-      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales"] },
-      { icon: "📝", label: "New Deal",       desc: "Create a deal",            message: "I want to create a new deal in HubSpot", roles: ["sales"] },
-      { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales"] },
-      { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales"] },
+      { icon: "📊", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst","admin"] },
+      { icon: "📋", label: "Open Deals",     desc: "View all active deals",    message: "Show me all open deals",            roles: ["sales","analyst","admin","installer"] },
+      { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        message: "I want to add a new line item to a deal", roles: ["sales","admin"] },
+      { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales","admin"] },
+      { icon: "📝", label: "New Deal",       desc: "Create a deal",            message: "I want to create a new deal in HubSpot", roles: ["sales","admin"] },
+      { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales","admin"] },
+      { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales","admin"] },
       // ── Operations ──
-      { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["sales","analyst","installer"] },
-      { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["sales","analyst","installer"] },
-      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["sales"] },
-      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["sales","analyst"] },
+      { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["sales","analyst","admin","operations","installer"] },
+      { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["sales","analyst","admin","operations","installer"] },
+      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: "I want to create a new service for an appointment scheduled deal", roles: ["sales","admin"] },
+      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["sales","analyst","admin","operations"] },
     ];
 
     const STAGE_BUTTONS = [
@@ -115,10 +115,10 @@
 
     const MAP_STAGE_BUTTONS = [
       { icon: "🗺",  label: "All Deals",    stage: "",                     color: "#6366f1" },
-      { icon: "📅", label: "Scheduled",    stage: "appointmentscheduled",  color: "#25a35a" },
+      { icon: "📅", label: "Scheduled",    stage: "appointmentscheduled",  color: "#a855f7" },
       { icon: "🎯", label: "Qualified",    stage: "qualifiedtobuy",        color: "#f59e0b" },
       { icon: "📊", label: "Presentation", stage: "presentationscheduled", color: "#3b82f6" },
-      { icon: "🤝", label: "Decision",     stage: "decisionmakerboughtin", color: "#a855f7" },
+      { icon: "🤝", label: "Decision",     stage: "decisionmakerboughtin", color: "#ef4444" },
       { icon: "📄", label: "Contract",     stage: "contractsent",          color: "#06b6d4" },
       { icon: "🏆", label: "Won",          stage: "closedwon",             color: "#10b981" },
     ]; // end MAP_STAGE_BUTTONS
@@ -144,9 +144,13 @@
         "- submit_form: submit customer PDF form (requires file_data as base64, file_name, customer_name, email)",
       ];
 
-      var tools = role === "sales" ? baseTools.concat(salesTools) : baseTools;
-      var roleDesc = role === "sales"
+      var tools = (role === "sales" || role === "admin") ? baseTools.concat(salesTools) : baseTools;
+      var roleDesc = role === "admin"
+        ? "You are helping the PSD admin. You have full access to all records, deals, services, pricing, and operations."
+        : role === "sales"
         ? "You are helping the PSD sales team. You have full access to view and create/update all HubSpot records."
+        : role === "operations"
+        ? "You are helping the PSD operations team. You can view deals, services, farm map, and summaries. You cannot create or update deals, contacts, or pricing."
         : role === "analyst"
         ? "You are helping a PSD analyst. You can view deals, line items, map, and farm data. Do NOT show or mention pricing, amounts, or unit prices. Hide all financial data."
         : "You are helping a PSD field installer from team ID " + teamId + ". Only show deals that have a service associated with team ID " + teamId + ". Show line items for those deals only. Do NOT show pricing, amounts, or financial data. Do NOT allow any create or update operations.";
@@ -597,6 +601,10 @@
       var salesActions = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && SALES_LABELS.includes(a.label); });
       var opsActions   = ALL_ACTIONS.filter(function(a) { return a.roles.includes(role) && OPS_LABELS.includes(a.label); });
 
+      // Operations-only role: skip sales section header entirely
+      var showSales = salesActions.length > 0;
+      var showOps   = opsActions.length > 0;
+
       function renderBtn(a, i) {
         return React.createElement("button", { key: i, className: "qa-btn",
           onClick: function() {
@@ -616,12 +624,12 @@
       }
 
       return React.createElement("div", null,
-        salesActions.length > 0 && React.createElement("div", null,
+        showSales && React.createElement("div", null,
           React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 4 } }, "Sales"),
           React.createElement("div", { className: "quick-actions" }, salesActions.map(renderBtn))
         ),
-        opsActions.length > 0 && React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 } }, "Operations"),
+        showOps && React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: showSales ? 12 : 4 } }, "Operations"),
           React.createElement("div", { className: "quick-actions" }, opsActions.map(renderBtn))
         )
       );
@@ -710,11 +718,25 @@
       return React.createElement("div", { style: { whiteSpace: "pre-wrap", wordBreak: "break-word" } }, content);
     }
 
+    // ── Portal config by URL path ────────────────────────────
+    const PORTAL_CONFIG = {
+      '/sales':      { title: 'PSD Sales Portal',      subtitle: 'Sales team access', allowedRoles: ['sales','admin'],               accentColor: '#25a35a' },
+      '/operations': { title: 'PSD Operations Portal', subtitle: 'Operations team access', allowedRoles: ['operations','admin'],      accentColor: '#3b82f6' },
+      '/service':    { title: 'PSD Service Portal',    subtitle: 'Field installer access', allowedRoles: ['installer','admin'],       accentColor: '#f59e0b' },
+      '/':           { title: 'PSD Admin Portal',      subtitle: 'Full access', allowedRoles: ['admin','sales','operations','installer','analyst'], accentColor: '#25a35a' },
+    };
+
+    function getPortalConfig() {
+      var path = window.location.pathname.replace(/\/$/, '') || '/';
+      return PORTAL_CONFIG[path] || PORTAL_CONFIG['/'];
+    }
+
     // ── PIN Screen ──────────────────────────────────────────────
     function PinScreen({ onAuth }) {
       const [pin, setPin] = useState("");
       const [error, setError] = useState(false);
       const [loading, setLoading] = useState(false);
+      const portal = getPortalConfig();
 
       async function submitPin(p) {
         if (p.length < 4) return;
@@ -723,7 +745,13 @@
           const res = await fetch('/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: p }) });
           const data = await res.json();
           if (data.success) {
-            onAuth(data.role, data.name, data.team_id || null);
+            // Check role is allowed on this portal
+            if (!portal.allowedRoles.includes(data.role)) {
+              setError(true);
+              setTimeout(function() { setError(false); setPin(""); }, 1000);
+            } else {
+              onAuth(data.role, data.name, data.team_id || null);
+            }
           } else {
             setError(true);
             setTimeout(function() { setError(false); setPin(""); }, 1000);
@@ -751,18 +779,19 @@
 
       return React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0f1923", gap: 32 } },
         React.createElement("div", { style: { textAlign: "center" } },
-          React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 auto 16px" } }, "P"),
-          React.createElement("div", { style: { fontSize: 20, fontWeight: 700, marginBottom: 4 } }, "PSD Sales Assistant"),
-          React.createElement("div", { style: { fontSize: 13, color: "#6b8fa8" } }, "Enter your PIN to continue")
+          React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, background: "linear-gradient(135deg, #1a4a2a, " + portal.accentColor + ")", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 auto 16px" } }, "P"),
+          React.createElement("div", { style: { fontSize: 20, fontWeight: 700, marginBottom: 4 } }, portal.title),
+          React.createElement("div", { style: { fontSize: 13, color: "#6b8fa8" } }, portal.subtitle),
+          React.createElement("div", { style: { fontSize: 11, color: "#3a5a70", marginTop: 6 } }, "Enter your PIN to continue")
         ),
         React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center" } }, dots),
-        error && React.createElement("div", { style: { fontSize: 12, color: "#e05252" } }, "Invalid PIN — try again"),
+        error && React.createElement("div", { style: { fontSize: 12, color: "#e05252" } }, "Invalid PIN for this portal"),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 72px)", gap: 10 } },
           keys.map(function(row, ri) {
             return row.map(function(k, ki) {
               return React.createElement("button", { key: ri + "-" + ki, className: "pin-key",
                 onClick: function() { pressKey(k); },
-                style: k === "✓" ? { background: "linear-gradient(135deg, #1a6b3c, #25a35a)", color: "#fff", border: "none" } : k === "del" ? { fontSize: 16 } : {}
+                style: k === "✓" ? { background: "linear-gradient(135deg, #1a4a2a, " + portal.accentColor + ")", color: "#fff", border: "none" } : k === "del" ? { fontSize: 16 } : {}
               }, k === "del" ? "⌫" : k);
             });
           })
@@ -783,11 +812,15 @@
 
       function handleAuth(role, name, teamId) {
         setAuth({ role, name, teamId });
-        var welcome = role === "installer"
+        var welcome = role === "admin"
+          ? "Welcome, " + name + "! You have full admin access — deals, services, pricing, maps, and forms. What do you need?"
+          : role === "sales"
+          ? "Hey! I'm your PSD Sales Assistant. I can help with deals, pricing, forms, and more. What do you need?"
+          : role === "operations"
+          ? "Hey! I'm your PSD Operations Assistant. I can show services, farm maps, and deal summaries. What do you need?"
+          : role === "installer"
           ? "Hey! I'm your PSD Assistant. I can show your assigned installations and line items. What do you need?"
-          : role === "analyst"
-          ? "Hey! I'm your PSD Analytics Assistant. I can show deals, farm maps, and summaries. What would you like to see?"
-          : "Hey! I'm your PSD Sales Assistant. I can help with deals, pricing, forms, and more. What do you need?";
+          : "Hey! I'm your PSD Analytics Assistant. I can show deals, farm maps, and summaries. What would you like to see?";
         setMessages([{ role: "assistant", content: welcome, display: true }]);
         setShowActions(true);
       }
@@ -914,8 +947,8 @@
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
           React.createElement("div", { style: { width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
           React.createElement("div", null,
-            React.createElement("div", { style: { fontWeight: 600, fontSize: 14 } }, "PSD Sales Assistant"),
-            React.createElement("div", { style: { fontSize: 10, color: "#4a9a6b", marginTop: 1 } }, "● " + auth.name + " — " + auth.role.charAt(0).toUpperCase() + auth.role.slice(1))
+            React.createElement("div", { style: { fontWeight: 600, fontSize: 14 } }, getPortalConfig().title),
+            React.createElement("div", { style: { fontSize: 10, color: "#4a9a6b", marginTop: 1 } }, "● " + auth.name + " — " + (auth.role.charAt(0).toUpperCase() + auth.role.slice(1)))
           ),
           React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 8 } },
             React.createElement("button", {
@@ -968,7 +1001,7 @@
 
         // Input
         React.createElement("div", { style: { padding: "10px 16px 18px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 9, alignItems: "flex-end" } },
-          auth.role === "sales" && React.createElement("button", { onClick: triggerUpload, style: { width: 38, height: 38, borderRadius: 9, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
+          (auth.role === "sales" || auth.role === "admin") && React.createElement("button", { onClick: triggerUpload, style: { width: 38, height: 38, borderRadius: 9, border: "1px solid #1e2d3d", background: uploadedFile ? "#1a6b3c" : "#162130", color: uploadedFile ? "#fff" : "#6b8fa8", cursor: "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "📎"),
           React.createElement("input", { ref: fileRef, type: "file", accept: ".pdf,image/*", onChange: handleFile, style: { display: "none" } }),
           React.createElement("textarea", {
             value: input,
