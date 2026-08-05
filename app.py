@@ -499,7 +499,7 @@ def hs_get_all_services():
         stage_map.setdefault('3',           'Closed')
 
         # 3. Get all services — fetch broad property set including hs_object_name
-        svc_props = 'hs_object_name,subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id,hs_shared_team_ids'
+        svc_props = 'hs_name,hs_object_name,subject,hs_ticket_name,content,title,name,description,hs_pipeline,hs_pipeline_stage,hs_object_status,hs_ticket_priority,hs_ticket_category,createdate,start_date,hs_start_date,hs_due_date,target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hubspot_team_id,hs_shared_team_ids'
         svc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={svc_props}', headers=HUBSPOT_HEADERS())
         if svc_res.status_code != 200:
             return jsonify({'error': svc_res.text}), svc_res.status_code
@@ -538,6 +538,7 @@ def hs_get_all_services():
 
             # Resolve name — try every known field HubSpot might store service name in
             raw_name = (
+                sp.get('hs_name') or
                 sp.get('hs_object_name') or
                 sp.get('subject') or
                 sp.get('hs_ticket_name') or
@@ -633,6 +634,7 @@ def hs_repair_service(service_id):
             return jsonify({'error': 'name is required'}), 400
         payload = {
             'properties': {
+                'hs_name':        name,
                 'hs_object_name': name,
                 'subject':        name,
                 'hs_ticket_name': name,
@@ -702,6 +704,7 @@ def hs_create_service():
 
         payload = {
             'properties': {
+                'hs_name':           data.get('name', ''),
                 'hs_object_name':    data.get('name', ''),
                 'subject':           data.get('name', ''),
                 'hs_ticket_name':    data.get('name', ''),
