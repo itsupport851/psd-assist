@@ -92,7 +92,7 @@
       { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
-      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMapSelector: true, roles: ["analyst","admin","operations"] },
+      { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMap: true, roles: ["analyst","admin","operations"] },
     ];
 
     const STAGE_BUTTONS = [
@@ -142,7 +142,7 @@
         "- create_contact: create new HubSpot contact (optional deal_id to associate)",
         "- create_service: create service for appointmentscheduled deal only (requires deal_id, name, description, optional: stage, status, start_date, target_end_date, total_cost, team_id)",
         
-        "- submit_form: submit customer PDF form (requires file_data as base64, file_name, customer_name, email)",
+        "- repair_service: update a service's name in HubSpot (requires service_id, name). Use when a service has a blank name.",
       ];
 
       var portalPath = window.location.pathname;
@@ -194,7 +194,7 @@
         "When showing map: call get_deals_with_addresses then end response with MAP_LINK.",
         "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
         "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
-        "When user asks for open services or services summary: call get_all_services then respond with SERVICES_TABLE.",
+        "When user asks for open services or services summary: call get_all_services then respond with SERVICES_TABLE. If any service has a blank name, immediately call repair_service with a name derived from deal_name (e.g. 'Fan Motor Installation — {deal_name}'), then show updated table.",
         "When user asks for service summary by stage/status: respond with SERVICE_STAGE_SELECTOR.",
         "",
         "Display formats:",
@@ -222,6 +222,7 @@
         "{\"tool\": \"get_services\", \"params\": {\"deal_id\": \"339921027805\"}}",
         "{\"tool\": \"get_all_services\", \"params\": {}}",
         "{\"tool\": \"inspect_service\", \"params\": {\"service_id\": \"825721437925\"}}",
+        "{\"tool\": \"repair_service\", \"params\": {\"service_id\": \"825721437925\", \"name\": \"Fan Motor Installation — Henderson Broiler Farm\"}}",
         "{\"tool\": \"get_teams\", \"params\": {}}",
         
         "{\"tool\": \"create_service\", \"params\": {\"deal_id\": \"339921027805\", \"name\": \"Fan Motor Installation\", \"description\": \"Install fans\", \"stage\": \"new\", \"status\": \"ON_TRACK\", \"start_date\": \"2026-04-01\", \"target_end_date\": \"2026-04-30\", \"total_cost\": \"9600\", \"team_id\": \"369709672\"}}",
@@ -254,6 +255,10 @@
       if (tool === "get_services") return await callRailway("/hubspot/services/" + params.deal_id);
       if (tool === "get_all_services") return await callRailway("/hubspot/all-services");
       if (tool === "inspect_service") return await callRailway("/hubspot/service-inspect/" + params.service_id);
+      if (tool === "repair_service") {
+        var res = await fetch("/hubspot/services/" + params.service_id + "/repair", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: params.name }) });
+        return await res.json();
+      }
       if (tool === "get_teams") return await callRailway("/hubspot/teams");
       if (tool === "update_line_item") {
         const res = await fetch("/hubspot/line-items/" + params.line_item_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit_price: params.unit_price }) });
@@ -486,10 +491,13 @@
               href: url,
               target: "_blank",
               rel: "noopener noreferrer",
-              style: { display: "flex", alignItems: "center", gap: 7, padding: "8px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 10, color: "#e8edf2", textDecoration: "none", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 0.15s" }
+              className: "qa-btn",
+              style: { textDecoration: "none", flex: "0 0 auto" }
             },
               React.createElement("span", { style: { width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0, display: "inline-block" } }),
-              s.label
+              React.createElement("div", null,
+                React.createElement("div", { className: "qa-label" }, s.label)
+              )
             );
           })
         )
@@ -695,9 +703,131 @@
       );
     }
 
+    // ── New Service Wizard — 3-step inline flow ──────────────
+    const WIZARD_STAGE_BUTTONS = [
+      { icon: "📋", label: "All Open",      stage: "",                      color: "#6366f1" },
+      { icon: "📅", label: "Scheduled",     stage: "appointmentscheduled",  color: "#a855f7" },
+      { icon: "🎯", label: "Qualified",     stage: "qualifiedtobuy",        color: "#f59e0b" },
+      { icon: "📊", label: "Presentation",  stage: "presentationscheduled", color: "#3b82f6" },
+      { icon: "🤝", label: "Decision",      stage: "decisionmakerboughtin", color: "#ef4444" },
+      { icon: "📄", label: "Contract",      stage: "contractsent",          color: "#06b6d4" },
+    ];
+
+    function NewServiceWizard({ onDone, onCancel }) {
+      const [step, setStep]         = React.useState(1);   // 1=stage, 2=deal, 3=form
+      const [allDeals, setAllDeals] = React.useState([]);
+      const [filteredDeals, setFilteredDeals] = React.useState([]);
+      const [selectedStageLabel, setSelectedStageLabel] = React.useState('');
+      const [selectedDeal, setSelectedDeal] = React.useState(null);
+      const [loadingDeals, setLoadingDeals] = React.useState(false);
+
+      function pickStage(stageId, stageLabel) {
+        setLoadingDeals(true);
+        setSelectedStageLabel(stageLabel);
+        fetch("/hubspot/deals?limit=100&properties=dealname,dealstage,total_fans,total_barns,amount")
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var deals = (data.deals || []).filter(function(d) {
+              var s = (d.properties || {}).dealstage || '';
+              if (s === 'closedwon' || s === 'closedlost') return false;
+              return stageId === '' || s === stageId;
+            });
+            setAllDeals(deals);
+            setFilteredDeals(deals);
+            setStep(2);
+          })
+          .catch(function() { setFilteredDeals([]); setStep(2); })
+          .finally(function() { setLoadingDeals(false); });
+      }
+
+      function pickDeal(deal) {
+        setSelectedDeal(deal);
+        setStep(3);
+      }
+
+      // ── Step 1: Stage picker ──
+      if (step === 1) {
+        return React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 10, fontWeight: 600 } }, "🔧 New Service — Step 1 of 3"),
+          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 10 } }, "Which deals do you want to see?"),
+          React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+            WIZARD_STAGE_BUTTONS.map(function(s, i) {
+              return React.createElement("button", {
+                key: i, className: "qa-btn",
+                style: { flex: "0 0 auto" },
+                disabled: loadingDeals,
+                onClick: function() { pickStage(s.stage, s.label); }
+              },
+                React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: s.color, display: "inline-block", flexShrink: 0 } }),
+                React.createElement("div", null,
+                  React.createElement("div", { className: "qa-label" }, s.label)
+                )
+              );
+            })
+          ),
+          React.createElement("button", { className: "svc-form-btn-cancel", style: { marginTop: 10, width: "auto", padding: "5px 14px" }, onClick: onCancel }, "Cancel")
+        );
+      }
+
+      // ── Step 2: Deal picker ──
+      if (step === 2) {
+        return React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 6, fontWeight: 600 } }, "🔧 New Service — Step 2 of 3"),
+          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 10 } },
+            filteredDeals.length + " deal" + (filteredDeals.length !== 1 ? "s" : "") + " — " + selectedStageLabel + ". Pick one to create a service for:"
+          ),
+          filteredDeals.length === 0
+            ? React.createElement("div", { style: { color: "#6b8fa8", fontSize: 12, fontStyle: "italic", marginBottom: 8 } }, "No deals found for this stage.")
+            : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", marginBottom: 8 } },
+                filteredDeals.map(function(d, i) {
+                  var dp = d.properties || {};
+                  var stageName = { appointmentscheduled: "Scheduled", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation", decisionmakerboughtin: "Decision", contractsent: "Contract", closedwon: "Won" }[dp.dealstage] || dp.dealstage || "";
+                  return React.createElement("button", {
+                    key: d.id, className: "qa-btn",
+                    style: { width: "100%", justifyContent: "flex-start", gap: 10 },
+                    onClick: function() { pickDeal(d); }
+                  },
+                    React.createElement("div", { style: { flex: 1, textAlign: "left" } },
+                      React.createElement("div", { className: "qa-label" }, dp.dealname || d.id),
+                      React.createElement("div", { className: "qa-desc" }, (dp.total_fans || "?") + " fans · " + (dp.total_barns || "?") + " barns" + (stageName ? " · " + stageName : ""))
+                    )
+                  );
+                })
+              ),
+          React.createElement("div", { style: { display: "flex", gap: 8 } },
+            React.createElement("button", { className: "svc-form-btn-cancel", style: { width: "auto", padding: "5px 14px" }, onClick: function() { setStep(1); } }, "← Back"),
+            React.createElement("button", { className: "svc-form-btn-cancel", style: { width: "auto", padding: "5px 14px" }, onClick: onCancel }, "Cancel")
+          )
+        );
+      }
+
+      // ── Step 3: Service form ──
+      if (step === 3 && selectedDeal) {
+        var dp = selectedDeal.properties || {};
+        var prefill = {
+          deal_id:   selectedDeal.id,
+          deal_name: dp.dealname || '',
+          name:      "Fan Motor Installation — " + (dp.dealname || ''),
+          description: "Install fans across " + (dp.total_barns || "?") + " barns",
+        };
+        return React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 10, fontWeight: 600 } }, "🔧 New Service — Step 3 of 3"),
+          React.createElement(ServiceForm, {
+            data: prefill,
+            onSubmit: function(dealId, name, deal, team, err) {
+              if (err) { onDone(false, err); return; }
+              onDone(true, name, dealId);
+            },
+            onCancel: function() { setStep(2); }  // back to deal picker, not full cancel
+          })
+        );
+      }
+
+      return null;
+    }
+
     function TeamsSelector({ teams, onAction }) {
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a team to assign:"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           teams.map(function(t, i) {
             return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction("Use team: " + t.name + " (ID: " + t.id + ")"); } },
@@ -755,10 +885,11 @@
       function renderBtn(a, i) {
         return React.createElement("button", { key: i, className: "qa-btn",
           onClick: function() {
-            if (a.isMapSelector)      { onMapSelector(); return; }
-            if (a.isNewServiceForm)   { onNewServiceForm(); return; }
-            if (a.isUpload)           { onUpload(); return; }
-            if (a.isStageSelector)    { onStageSelector(); return; }
+            if (a.isMap)            { window.open(MAP_URL, "_blank"); return; }
+            if (a.isMapSelector)    { onMapSelector(); return; }
+            if (a.isNewServiceForm) { onNewServiceForm(); return; }
+            if (a.isUpload)         { onUpload(); return; }
+            if (a.isStageSelector)  { onStageSelector(); return; }
             if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
             onAction(a.message);
           }
@@ -787,11 +918,11 @@
       if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
       if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
-      if (content === "NEW_SERVICE_FORM") return React.createElement(ServiceForm, {
-        data: {},
-        onSubmit: function(dealId, name, deal, team, err) {
-          if (err) { onAction("Service creation failed: " + err); return; }
-          onAction("Service created: " + name + " for deal " + dealId + ". Please confirm and show updated services.");
+      if (content === "MAP_STAGE_SELECTOR") return React.createElement(MapStageSelector, {});
+      if (content === "NEW_SERVICE_FORM") return React.createElement(NewServiceWizard, {
+        onDone: function(success, nameOrErr, dealId) {
+          if (!success) { onAction("Service creation failed: " + nameOrErr); return; }
+          onAction("Service '" + nameOrErr + "' created for deal " + dealId + ". Show updated open services.");
         },
         onCancel: function() { onAction("Cancelled new service"); }
       });
@@ -1125,25 +1256,31 @@
       return React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" } },
 
         // Header
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: "1px solid #1e2d3d", background: "#0d1520" } },
-          React.createElement("div", { style: { width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
-          React.createElement("div", null,
-            React.createElement("div", { style: { fontWeight: 600, fontSize: 14 } }, getPortalConfig().title),
-            React.createElement("div", { style: { fontSize: 10, color: "#4a9a6b", marginTop: 1 } }, "● " + auth.name + " — " + (auth.role.charAt(0).toUpperCase() + auth.role.slice(1)))
+        React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 16px", borderBottom: "1px solid #1e2d3d", background: "#0d1520", flexShrink: 0 } },
+          // Left — Lock button
+          React.createElement("div", { style: { position: "absolute", left: 12, display: "flex", gap: 6 } },
+            React.createElement("button", {
+              onClick: function() { setAuth(null); setMessages([]); },
+              style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#6b8fa8", fontSize: 11, cursor: "pointer" }
+            }, "🔒")
           ),
-          React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 8 } },
+          // Center — Logo + Title
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+            React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
+            React.createElement("div", { style: { textAlign: "center" } },
+              React.createElement("div", { style: { fontWeight: 700, fontSize: 14, lineHeight: 1.2 } }, getPortalConfig().title),
+              React.createElement("div", { style: { fontSize: 10, color: "#4a9a6b", marginTop: 2 } }, "● " + auth.name + " — " + (auth.role.charAt(0).toUpperCase() + auth.role.slice(1)))
+            )
+          ),
+          // Right — Options button
+          React.createElement("div", { style: { position: "absolute", right: 12, display: "flex", gap: 6 } },
             React.createElement("button", {
               onClick: function() {
                 setShowActions(true);
                 setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
               },
               style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, cursor: "pointer" }
-            }, "⚡ Options"),
-            auth.role !== "installer" && React.createElement("a", { href: "/map", target: "_blank", style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, textDecoration: "none" } }, "🗺 Map"),
-            React.createElement("button", {
-              onClick: function() { setAuth(null); setMessages([]); },
-              style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#6b8fa8", fontSize: 11, cursor: "pointer" }
-            }, "🔒 Lock")
+            }, "⚡ Options")
           )
         ),
 
