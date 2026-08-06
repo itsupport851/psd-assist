@@ -119,11 +119,11 @@
     ];
 
     const STAGE_BUTTONS = [
-      { icon: "📋", label: "All Deals",    message: "Show me all deals with fans, barns, operation type and amounts" },
-      { icon: "📅", label: "Scheduled",    message: "Show me all deals with stage appointmentscheduled — include fans, barns, operation type and amounts" },
-      { icon: "🎯", label: "Qualified",    message: "Show me all deals with stage qualifiedtobuy — include fans, barns, operation type and amounts" },
-      { icon: "🏆", label: "Won",          message: "Show me all deals with stage closedwon — include fans, barns, operation type and amounts" },
-      { icon: "❌", label: "Lost",         message: "Show me all deals with stage closedlost — include fans, barns, operation type and amounts" },
+      { icon: "📋", label: "All Deals",    stage: "" },
+      { icon: "📅", label: "Scheduled",    stage: "appointmentscheduled" },
+      { icon: "🎯", label: "Qualified",    stage: "qualifiedtobuy" },
+      { icon: "🏆", label: "Won",          stage: "closedwon" },
+      { icon: "❌", label: "Lost",         stage: "closedlost" },
     ];
 
     const SERVICE_STAGE_BUTTONS = [
@@ -1299,7 +1299,7 @@
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which deals do you want to see?"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           STAGE_BUTTONS.map(function(s, i) {
-            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction(s.message); } },
+            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('GET_DEALS:' + (s.stage || '')); } },
               React.createElement("span", { className: "qa-icon" }, s.icon),
               React.createElement("div", null, React.createElement("div", { className: "qa-label" }, s.label))
             );
@@ -2028,6 +2028,37 @@
             setMessages(function(prev) { return prev.concat([{ role: "assistant", content: assistantContent2, display: true }]); });
           } catch(err) {
             setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load service details for " + payload.service_name + ". " + err.message, display: true }]); });
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Direct deals fetch when UI requests table view (avoids ambiguous assistant phrasing)
+        if (text.startsWith("GET_DEALS:")) {
+          var stageParam = text.replace("GET_DEALS:", "");
+          if (stageParam === undefined) stageParam = "";
+          var userMsg3 = { role: "user", content: stageParam ? ("Show me deals with stage: " + stageParam) : "Show me all deals", display: true };
+          setMessages(function(prev) { return prev.concat([userMsg3]); });
+          setInput("");
+          setLoading(true);
+          try {
+            var res = await executeTool("get_open_deals", stageParam ? { stage: stageParam } : {});
+            var rawDeals = res.deals || [];
+            var payload = { deals: rawDeals.map(function(d) {
+              var p = d.properties || {};
+              return {
+                id: d.id,
+                name: p.dealname || p.gp_account_name || String(d.id),
+                amount: Number(p.amount || p.dealamount || 0) || 0,
+                stage: p.dealstage || p.stage || "",
+                total_fans: Number(p.total_fans || p.total_fans_count || p.number_of_fans || 0) || 0,
+                total_barns: Number(p.total_barns || 0) || 0,
+                operation_type: p.operation_type || p.operationType || p.farm_type || ""
+              };
+            }) };
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "DEALS_TABLE:" + JSON.stringify(payload), display: true }]); });
+          } catch(err) {
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load deals: " + err.message, display: true }]); });
           }
           setLoading(false);
           return;
