@@ -2154,29 +2154,29 @@
             var all = await executeTool("get_all_services", {});
             var svcs = all.services || [];
             var filtered = svcs.filter(function(s) {
-              var p = s.properties || {};
+              var p = s.properties || s || {};
               if (payload && payload.stage) {
-                var st = (p.stage || p.service_stage || "").toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+                var st = (p.stage || p.service_stage || s.stage || "").toString().toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (st.indexOf(payload.stage.replace(/[^a-z0-9]/g, '').toLowerCase()) === -1) return false;
               }
               if (payload && payload.status) {
-                var ss = (p.status || p.hs_ticket_priority || "").toString().toUpperCase();
+                var ss = (p.status || p.hs_ticket_priority || s.status || p.hs_status || "").toString().toUpperCase();
                 if (ss.indexOf(payload.status.toUpperCase()) === -1) return false;
               }
               return true;
             });
             var payloadOut = { services: filtered.map(function(s) {
-              var p = s.properties || {};
+              var p = s.properties || s || {};
               return {
                 id: s.id,
-                name: p.hs_object_name || p.name || p.service_name || '',
-                deal_name: p.deal_name || p.associated_deal_name || '',
-                team: p.team_name || p.hs_team || '',
-                stage: p.stage || p.service_stage || '',
-                status: p.status || p.hs_ticket_priority || '',
-                start_date: p.start_date || p.hs_task_start_date || '',
-                due_date: p.target_end_date || p.due_date || '',
-                total_cost: p.total_cost || p.total_costs || ''
+                name: s.name || p.hs_object_name || p.hs_name || p.service_name || p.subject || p.hs_ticket_name || p.name || '',
+                deal_name: p.deal_name || p.associated_deal_name || s.deal_name || s.deal || '',
+                team: p.team_name || p.hs_team || s.team || '',
+                stage: p.stage || p.service_stage || s.stage || p.hs_pipeline_stage || '',
+                status: p.status || p.hs_ticket_priority || s.status || p.hs_status || '',
+                start_date: p.start_date || p.hs_start_date || s.start_date || '',
+                due_date: p.target_end_date || p.due_date || s.due_date || '',
+                total_cost: p.total_cost || p.hs_total_cost || s.total_cost || ''
               };
             }) };
             setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SERVICES_TABLE:" + JSON.stringify(payloadOut), display: true }]); });
