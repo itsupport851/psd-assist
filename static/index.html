@@ -105,7 +105,7 @@
       // ── Sales ──
       { icon: "📋", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst","admin"] },
       { icon: "➕", label: "New Deal",       desc: "Create a deal",            message: null, isNewDeal: true,               roles: ["sales","admin"] },
-      { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        message: "I want to add a new line item to a deal", roles: ["sales","admin"] },
+      { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        isAddLineItem: true, roles: ["sales","admin"] },
       { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales","admin"] },
       { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales","admin"] },
       { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales","admin"] },
@@ -113,7 +113,6 @@
       { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales","admin"] },
       // ── Operations ──
       { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🖥️", label: "Display Service", desc: "Select a team and view service details", message: null, isDisplayService: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
       { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMap: true, roles: ["analyst","admin","operations"] },
@@ -415,6 +414,90 @@
               React.createElement("td", null)
             )
           )
+        )
+      );
+    }
+
+    function AddLineItemForm({ onSubmit, onCancel }) {
+      const [deals, setDeals] = useState([]);
+      const [selectedDeal, setSelectedDeal] = useState(null);
+      const [items, setItems] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [newLine, setNewLine] = useState({ pulley_size: '', brand: '', size: '', motor_size: '', qty: 1, unit_price: 0 });
+
+      useEffect(function() {
+        // load deals for selection
+        executeTool('get_open_deals', {}).then(function(r) {
+          var ds = (r.deals || []).map(function(d) { return { id: d.id, name: (d.properties && (d.properties.dealname || d.properties.gp_account_name)) || String(d.id) }; });
+          setDeals(ds);
+        }).catch(function() { setDeals([]); });
+      }, []);
+
+      function loadItemsForDeal(dealId) {
+        if (!dealId) { setItems([]); return; }
+        setLoading(true);
+        executeTool('get_line_items', { deal_id: dealId }).then(function(res) {
+          var lis = (res.line_items || []).map(function(li) {
+            var p = li.properties || {};
+            return {
+              id: li.id,
+              brand: p.fan_brand || p.brand || p.name || '',
+              size: p.fan_size || p.size || '',
+              motor_size: p.motor_size || '',
+              qty: p.quantity || p.qty || p.number_of_fans || 1,
+              unit_price: p.price || p.unit_price || 0
+            };
+          });
+          setItems(lis);
+        }).catch(function() { setItems([]); }).finally(function(){ setLoading(false); });
+      }
+
+      function handleAdd() {
+        if (!selectedDeal) return alert('Select a deal first');
+        var payload = {
+          deal_id: selectedDeal,
+          name: (newLine.brand || 'Line Item') + ' ' + (newLine.size || ''),
+          fan_brand: newLine.brand,
+          fan_size: newLine.size,
+          motor_size: newLine.motor_size,
+          quantity: Number(newLine.qty || 1),
+          unit_price: Number(newLine.unit_price || 0)
+        };
+        executeTool('add_line_item', payload).then(function(r){
+          if (r && r.success) {
+            loadItemsForDeal(selectedDeal);
+            setNewLine({ pulley_size: '', brand: '', size: '', motor_size: '', qty: 1, unit_price: 0 });
+            if (onSubmit) onSubmit(r);
+          } else {
+            alert('Failed to add line item: ' + (r && r.error ? r.error : 'unknown'));
+          }
+        }).catch(function(err){ alert('Error: ' + err.message); });
+      }
+
+      return React.createElement('div', null,
+        React.createElement('div', { style: { marginBottom: 10 } },
+          React.createElement('div', { style: { fontSize: 12, color: '#6b8fa8', marginBottom: 6 } }, 'Select Deal'),
+          React.createElement('select', { className: 'svc-form-input', value: selectedDeal || '', onChange: function(e){ setSelectedDeal(e.target.value); loadItemsForDeal(e.target.value); } },
+            React.createElement('option', { value: '' }, '-- Select deal --'),
+            deals.map(function(d){ return React.createElement('option', { key: d.id, value: d.id }, d.name); })
+          )
+        ),
+        selectedDeal && React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 12, color: '#6b8fa8', marginBottom: 6 } }, 'Existing Line Items'),
+          React.createElement(LineItemsTable, { data: { deal_name: deals.find(function(x){return x.id===selectedDeal})?.name || '', items: items }, role: 'sales' })
+        ),
+        React.createElement('div', { style: { marginTop: 12 } },
+          React.createElement('div', { style: { fontSize: 12, color: '#6b8fa8', marginBottom: 6 } }, 'New Line Item'),
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 8 } },
+            React.createElement('input', { className: 'svc-form-input', placeholder: 'Pulley Size', value: newLine.pulley_size, onChange: function(e){ setNewLine(Object.assign({}, newLine, { pulley_size: e.target.value })); } }),
+            React.createElement('input', { className: 'svc-form-input', placeholder: 'Brand', value: newLine.brand, onChange: function(e){ setNewLine(Object.assign({}, newLine, { brand: e.target.value })); } }),
+            React.createElement('input', { className: 'svc-form-input', placeholder: 'Size', value: newLine.size, onChange: function(e){ setNewLine(Object.assign({}, newLine, { size: e.target.value })); } }),
+            React.createElement('input', { className: 'svc-form-input', placeholder: 'Motor HP', value: newLine.motor_size, onChange: function(e){ setNewLine(Object.assign({}, newLine, { motor_size: e.target.value })); } }),
+            React.createElement('div', null, React.createElement('button', { className: 'qa-btn', onClick: handleAdd }, 'Add'))
+          )
+        ),
+        React.createElement('div', { style: { marginTop: 12, display: 'flex', gap: 8 } },
+          React.createElement('button', { className: 'svc-form-btn-cancel', onClick: onCancel }, 'Close')
         )
       );
     }
@@ -1376,9 +1459,9 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onNewDealForm, onDisplayService, role }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onNewDealForm, onDisplayService, onAddLineItem, role }) {
       var SALES_LABELS = ["Deal Summary","New Deal","Add Line Item","New Contact","Submit Form","Update Pricing"];
-      var OPS_LABELS   = ["Services Summary","Open Services","Display Service","New Service","Farm Map"];
+      var OPS_LABELS   = ["Services Summary","Display Service","New Service","Farm Map"];
 
       // Determine which sections this portal allows
       var path = window.location.pathname;
@@ -1408,6 +1491,7 @@
             if (a.isMapSelector)    { onMapSelector(); return; }
             if (a.isNewServiceForm) { onNewServiceForm(); return; }
             if (a.isNewDeal)       { onNewDealForm && onNewDealForm(); return; }
+            if (a.isAddLineItem)   { onAddLineItem && onAddLineItem(); return; }
             if (a.isDisplayService) { onDisplayService(); return; }
             if (a.isUpload)         { onUpload(); return; }
             if (a.isStageSelector)  { onStageSelector(); return; }
@@ -1454,6 +1538,11 @@
       if (content === "NEW_DEAL_FORM") return React.createElement(NewDealForm, {
         onSubmit: function(form) { onAction("SUBMIT_DEAL:" + JSON.stringify(form)); },
         onCancel: function() { onAction("Cancel new deal"); }
+      });
+
+      if (content === "ADD_LINE_ITEM_FORM") return React.createElement(AddLineItemForm, {
+        onSubmit: function(res) { onAction("Added line item"); },
+        onCancel: function() { onAction("Cancel add line item"); }
       });
 
       if (content.includes("SERVICES_TABLE:")) {
@@ -2066,6 +2155,11 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "NEW_DEAL_FORM", display: true }]); });
       }
 
+      function triggerAddLineItem() {
+        setShowActions(false);
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "ADD_LINE_ITEM_FORM", display: true }]); });
+      }
+
       function triggerDisplayService() {
         setShowActions(false);
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "DISPLAY_SERVICE", display: true }]); });
@@ -2401,12 +2495,12 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onNewDealForm: triggerNewDealForm, onDisplayService: triggerDisplayService, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onNewDealForm: triggerNewDealForm, onDisplayService: triggerDisplayService, onAddLineItem: triggerAddLineItem, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onNewDealForm: triggerNewDealForm, onDisplayService: triggerDisplayService, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onNewDealForm: triggerNewDealForm, onDisplayService: triggerDisplayService, onAddLineItem: triggerAddLineItem, role: auth.role })
                 )
             );
           }),
