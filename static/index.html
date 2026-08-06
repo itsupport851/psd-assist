@@ -1480,6 +1480,24 @@
         );
       }
 
+      // If the assistant returned a plain deals summary (e.g. "**9 total deals**")
+      // offer a quick action to render the data as a table when no DEALS_TABLE payload is present.
+      try {
+        if (typeof content === 'string') {
+          var hasDealsSummary = /\*\*?\d+\s+total\s+deals\*\*?/i.test(content) || /here'?s a summary of all open deals/i.test(content) || /total deals\b/i.test(content);
+          var hasDealsTable = content.indexOf("DEALS_TABLE:") !== -1;
+          if (hasDealsSummary && !hasDealsTable && typeof onAction === 'function') {
+            return React.createElement("div", null,
+              React.createElement("div", { dangerouslySetInnerHTML: { __html: renderMarkdown(content) } }),
+              React.createElement("div", { style: { marginTop: 8 } },
+                React.createElement("button", { className: "qa-btn", onClick: function() { onAction("Show me the deals as a table"); } }, "Show as table"),
+                React.createElement("span", { style: { marginLeft: 10, color: '#6b8fa8', fontSize: 12 } }, "or ask: 'Show as table'")
+              )
+            );
+          }
+        }
+      } catch(e) {}
+
       return React.createElement("div", { dangerouslySetInnerHTML: { __html: renderMarkdown(content) }, style: { wordBreak: "break-word" } });
     }
 
