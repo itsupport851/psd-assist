@@ -128,13 +128,13 @@
     ];
 
     const SERVICE_STAGE_BUTTONS = [
-      { icon: "🔧", label: "All Services", message: "Show me all open services" },
-      { icon: "🆕", label: "New", message: "Show me all services with stage new" },
-      { icon: "⚙️", label: "In Progress", message: "Show me all services with stage in progress" },
-      { icon: "✅", label: "Closed", message: "Show me all services with stage closed" },
-      { icon: "🟢", label: "On Track", message: "Show me all services with status on track" },
-      { icon: "🟡", label: "At Risk", message: "Show me all services with status at risk" },
-      { icon: "🔴", label: "Behind", message: "Show me all services with status behind" },
+      { icon: "🔧", label: "All Services", stage: "", status: "" },
+      { icon: "🆕", label: "New", stage: "new", status: "" },
+      { icon: "⚙️", label: "In Progress", stage: "in_progress", status: "" },
+      { icon: "✅", label: "Closed", stage: "closed", status: "" },
+      { icon: "🟢", label: "On Track", stage: "", status: "ON_TRACK" },
+      { icon: "🟡", label: "At Risk", stage: "", status: "AT_RISK" },
+      { icon: "🔴", label: "Behind", stage: "", status: "BEHIND" },
     ];
 
     const MAP_STAGE_BUTTONS = [
@@ -608,7 +608,8 @@
         React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Filter services by:"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           SERVICE_STAGE_BUTTONS.map(function(s, i) {
-            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction(s.message); } },
+            var payload = { stage: s.stage || "", status: s.status || "" };
+            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('GET_SERVICES:' + JSON.stringify(payload)); } },
               React.createElement("span", { className: "qa-icon" }, s.icon),
               React.createElement("div", null, React.createElement("div", { className: "qa-label" }, s.label))
             );
@@ -1339,7 +1340,7 @@
       );
     }
 
-    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, role }) {
+    function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onNewDealForm, onDisplayService, role }) {
       var SALES_LABELS = ["Deal Summary","New Deal","Add Line Item","New Contact","Submit Form","Update Pricing"];
       var OPS_LABELS   = ["Services Summary","Open Services","Display Service","New Service","Farm Map"];
 
@@ -1399,7 +1400,7 @@
     }
 
     function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onNewDealForm, onDisplayService, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, onDisplayService: onDisplayService, role: role });
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, onNewDealForm: onNewDealForm, onDisplayService: onDisplayService, role: role });
       if (content === "DISPLAY_SERVICE") return React.createElement(TeamsSelectorWrapper, { onAction: onAction });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
       if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
@@ -2106,6 +2107,50 @@
           return;
         }
 
+        // Direct services fetch when UI requests services table
+        if (text.startsWith("GET_SERVICES:")) {
+          var payload = null;
+          try { payload = JSON.parse(text.replace("GET_SERVICES:", "")); } catch(e) { payload = {}; }
+          setMessages(function(prev) { return prev.concat([{ role: "user", content: payload && (payload.stage || payload.status) ? ("Show services filter: " + JSON.stringify(payload)) : "Show all services", display: true }]); });
+          setInput("");
+          setLoading(true);
+          try {
+            var all = await executeTool("get_all_services", {});
+            var svcs = all.services || [];
+            var filtered = svcs.filter(function(s) {
+              var p = s.properties || {};
+              if (payload && payload.stage) {
+                var st = (p.stage || p.service_stage || "").toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (st.indexOf(payload.stage.replace(/[^a-z0-9]/g, '').toLowerCase()) === -1) return false;
+              }
+              if (payload && payload.status) {
+                var ss = (p.status || p.hs_ticket_priority || "").toString().toUpperCase();
+                if (ss.indexOf(payload.status.toUpperCase()) === -1) return false;
+              }
+              return true;
+            });
+            var payloadOut = { services: filtered.map(function(s) {
+              var p = s.properties || {};
+              return {
+                id: s.id,
+                name: p.hs_object_name || p.name || p.service_name || '',
+                deal_name: p.deal_name || p.associated_deal_name || '',
+                team: p.team_name || p.hs_team || '',
+                stage: p.stage || p.service_stage || '',
+                status: p.status || p.hs_ticket_priority || '',
+                start_date: p.start_date || p.hs_task_start_date || '',
+                due_date: p.target_end_date || p.due_date || '',
+                total_cost: p.total_cost || p.total_costs || ''
+              };
+            }) };
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SERVICES_TABLE:" + JSON.stringify(payloadOut), display: true }]); });
+          } catch(err) {
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load services: " + err.message, display: true }]); });
+          }
+          setLoading(false);
+          return;
+        }
+
         // Handle service form submission
         var serviceData = null;
         if (text.startsWith("SUBMIT_SERVICE:")) {
@@ -2309,7 +2354,7 @@
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onNewDealForm: triggerNewDealForm, onDisplayService: triggerDisplayService, role: auth.role })
                 )
             );
           }),
