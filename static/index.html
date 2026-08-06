@@ -2082,11 +2082,46 @@
           if (finalResponse) {
               // Strip any leaked tool-call JSON or arrays that Claude may have prepended
               var cleaned = String(finalResponse || '');
-              // Remove one or more leading JSON objects/arrays that were accidentally prepended
-              var jsonLeadRegex = /^\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*/;
-              while (jsonLeadRegex.test(cleaned)) {
-                cleaned = cleaned.replace(jsonLeadRegex, '');
+
+              function stripLeadingJsonFragments(text) {
+                var s = String(text || '');
+                // Trim left whitespace first
+                s = s.replace(/^\s+/, '');
+                while (s.length) {
+                  s = s.replace(/^\s+/, '');
+                  if (!s) break;
+                  var first = s[0];
+                  if (first === '{' || first === '[') {
+                    // Attempt to find balanced JSON/object/array end by scanning with stack
+                    var stack = [];
+                    var i = 0;
+                    for (; i < s.length; i++) {
+                      var ch = s[i];
+                      if (ch === '{' || ch === '[') stack.push(ch);
+                      else if (ch === '}') {
+                        if (stack.length && stack[stack.length-1] === '{') stack.pop(); else break;
+                      } else if (ch === ']') {
+                        if (stack.length && stack[stack.length-1] === '[') stack.pop(); else break;
+                      }
+                      if (stack.length === 0) { i++; break; }
+                    }
+                    if (stack.length === 0) {
+                      // remove the leading JSON fragment and continue
+                      s = s.slice(i).replace(/^\s+/, '');
+                      continue;
+                    }
+                    // unbalanced — stop trying
+                    break;
+                  }
+                  // If we start with garbage (like a stray '}' ), skip until next '{' or '[' and continue
+                  var nextIdx = s.search(/[\{\[]/);
+                  if (nextIdx === -1) break;
+                  s = s.slice(nextIdx);
+                }
+                return s.trim();
               }
+
+              cleaned = stripLeadingJsonFragments(cleaned);
               // Legacy specific-strip fallbacks (keeps behavior safe)
               cleaned = cleaned.replace(/^\s*\{[\s\S]*?"tool"[\s\S]*?\}\s*/g, '').replace(/^\s*\{[\s\S]*?"deals"[\s\S]*?\}\s*/, '').trim();
             setMessages(function(prev) { return prev.concat([{ role: "assistant", content: cleaned, display: true }]); });
