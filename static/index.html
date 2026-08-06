@@ -2080,8 +2080,15 @@
             }
           }
           if (finalResponse) {
-            // Strip any leaked tool-call JSON that Claude may have prepended
-            var cleaned = finalResponse.replace(/^\s*\{[\s\S]*?"tool"[\s\S]*?\}\s*/g, '').replace(/^\s*\{[\s\S]*?"deals"[\s\S]*?\}\s*/, '').trim();
+              // Strip any leaked tool-call JSON or arrays that Claude may have prepended
+              var cleaned = String(finalResponse || '');
+              // Remove one or more leading JSON objects/arrays that were accidentally prepended
+              var jsonLeadRegex = /^\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*/;
+              while (jsonLeadRegex.test(cleaned)) {
+                cleaned = cleaned.replace(jsonLeadRegex, '');
+              }
+              // Legacy specific-strip fallbacks (keeps behavior safe)
+              cleaned = cleaned.replace(/^\s*\{[\s\S]*?"tool"[\s\S]*?\}\s*/g, '').replace(/^\s*\{[\s\S]*?"deals"[\s\S]*?\}\s*/, '').trim();
             setMessages(function(prev) { return prev.concat([{ role: "assistant", content: cleaned, display: true }]); });
           }
         } catch(err) {
