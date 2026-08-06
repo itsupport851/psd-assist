@@ -103,18 +103,19 @@
     // Role-based quick actions
     const ALL_ACTIONS = [
       // ── Sales ──
-      { icon: "📊", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst","admin"] },
-      { icon: "📋", label: "Open Deals",     desc: "View all active deals",    message: "Show me all open deals",            roles: ["sales","analyst","admin","installer"] },
+      { icon: "📋", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst","admin"] },
+      { icon: "➕", label: "New Deal",       desc: "Create a deal",            message: null, isNewDeal: true,               roles: ["sales","admin"] },
       { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        message: "I want to add a new line item to a deal", roles: ["sales","admin"] },
+      { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales","admin"] },
+      { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales","admin"] },
       { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales","admin"] },
-      { icon: "📝", label: "New Deal",       desc: "Create a deal",            message: "I want to create a new deal in HubSpot", roles: ["sales","admin"] },
       { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales","admin"] },
       { icon: "📤", label: "Submit Form",    desc: "Upload customer PDF",      message: null, isUpload: true,               roles: ["sales","admin"] },
       // ── Operations ──
       { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
       { icon: "🔧", label: "Open Services",  desc: "All active services",      message: "Show me all open services", isServiceAction: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "�️", label: "Display Service", desc: "Select a team and view service details", message: null, isDisplayService: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "�🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
+      { icon: "🖥️", label: "Display Service", desc: "Select a team and view service details", message: null, isDisplayService: true, roles: ["analyst","admin","operations","installer"] },
+      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
       { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMap: true, roles: ["analyst","admin","operations"] },
     ];
 
@@ -868,6 +869,36 @@
       );
     }
 
+    function NewDealForm({ onSubmit, onCancel }) {
+      const [form, setForm] = React.useState({
+        dealname: '', gp_account_number: '', owner_name: '', farm_address: '', city: '', state: '', zip: '', total_fans: '', total_barns: ''
+      });
+      function update(f, v) { setForm(function(prev) { return Object.assign({}, prev, { [f]: v }); }); }
+      async function handleSubmit() {
+        if (!form.dealname) return;
+        // forward to parent via SUBMIT_DEAL message
+        if (typeof onSubmit === 'function') onSubmit(form);
+      }
+      return React.createElement("div", { className: "svcd-card" },
+        React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "New Deal"),
+        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 } },
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "Deal Name"), React.createElement("input", { className: "svc-form-input", value: form.dealname, onChange: function(e){ update('dealname', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "GP Account #"), React.createElement("input", { className: "svc-form-input", value: form.gp_account_number, onChange: function(e){ update('gp_account_number', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "Owner Name"), React.createElement("input", { className: "svc-form-input", value: form.owner_name, onChange: function(e){ update('owner_name', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "Total Fans"), React.createElement("input", { className: "svc-form-input", type: "number", value: form.total_fans, onChange: function(e){ update('total_fans', e.target.value); } })),
+          React.createElement("div", { style: { gridColumn: '1 / -1' } }, React.createElement("div", { className: "svc-form-label" }, "Address"), React.createElement("input", { className: "svc-form-input", value: form.farm_address, onChange: function(e){ update('farm_address', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "City"), React.createElement("input", { className: "svc-form-input", value: form.city, onChange: function(e){ update('city', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "State"), React.createElement("input", { className: "svc-form-input", value: form.state, onChange: function(e){ update('state', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "Zip"), React.createElement("input", { className: "svc-form-input", value: form.zip, onChange: function(e){ update('zip', e.target.value); } })),
+          React.createElement("div", null, React.createElement("div", { className: "svc-form-label" }, "Total Barns"), React.createElement("input", { className: "svc-form-input", type: "number", value: form.total_barns, onChange: function(e){ update('total_barns', e.target.value); } }))
+        ),
+        React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 10 } },
+          React.createElement("button", { className: "svc-form-btn-cancel", onClick: onCancel }, "Cancel"),
+          React.createElement("button", { className: "svc-form-btn", onClick: function(){ handleSubmit(); } }, "Create Deal")
+        )
+      );
+    }
+
     // ── New Service Wizard — multi-deal flow ──────────────────
     const WIZARD_STAGE_BUTTONS = [
       { icon: "📋", label: "All Open",      stage: "",                      color: "#6366f1" },
@@ -1309,7 +1340,7 @@
     }
 
     function QuickActions({ onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, role }) {
-      var SALES_LABELS = ["Deal Summary","Open Deals","Add Line Item","Update Pricing","New Deal","New Contact","Submit Form"];
+      var SALES_LABELS = ["Deal Summary","New Deal","Add Line Item","New Contact","Submit Form","Update Pricing"];
       var OPS_LABELS   = ["Services Summary","Open Services","Display Service","New Service","Farm Map"];
 
       // Determine which sections this portal allows
@@ -1339,6 +1370,7 @@
             if (a.isMap)            { window.open(MAP_URL, "_blank"); return; }
             if (a.isMapSelector)    { onMapSelector(); return; }
             if (a.isNewServiceForm) { onNewServiceForm(); return; }
+            if (a.isNewDeal)       { onNewDealForm && onNewDealForm(); return; }
             if (a.isDisplayService) { onDisplayService(); return; }
             if (a.isUpload)         { onUpload(); return; }
             if (a.isStageSelector)  { onStageSelector(); return; }
@@ -1366,7 +1398,7 @@
       );
     }
 
-    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, role }) {
+    function MessageContent({ content, onAction, onUpload, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onNewDealForm, onDisplayService, role }) {
       if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onUpload: onUpload, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, onDisplayService: onDisplayService, role: role });
       if (content === "DISPLAY_SERVICE") return React.createElement(TeamsSelectorWrapper, { onAction: onAction });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
@@ -1380,6 +1412,11 @@
           onAction(msg + ".");
         },
         onCancel: function() { onAction("Cancelled new service"); }
+      });
+
+      if (content === "NEW_DEAL_FORM") return React.createElement(NewDealForm, {
+        onSubmit: function(form) { onAction("SUBMIT_DEAL:" + JSON.stringify(form)); },
+        onCancel: function() { onAction("Cancel new deal"); }
       });
 
       if (content.includes("SERVICES_TABLE:")) {
@@ -1987,6 +2024,11 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "NEW_SERVICE_FORM", display: true }]); });
       }
 
+      function triggerNewDealForm() {
+        setShowActions(false);
+        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "NEW_DEAL_FORM", display: true }]); });
+      }
+
       function triggerDisplayService() {
         setShowActions(false);
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "DISPLAY_SERVICE", display: true }]); });
@@ -2069,6 +2111,26 @@
         if (text.startsWith("SUBMIT_SERVICE:")) {
           try { serviceData = JSON.parse(text.replace("SUBMIT_SERVICE:", "")); } catch(e) {}
           text = "Create this service: " + JSON.stringify(serviceData);
+        }
+
+        if (text.startsWith("SUBMIT_DEAL:")) {
+          var dealData = null;
+          try { dealData = JSON.parse(text.replace("SUBMIT_DEAL:", "")); } catch(e) {}
+          setInput("");
+          setLoading(true);
+          try {
+            var res = await fetch('/hubspot/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dealData) });
+            var result = await res.json();
+            if (result && result.success) {
+              setMessages(function(prev) { return prev.concat([{ role: 'assistant', content: 'Deal created: ' + (result.deal && (result.deal.properties && result.deal.properties.dealname) ? result.deal.properties.dealname : (dealData.dealname || 'New Deal')) + ' (ID: ' + (result.deal && result.deal.id ? result.deal.id : '') + ')', display: true }]); });
+            } else {
+              setMessages(function(prev) { return prev.concat([{ role: 'assistant', content: 'Failed to create deal: ' + (result && result.error ? result.error : 'unknown error'), display: true }]); });
+            }
+          } catch(err) {
+            setMessages(function(prev) { return prev.concat([{ role: 'assistant', content: 'Failed to create deal: ' + err.message, display: true }]); });
+          }
+          setLoading(false);
+          return;
         }
 
         var userContent = uploadedFile
@@ -2242,7 +2304,7 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onUpload: triggerUpload, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onNewDealForm: triggerNewDealForm, onDisplayService: triggerDisplayService, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
