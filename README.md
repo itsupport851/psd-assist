@@ -1,6 +1,6 @@
-# PSD Workbook Webhook
+# PSD Assist
 
-A Flask-based webhook service for:
+A Flask-based service for:
 - Filling a Dropbox-hosted GPC Commercial Workbook template with customer data
 - Exposing HubSpot CRM utility endpoints for deals, line items, contacts, teams, and service records
 - Serving a static React-like portal UI for sales, operations, and service workflows
