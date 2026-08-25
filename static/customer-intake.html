@@ -83,8 +83,8 @@
 </div>
 
 <script>
-const TOTAL_STEPS = 5;
-const STEP_LABELS = ['Farm & Contact Info', 'Poultry Operation Type', 'Barn & Fan Inventory', 'Equipment & Condition Checklist', 'Installation Scheduling'];
+const TOTAL_STEPS = 4;
+const STEP_LABELS = ['Farm & Contact Info', 'Operation & Fan Inventory', 'Equipment & Condition Checklist', 'Installation Scheduling'];
 
 let state = {
   step: 1,
@@ -98,7 +98,7 @@ let state = {
   power_company: '',
   gp_account_name: '', gp_account_number: '', owner_name: '', phone: '', email: '',
   farm_address: '', city: '', state: '', zip: '', county: '', year_built: '',
-  op_broiler: false, op_breeder: false, op_layer: false, op_pullet: false, op_other: false, op_other_text: '',
+  operation_type: '', op_other_text: '',
   total_barns: '', total_fans: '',
   fan_rows: [{ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }],
   fan_blades_condition: '', fans_mounted_secure: '', shutters_operate: '',
@@ -144,7 +144,6 @@ function renderInner() {
   if (state.step === 2) html += renderStep2();
   if (state.step === 3) html += renderStep3();
   if (state.step === 4) html += renderStep4();
-  if (state.step === 5) html += renderStep5();
   if (state.errorMsg) html += `<div class="error-text">${state.errorMsg}</div>`;
   html += '<div class="btn-row">';
   if (state.step > 1) html += `<button class="btn btn-secondary" onclick="goBack()">Back</button>`;
@@ -188,27 +187,24 @@ function renderStep1() {
 
 function renderStep2() {
   const opts = [
-    ['op_broiler', 'Broiler'], ['op_breeder', 'Breeder'],
-    ['op_layer', 'Layer / Egg Production'], ['op_pullet', 'Pullet']
+    ['Broiler', 'Broiler'], ['Breeder', 'Breeder'],
+    ['Egg Production', 'Egg Production'], ['Pullet', 'Pullet'], ['Other', 'Other']
   ];
-  let html = `<h2>Type of Poultry Operation</h2><div class="sub">Check all that apply.</div><div class="check-group">`;
-  opts.forEach(([key, label]) => {
-    html += `<label class="check-item"><input type="checkbox" ${state[key] ? 'checked' : ''} onchange="update('${key}', this.checked)"><span>${label}</span></label>`;
-  });
-  html += `<label class="check-item"><input type="checkbox" ${state.op_other ? 'checked' : ''} onchange="update('op_other', this.checked)"><span>Other</span></label>`;
-  if (state.op_other) html += `<div class="other-input"><input id="f-op_other_text" type="text" placeholder="Please specify" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
-  html += `</div>`;
-  return html;
-}
+  let html = `<h2>Poultry Operation &amp; Fan Inventory</h2><div class="sub">Tell us about your operation and fan setup.</div>`;
+  html += `<div class="field"><label>Type of Poultry Operation</label>
+    <select id="f-operation_type" onchange="update('operation_type', this.value)">
+      <option value="" ${state.operation_type === '' ? 'selected' : ''}>Select operation type…</option>
+      ${opts.map(([val, label]) => `<option value="${val}" ${state.operation_type === val ? 'selected' : ''}>${label}</option>`).join('')}
+    </select>
+  </div>`;
+  if (state.operation_type === 'Other') html += `<div class="field"><label>Please specify</label><input id="f-op_other_text" type="text" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
 
-function renderStep3() {
-  let html = `
-    <h2>Barn &amp; Fan Inventory</h2>
-    <div class="sub">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
+  html += `
     <div class="row2">
       <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_barns}" oninput="update('total_barns', digitsOnly(this.value))"></div>
       <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_fans}" oninput="update('total_fans', digitsOnly(this.value))"></div>
     </div>
+    <div class="sub" style="margin-top:10px;">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
     <table class="fan-table">
       <thead><tr><th>&#35; Fans</th><th>Brand</th><th>Size (in)</th><th>Motor (HP)</th><th>Pulley (in/AK)</th><th></th></tr></thead>
       <tbody>`;
@@ -237,7 +233,7 @@ function ynQuestion(key, question) {
   </div>`;
 }
 
-function renderStep4() {
+function renderStep3() {
   let html = `<h2>Equipment &amp; Condition Checklist</h2><div class="sub">Please answer honestly — this helps us plan a smooth installation.</div>`;
   html += `<div class="part-title">Part A — Fan Condition</div>`;
   html += ynQuestion('fan_blades_condition', 'All fan blades are in good condition — no warping or visible damage');
@@ -276,7 +272,7 @@ function renderStep4() {
   return html;
 }
 
-function renderStep5() {
+function renderStep4() {
   let html = `<h2>Installation Scheduling</h2><div class="sub">Help us plan the right time window for your installation.</div>`;
   html += `<div class="row2">
     <div class="field"><label>Available Installation Window From</label><input id="f-install_window_from" type="date" value="${state.install_window_from}" oninput="update('install_window_from', this.value)"></div>
@@ -290,8 +286,8 @@ function renderStep5() {
 function renderSuccess() {
   return `<div class="card success">
     <div class="icon">&#9989;</div>
-    <h2>Survey Submitted</h2>
-    <p>Thank you — your farm survey has been received. A PSD team member will follow up if any information needs clarification.</p>
+    <h2>Customer Information Form Submitted Successfully</h2>
+    <p>Thank you — your information has been received. A PSD team member will follow up if any information needs clarification.</p>
   </div>`;
 }
 
@@ -349,13 +345,11 @@ function validateStep() {
     if (required.some(k => !state[k])) return 'Please complete all required fields.';
   }
   if (state.step === 2) {
-    if (!(state.op_broiler || state.op_breeder || state.op_layer || state.op_pullet || state.op_other)) return 'Please select at least one operation type.';
-    if (state.op_other && !state.op_other_text) return 'Please specify the other operation type.';
-  }
-  if (state.step === 3) {
+    if (!state.operation_type) return 'Please select a type of poultry operation.';
+    if (state.operation_type === 'Other' && !state.op_other_text) return 'Please specify the other operation type.';
     if (!state.total_barns || !state.total_fans) return 'Please enter total barns and total fans.';
   }
-  if (state.step === 4) {
+  if (state.step === 3) {
     const requiredYN = ['fan_blades_condition', 'fans_mounted_secure', 'shutters_operate', 'hardware_no_rust', 'hardware_removable',
       'belts_inspected', 'spare_belts_onhand', 'tensioners_good', 'bearings_good', 'motors_upright', 'motor_hardware_accessible'];
     if (requiredYN.some(k => !state[k])) return 'Please answer every Yes/No question.';

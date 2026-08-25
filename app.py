@@ -8,6 +8,7 @@ import re
 import json
 import tempfile
 import time
+from datetime import datetime, timezone
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -1062,12 +1063,9 @@ def _note_association_payload(note_id, obj_id, to_object_type, association_type)
 
 
 def _build_checklist_note(data):
-    op_types = []
-    if data.get('op_broiler'): op_types.append('Broiler')
-    if data.get('op_breeder'): op_types.append('Breeder')
-    if data.get('op_layer'): op_types.append('Layer / Egg Production')
-    if data.get('op_pullet'): op_types.append('Pullet')
-    if data.get('op_other') and data.get('op_other_text'): op_types.append(f"Other: {data['op_other_text']}")
+    operation_type = data.get('operation_type', '')
+    if operation_type == 'Other' and data.get('op_other_text'):
+        operation_type = f"Other: {data['op_other_text']}"
 
     tensioner_labels = {
         'not_applicable': 'Not applicable — all tensioners are in good condition.',
@@ -1079,7 +1077,7 @@ def _build_checklist_note(data):
         f"<strong>PSD Pre-Installation Farm Survey</strong>",
         f"Power Company: {data.get('power_company', '')}",
         f"County: {data.get('county', '')} | Year Farm Built: {data.get('year_built', '')}",
-        f"Operation Type: {', '.join(op_types) or 'Not specified'}",
+        f"Operation Type: {operation_type or 'Not specified'}",
         f"Total Barns: {data.get('total_barns', '')} | Total Fans: {data.get('total_fans', '')}",
         "",
         "<strong>Fan Configurations:</strong>"
@@ -1113,6 +1111,16 @@ def _build_checklist_note(data):
     return '<br>'.join(lines)
 
 
+def _date_to_hs_ms(date_str):
+    if not date_str:
+        return None
+    try:
+        dt = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        return str(int(dt.timestamp() * 1000))
+    except ValueError:
+        return None
+
+
 @app.route('/submit-customer-form', methods=['POST'])
 def submit_customer_form():
     try:
@@ -1128,6 +1136,9 @@ def submit_customer_form():
 
         owner_name = data.get('owner_name', '').strip()
         first_name, _, last_name = owner_name.partition(' ')
+        operation_type = data.get('operation_type', '')
+        if operation_type == 'Other' and data.get('op_other_text'):
+            operation_type = data['op_other_text']
 
         contact_payload = {
             'properties': {
@@ -1173,6 +1184,8 @@ def submit_customer_form():
                 'last_name': last_name,
                 'phone_number': data.get('phone', ''),
                 'customer_email': data.get('email', ''),
+                'year_farm_built': str(data.get('year_built', '')),
+                'type_of_poultry_opperation': operation_type,
             }
         }
         deal_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=deal_payload, headers=HUBSPOT_HEADERS())
@@ -1182,6 +1195,23 @@ def submit_customer_form():
 
         assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': contact_id}, 'type': 'deal_to_contact'}]}
         requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/contacts/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
+
+        # Appointment for the installation window (best-effort, does not block submission)
+        try:
+            appointment_payload = {
+                'properties': {
+                    'hs_appointment_name': f"{data.get('gp_account_name', '')} Scheduled",
+                    'hs_appointment_start': _date_to_hs_ms(data.get('install_window_from', '')),
+                    'hs_appointment_end': _date_to_hs_ms(data.get('install_window_to', '')),
+                    'hs_pipeline_stage': '83b59094-da00-4f58-bc51-ba4d9a66a248',
+                }
+            }
+            appt_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/appointments', json=appointment_payload, headers=HUBSPOT_HEADERS())
+            if appt_res.status_code == 201:
+                appointment_id = appt_res.json()['id']
+                requests.put(f'{HUBSPOT_BASE}/crm/v4/objects/appointments/{appointment_id}/associations/default/deals/{deal_id}', headers=HUBSPOT_HEADERS())
+        except Exception:
+            pass
 
         # Fan configuration rows → line items (best-effort, does not block submission)
         for row in data.get('fan_rows', []):
