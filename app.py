@@ -24,6 +24,7 @@ POWER_COMPANY_PIPELINE_MAP = {
     'Entergy Louisiana': os.environ.get('PIPELINE_ENTERGY_LOUISIANA', 'default'),
 }
 CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
+UNIT_PRICE = os.environ.get('UNIT_PRICE', '0')
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
@@ -1172,8 +1173,6 @@ def submit_customer_form():
                 'last_name': last_name,
                 'phone_number': data.get('phone', ''),
                 'customer_email': data.get('email', ''),
-                'customer_form_sent_date': str(int(time.time() * 1000)),
-                'customer_form_received_date': str(int(time.time() * 1000)),
             }
         }
         deal_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=deal_payload, headers=HUBSPOT_HEADERS())
@@ -1189,11 +1188,12 @@ def submit_customer_form():
             if not (row.get('brand') or row.get('size')):
                 continue
             try:
+                name_parts = [row.get('brand', ''), row.get('size', ''), row.get('motor_hp', ''), row.get('pulley_size', '')]
                 li_payload = {
                     'properties': {
-                        'name': f"{row.get('brand', 'Fan')} {row.get('size', '')}in Fan",
+                        'name': ' '.join(p for p in name_parts if p),
                         'quantity': str(row.get('num_fans') or 1),
-                        'price': '0',
+                        'price': UNIT_PRICE,
                         'fan_brand': row.get('brand', ''),
                         'fan_size': str(row.get('size', '')),
                         'motor_size': str(row.get('motor_hp', '')),

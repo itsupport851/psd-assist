@@ -206,8 +206,8 @@ function renderStep3() {
     <h2>Barn &amp; Fan Inventory</h2>
     <div class="sub">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
     <div class="row2">
-      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_barns}" oninput="update('total_barns', this.value)"></div>
-      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_fans}" oninput="update('total_fans', this.value)"></div>
+      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_barns}" oninput="update('total_barns', digitsOnly(this.value))"></div>
+      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_fans}" oninput="update('total_fans', digitsOnly(this.value))"></div>
     </div>
     <table class="fan-table">
       <thead><tr><th>&#35; Fans</th><th>Brand</th><th>Size (in)</th><th>Motor (HP)</th><th>Pulley (in/AK)</th><th></th></tr></thead>
@@ -340,6 +340,8 @@ function formatPhoneNumber(value) {
   if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
+
+function digitsOnly(value) { return value.replace(/\D/g, ''); }
 
 function validateStep() {
   if (state.step === 1) {
