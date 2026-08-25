@@ -19,6 +19,11 @@ TEMPLATE_PATH = os.environ.get('TEMPLATE_PATH', '/PSD Customers/GPC_Commercial_W
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 HUBSPOT_API_KEY = os.environ.get('HUBSPOT_API_KEY', '')
 CUSTOMER_INTAKE_PIN = os.environ.get('CUSTOMER_INTAKE_PIN', '')
+POWER_COMPANY_PIPELINE_MAP = {
+    'Georgia Power': os.environ.get('PIPELINE_GEORGIA_POWER', 'default'),
+    'Entergy Louisiana': os.environ.get('PIPELINE_ENTERGY_LOUISIANA', 'default'),
+}
+CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
@@ -1071,6 +1076,7 @@ def _build_checklist_note(data):
 
     lines = [
         f"<strong>PSD Pre-Installation Farm Survey</strong>",
+        f"Power Company: {data.get('power_company', '')}",
         f"County: {data.get('county', '')} | Year Farm Built: {data.get('year_built', '')}",
         f"Operation Type: {', '.join(op_types) or 'Not specified'}",
         f"Total Barns: {data.get('total_barns', '')} | Total Fans: {data.get('total_fans', '')}",
@@ -1096,7 +1102,13 @@ def _build_checklist_note(data):
         f"Motors mounted upright: {data.get('motors_upright', '')}",
         f"Motor hardware accessible: {data.get('motor_hardware_accessible', '')}",
         "",
-        f"Confirmed by initials: {data.get('confirmation_initials', '')}"
+        f"Confirmed by initials: {data.get('confirmation_initials', '')}",
+        "",
+        "<strong>Installation Scheduling:</strong>",
+        f"Installation Month: {data.get('installation_month', '')}",
+        f"Available Window: {data.get('install_window_from', '')} to {data.get('install_window_to', '')}",
+        f"Flock Cycle (weeks between flocks): {data.get('flock_cycle_weeks', '')}",
+        f"Scheduling Restrictions: {data.get('scheduling_restrictions', '')}"
     ]
     return '<br>'.join(lines)
 
@@ -1109,21 +1121,31 @@ def submit_customer_form():
             return jsonify({'error': 'No JSON data provided'}), 400
         if CUSTOMER_INTAKE_PIN and str(data.get('access_pin', '')) != CUSTOMER_INTAKE_PIN:
             return jsonify({'error': 'Invalid or missing access PIN'}), 401
-        required = ['gp_account_name', 'gp_account_number', 'owner_name', 'email', 'farm_address']
+        required = ['gp_account_name', 'gp_account_number', 'owner_name', 'email', 'farm_address', 'power_company']
         missing = [f for f in required if not data.get(f)]
         if missing:
             return jsonify({'error': f'Missing required fields: {missing}'}), 400
 
+        owner_name = data.get('owner_name', '').strip()
+        first_name, _, last_name = owner_name.partition(' ')
+
         contact_payload = {
             'properties': {
                 'email': data.get('email', ''),
-                'firstname': data.get('owner_name', ''),
+                'firstname': first_name,
+                'lastname': last_name,
                 'phone': data.get('phone', ''),
                 'company': data.get('gp_account_name', ''),
                 'address': data.get('farm_address', ''),
                 'city': data.get('city', ''),
                 'state': data.get('state', ''),
                 'zip': data.get('zip', ''),
+                'gp_account_number': str(data.get('gp_account_number', '')),
+                'farm_name': owner_name,
+                'farm_county': data.get('county', ''),
+                'year_farm_built': str(data.get('year_built', '')),
+                'total_number_of_barns': str(data.get('total_barns', '')),
+                'total_number_of_fans': str(data.get('total_fans', '')),
             }
         }
         contact_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=contact_payload, headers=HUBSPOT_HEADERS())
@@ -1134,8 +1156,8 @@ def submit_customer_form():
         deal_payload = {
             'properties': {
                 'dealname': f"{data.get('gp_account_name', '')} — {data.get('city', '')}",
-                'dealstage': 'appointmentscheduled',
-                'pipeline': 'default',
+                'dealstage': CUSTOMER_FORM_SENT_STAGE,
+                'pipeline': POWER_COMPANY_PIPELINE_MAP.get(data.get('power_company', ''), 'default'),
                 'psd_gp_account_name': data.get('gp_account_name', ''),
                 'psd_gp_account_number': str(data.get('gp_account_number', '')),
                 'psd_owner_name': data.get('owner_name', ''),
@@ -1145,6 +1167,11 @@ def submit_customer_form():
                 'psd_zip': data.get('zip', ''),
                 'total_fans': str(data.get('total_fans', '')),
                 'total_barns': str(data.get('total_barns', '')),
+                'installation_month': data.get('installation_month', ''),
+                'installation_window_start': data.get('install_window_from', ''),
+                'installation_window_end': data.get('install_window_to', ''),
+                'flock_cycle_weeks': str(data.get('flock_cycle_weeks', '')),
+                'scheduling_restrictions': data.get('scheduling_restrictions', ''),
             }
         }
         deal_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=deal_payload, headers=HUBSPOT_HEADERS())

@@ -82,8 +82,8 @@
 </div>
 
 <script>
-const TOTAL_STEPS = 4;
-const STEP_LABELS = ['Farm & Contact Info', 'Poultry Operation Type', 'Barn & Fan Inventory', 'Equipment & Condition Checklist'];
+const TOTAL_STEPS = 5;
+const STEP_LABELS = ['Farm & Contact Info', 'Poultry Operation Type', 'Barn & Fan Inventory', 'Equipment & Condition Checklist', 'Installation Scheduling'];
 
 let state = {
   step: 1,
@@ -94,6 +94,7 @@ let state = {
   submitted: false,
   submitting: false,
   errorMsg: '',
+  power_company: '',
   gp_account_name: '', gp_account_number: '', owner_name: '', phone: '', email: '',
   farm_address: '', city: '', state: '', zip: '', county: '', year_built: '',
   op_broiler: false, op_breeder: false, op_layer: false, op_pullet: false, op_other: false, op_other_text: '',
@@ -104,7 +105,8 @@ let state = {
   belts_inspected: '', spare_belts_onhand: '',
   tensioners_good: '', bearings_good: '', tensioner_option: '',
   motors_upright: '', motor_hardware_accessible: '',
-  confirmation_initials: ''
+  confirmation_initials: '',
+  installation_month: '', install_window_from: '', install_window_to: '', flock_cycle_weeks: '', scheduling_restrictions: ''
 };
 
 function render() {
@@ -141,6 +143,7 @@ function renderInner() {
   if (state.step === 2) html += renderStep2();
   if (state.step === 3) html += renderStep3();
   if (state.step === 4) html += renderStep4();
+  if (state.step === 5) html += renderStep5();
   if (state.errorMsg) html += `<div class="error-text">${state.errorMsg}</div>`;
   html += '<div class="btn-row">';
   if (state.step > 1) html += `<button class="btn btn-secondary" onclick="goBack()">Back</button>`;
@@ -155,6 +158,13 @@ function renderStep1() {
   return `
     <h2>Farm &amp; Contact Information</h2>
     <div class="sub">Basic details so we can identify your account and location.</div>
+    <div class="field"><label>Power Company</label>
+      <select id="f-power_company" onchange="update('power_company', this.value)">
+        <option value="" ${state.power_company === '' ? 'selected' : ''}>Select power company…</option>
+        <option value="Georgia Power" ${state.power_company === 'Georgia Power' ? 'selected' : ''}>Georgia Power</option>
+        <option value="Entergy Louisiana" ${state.power_company === 'Entergy Louisiana' ? 'selected' : ''}>Entergy Louisiana</option>
+      </select>
+    </div>
     <div class="field"><label>Georgia Power Account Name</label><input id="f-gp_account_name" type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
     <div class="field"><label>Georgia Power Account #</label><input id="f-gp_account_number" type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
     <div class="field"><label>Owner / Contact Name</label><input id="f-owner_name" type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
@@ -265,6 +275,24 @@ function renderStep4() {
   return html;
 }
 
+function renderStep5() {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  let html = `<h2>Installation Scheduling</h2><div class="sub">Help us plan the right time window for your installation.</div>`;
+  html += `<div class="field"><label>Installation Month</label>
+    <select id="f-installation_month" onchange="update('installation_month', this.value)">
+      <option value="" ${state.installation_month === '' ? 'selected' : ''}>Select month…</option>
+      ${months.map(m => `<option value="${m}" ${state.installation_month === m ? 'selected' : ''}>${m}</option>`).join('')}
+    </select>
+  </div>`;
+  html += `<div class="row2">
+    <div class="field"><label>Available Installation Window From</label><input id="f-install_window_from" type="date" value="${state.install_window_from}" oninput="update('install_window_from', this.value)"></div>
+    <div class="field"><label>Available Installation Window To</label><input id="f-install_window_to" type="date" value="${state.install_window_to}" oninput="update('install_window_to', this.value)"></div>
+  </div>`;
+  html += `<div class="field"><label>Flock Cycle (weeks between flocks)</label><input id="f-flock_cycle_weeks" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.flock_cycle_weeks}" oninput="update('flock_cycle_weeks', this.value)"></div>`;
+  html += ynQuestion('scheduling_restrictions', 'Any Scheduling Restrictions?');
+  return html;
+}
+
 function renderSuccess() {
   return `<div class="card success">
     <div class="icon">&#9989;</div>
@@ -314,7 +342,7 @@ function removeRow(i) { state.fan_rows.splice(i, 1); render(); }
 
 function validateStep() {
   if (state.step === 1) {
-    const required = ['gp_account_name', 'gp_account_number', 'owner_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
+    const required = ['power_company', 'gp_account_name', 'gp_account_number', 'owner_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
     if (required.some(k => !state[k])) return 'Please complete all required fields.';
   }
   if (state.step === 2) {
@@ -323,6 +351,13 @@ function validateStep() {
   }
   if (state.step === 3) {
     if (!state.total_barns || !state.total_fans) return 'Please enter total barns and total fans.';
+  }
+  if (state.step === 4) {
+    const requiredYN = ['fan_blades_condition', 'fans_mounted_secure', 'shutters_operate', 'hardware_no_rust', 'hardware_removable',
+      'belts_inspected', 'spare_belts_onhand', 'tensioners_good', 'bearings_good', 'motors_upright', 'motor_hardware_accessible'];
+    if (requiredYN.some(k => !state[k])) return 'Please answer every Yes/No question.';
+    if (!state.tensioner_option) return 'Please select a tensioner replacement option.';
+    if (!state.confirmation_initials) return 'Please enter your initials to confirm.';
   }
   return '';
 }
@@ -336,11 +371,9 @@ function goNext() {
 function goBack() { state.step--; state.errorMsg = ''; render(); }
 
 async function submitForm() {
-  const requiredYN = ['fan_blades_condition', 'fans_mounted_secure', 'shutters_operate', 'hardware_no_rust', 'hardware_removable',
-    'belts_inspected', 'spare_belts_onhand', 'tensioners_good', 'bearings_good', 'motors_upright', 'motor_hardware_accessible'];
-  if (requiredYN.some(k => !state[k])) { state.errorMsg = 'Please answer every Yes/No question.'; render(); return; }
-  if (!state.tensioner_option) { state.errorMsg = 'Please select a tensioner replacement option.'; render(); return; }
-  if (!state.confirmation_initials) { state.errorMsg = 'Please enter your initials to confirm.'; render(); return; }
+  if (!state.installation_month || !state.install_window_from || !state.install_window_to || !state.flock_cycle_weeks || !state.scheduling_restrictions) {
+    state.errorMsg = 'Please complete all installation scheduling fields.'; render(); return;
+  }
 
   state.submitting = true; state.errorMsg = ''; render();
   try {
