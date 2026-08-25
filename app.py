@@ -7,6 +7,7 @@ import io
 import re
 import json
 import tempfile
+import time
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -17,6 +18,7 @@ DROPBOX_APP_SECRET = os.environ.get('DROPBOX_APP_SECRET', '')
 TEMPLATE_PATH = os.environ.get('TEMPLATE_PATH', '/PSD Customers/GPC_Commercial_Workbook_template.xlsm')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 HUBSPOT_API_KEY = os.environ.get('HUBSPOT_API_KEY', '')
+CUSTOMER_INTAKE_PIN = os.environ.get('CUSTOMER_INTAKE_PIN', '')
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
@@ -152,6 +154,25 @@ def service_portal():
 @app.route('/map', methods=['GET'])
 def map_page():
     return app.send_static_file('map.html')
+
+@app.route('/customer-intake', methods=['GET'])
+def customer_intake_page():
+    return app.send_static_file('customer-intake.html')
+
+@app.route('/customer-intake-auth', methods=['POST'])
+def customer_intake_auth():
+    try:
+        data = request.get_json()
+        pin = str(data.get('pin', ''))
+        if not pin:
+            return jsonify({'error': 'PIN required'}), 400
+        if not CUSTOMER_INTAKE_PIN:
+            return jsonify({'error': 'Form is not yet configured'}), 500
+        if pin != CUSTOMER_INTAKE_PIN:
+            return jsonify({'error': 'Invalid PIN'}), 401
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/maps-key', methods=['GET'])
 def maps_key():
@@ -1020,6 +1041,161 @@ def hs_update_service(service_id):
             create_service_task(service_id, task_details)
 
         return jsonify({'success': True, 'service_id': service_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ── Customer-facing pre-installation farm survey ────────────
+def _note_association_payload(note_id, obj_id, to_object_type, association_type):
+    return {
+        'inputs': [{
+            'from': {'id': note_id},
+            'to': {'id': obj_id},
+            'type': association_type
+        }]
+    }
+
+
+def _build_checklist_note(data):
+    op_types = []
+    if data.get('op_broiler'): op_types.append('Broiler')
+    if data.get('op_breeder'): op_types.append('Breeder')
+    if data.get('op_layer'): op_types.append('Layer / Egg Production')
+    if data.get('op_pullet'): op_types.append('Pullet')
+    if data.get('op_other') and data.get('op_other_text'): op_types.append(f"Other: {data['op_other_text']}")
+
+    tensioner_labels = {
+        'not_applicable': 'Not applicable — all tensioners are in good condition.',
+        'customer_supply': 'Customer will supply and replace tensioners prior to installation.',
+        'psd_supply': 'Customer requests PSD to supply replacement tensioners at additional cost.'
+    }
+
+    lines = [
+        f"<strong>PSD Pre-Installation Farm Survey</strong>",
+        f"County: {data.get('county', '')} | Year Farm Built: {data.get('year_built', '')}",
+        f"Operation Type: {', '.join(op_types) or 'Not specified'}",
+        f"Total Barns: {data.get('total_barns', '')} | Total Fans: {data.get('total_fans', '')}",
+        "",
+        "<strong>Fan Configurations:</strong>"
+    ]
+    for row in data.get('fan_rows', []):
+        lines.append(f"- {row.get('num_fans', '')} fans | {row.get('brand', '')} | {row.get('size', '')}in | {row.get('motor_hp', '')}HP | Pulley: {row.get('pulley_size', '')}")
+
+    lines += [
+        "",
+        "<strong>Equipment &amp; Condition Checklist:</strong>",
+        f"Fan blades in good condition: {data.get('fan_blades_condition', '')}",
+        f"Fans securely mounted: {data.get('fans_mounted_secure', '')}",
+        f"Shutters open/close freely: {data.get('shutters_operate', '')}",
+        f"Hardware free of heavy rust: {data.get('hardware_no_rust', '')}",
+        f"Hardware removable without grinding: {data.get('hardware_removable', '')}",
+        f"Belts inspected: {data.get('belts_inspected', '')}",
+        f"Spare belts on hand: {data.get('spare_belts_onhand', '')}",
+        f"Tensioners in good condition: {data.get('tensioners_good', '')}",
+        f"Bearings in good condition: {data.get('bearings_good', '')}",
+        f"Tensioner replacement option: {tensioner_labels.get(data.get('tensioner_option', ''), data.get('tensioner_option', ''))}",
+        f"Motors mounted upright: {data.get('motors_upright', '')}",
+        f"Motor hardware accessible: {data.get('motor_hardware_accessible', '')}",
+        "",
+        f"Confirmed by initials: {data.get('confirmation_initials', '')}"
+    ]
+    return '<br>'.join(lines)
+
+
+@app.route('/submit-customer-form', methods=['POST'])
+def submit_customer_form():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        if CUSTOMER_INTAKE_PIN and str(data.get('access_pin', '')) != CUSTOMER_INTAKE_PIN:
+            return jsonify({'error': 'Invalid or missing access PIN'}), 401
+        required = ['gp_account_name', 'gp_account_number', 'owner_name', 'email', 'farm_address']
+        missing = [f for f in required if not data.get(f)]
+        if missing:
+            return jsonify({'error': f'Missing required fields: {missing}'}), 400
+
+        contact_payload = {
+            'properties': {
+                'email': data.get('email', ''),
+                'firstname': data.get('owner_name', ''),
+                'phone': data.get('phone', ''),
+                'company': data.get('gp_account_name', ''),
+                'address': data.get('farm_address', ''),
+                'city': data.get('city', ''),
+                'state': data.get('state', ''),
+                'zip': data.get('zip', ''),
+                'ower_name': data.get('owner_name', ''),
+                'georgia_power_account': str(data.get('gp_account_number', '')),
+            }
+        }
+        contact_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=contact_payload, headers=HUBSPOT_HEADERS())
+        if contact_res.status_code != 201:
+            return jsonify({'error': contact_res.text}), contact_res.status_code
+        contact_id = contact_res.json()['id']
+
+        deal_payload = {
+            'properties': {
+                'dealname': f"{data.get('gp_account_name', '')} — {data.get('city', '')}",
+                'dealstage': 'appointmentscheduled',
+                'pipeline': 'default',
+                'psd_gp_account_name': data.get('gp_account_name', ''),
+                'psd_gp_account_number': str(data.get('gp_account_number', '')),
+                'psd_owner_name': data.get('owner_name', ''),
+                'psd_farm_address': data.get('farm_address', ''),
+                'psd_city': data.get('city', ''),
+                'psd_state': data.get('state', ''),
+                'psd_zip': data.get('zip', ''),
+                'total_fans': str(data.get('total_fans', '')),
+                'total_barns': str(data.get('total_barns', '')),
+            }
+        }
+        deal_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=deal_payload, headers=HUBSPOT_HEADERS())
+        if deal_res.status_code != 201:
+            return jsonify({'error': deal_res.text}), deal_res.status_code
+        deal_id = deal_res.json()['id']
+
+        assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': contact_id}, 'type': 'deal_to_contact'}]}
+        requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/contacts/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
+
+        # Fan configuration rows → line items (best-effort, does not block submission)
+        for row in data.get('fan_rows', []):
+            if not (row.get('brand') or row.get('size')):
+                continue
+            try:
+                li_payload = {
+                    'properties': {
+                        'name': f"{row.get('brand', 'Fan')} {row.get('size', '')}in Fan",
+                        'quantity': str(row.get('num_fans') or 1),
+                        'price': '0',
+                        'fan_brand': row.get('brand', ''),
+                        'fan_size': str(row.get('size', '')),
+                        'motor_size': str(row.get('motor_hp', '')),
+                        'description': f"Pulley size: {row.get('pulley_size', '')}",
+                    }
+                }
+                li_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=li_payload, headers=HUBSPOT_HEADERS())
+                if li_res.status_code == 201:
+                    li_id = li_res.json()['id']
+                    requests.post(
+                        f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create',
+                        json={'inputs': [{'from': {'id': deal_id}, 'to': {'id': li_id}, 'type': 'deal_to_line_item'}]},
+                        headers=HUBSPOT_HEADERS()
+                    )
+            except Exception:
+                pass
+
+        # Checklist + survey details → note on the deal and contact (best-effort)
+        try:
+            note_payload = {'properties': {'hs_note_body': _build_checklist_note(data), 'hs_timestamp': str(int(time.time() * 1000))}}
+            note_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/notes', json=note_payload, headers=HUBSPOT_HEADERS())
+            if note_res.status_code == 201:
+                note_id = note_res.json()['id']
+                requests.put(f'{HUBSPOT_BASE}/crm/v4/objects/notes/{note_id}/associations/default/deals/{deal_id}', headers=HUBSPOT_HEADERS())
+                requests.put(f'{HUBSPOT_BASE}/crm/v4/objects/notes/{note_id}/associations/default/contacts/{contact_id}', headers=HUBSPOT_HEADERS())
+        except Exception:
+            pass
+
+        return jsonify({'success': True, 'contact_id': contact_id, 'deal_id': deal_id})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

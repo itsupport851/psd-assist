@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PSD Pre-Installation Farm Survey</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1923; font-family: 'Inter', system-ui, sans-serif; color: #e8edf2; min-height: 100vh; padding: 24px 16px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 20px; }
+  .header h1 { font-size: 20px; font-weight: 700; color: #e8edf2; }
+  .header p { font-size: 13px; color: #6b8fa8; margin-top: 4px; }
+  .progress { display: flex; gap: 6px; margin-bottom: 24px; }
+  .progress .seg { flex: 1; height: 5px; border-radius: 3px; background: #1e2d3d; transition: background .2s; }
+  .progress .seg.done { background: #25a35a; }
+  .step-label { text-align: center; font-size: 11px; color: #6b8fa8; margin-bottom: 18px; font-weight: 600; letter-spacing: .3px; }
+  .card { background: #131f2b; border: 1px solid #1e2d3d; border-radius: 16px; padding: 22px 20px; }
+  .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #e8edf2; }
+  .card .sub { font-size: 12px; color: #6b8fa8; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: #8ab4cc; font-weight: 600; margin-bottom: 5px; }
+  .field input[type=text], .field input[type=email], .field input[type=tel], .field input[type=number], .field select {
+    width: 100%; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 10px 12px; color: #e8edf2; font-size: 14px; outline: none; font-family: inherit;
+  }
+  .field input:focus, .field select:focus { border-color: #25a35a; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+  .check-group { display: flex; flex-direction: column; gap: 10px; }
+  .check-item { display: flex; align-items: center; gap: 10px; background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+  .check-item input { width: 18px; height: 18px; accent-color: #25a35a; }
+  .check-item span { font-size: 14px; }
+  .yn-item { background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .yn-item .q { font-size: 13px; margin-bottom: 8px; }
+  .yn-opts { display: flex; gap: 10px; }
+  .yn-opts label { flex: 1; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #1e2d3d; font-size: 13px; font-weight: 600; cursor: pointer; color: #8ab4cc; }
+  .yn-opts input { display: none; }
+  .yn-opts input:checked + span { color: #fff; }
+  .yn-opts label.yes:has(input:checked) { background: #1a6b3c; border-color: #25a35a; color: #fff; }
+  .yn-opts label.no:has(input:checked) { background: #6b1a1a; border-color: #e05252; color: #fff; }
+  .part-title { font-size: 12px; font-weight: 700; color: #25a35a; text-transform: uppercase; letter-spacing: .5px; margin: 18px 0 8px; }
+  .part-title:first-child { margin-top: 0; }
+  .radio-opt { display: flex; align-items: flex-start; gap: 10px; background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .radio-opt input { margin-top: 3px; accent-color: #25a35a; }
+  .radio-opt span { font-size: 13px; line-height: 1.4; }
+  .fan-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+  .fan-table th { text-align: left; color: #6b8fa8; font-weight: 600; padding: 6px 4px; font-size: 11px; }
+  .fan-table td { padding: 4px; }
+  .fan-table input { width: 100%; background: #162130; border: 1px solid #1e2d3d; border-radius: 6px; padding: 7px 8px; color: #e8edf2; font-size: 12px; outline: none; }
+  .fan-table input:focus { border-color: #25a35a; }
+  .remove-row { background: none; border: none; color: #e05252; font-size: 18px; cursor: pointer; padding: 4px 8px; }
+  .add-row-btn { margin-top: 10px; background: none; border: 1px dashed #2a3d52; color: #25a35a; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; }
+  .confirm-box { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin-bottom: 14px; }
+  .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+  .btn { flex: 1; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; }
+  .btn-primary { background: linear-gradient(135deg, #1a6b3c, #25a35a); color: #fff; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-secondary { background: #162130; color: #8ab4cc; border: 1px solid #1e2d3d; }
+  .error-text { color: #e05252; font-size: 12px; margin-top: 8px; }
+  .success { text-align: center; padding: 40px 16px; }
+  .success .icon { font-size: 48px; margin-bottom: 12px; }
+  .success h2 { font-size: 18px; margin-bottom: 8px; }
+  .success p { font-size: 13px; color: #6b8fa8; }
+  .other-input { margin-top: 8px; margin-left: 28px; }
+  .pin-gate { text-align: center; padding: 10px 4px; }
+  .pin-gate p { font-size: 13px; color: #6b8fa8; margin-bottom: 18px; }
+  .pin-gate input { width: 100%; max-width: 220px; text-align: center; letter-spacing: 6px; font-size: 22px; background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px; color: #e8edf2; outline: none; margin-bottom: 14px; }
+  .pin-gate input:focus { border-color: #25a35a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>PSD Pre-Installation Farm Survey</h1>
+    <p>Please complete all sections before your scheduled installation date.</p>
+  </div>
+  <div id="app"></div>
+</div>
+
+<script>
+const TOTAL_STEPS = 4;
+const STEP_LABELS = ['Farm & Contact Info', 'Poultry Operation Type', 'Barn & Fan Inventory', 'Equipment & Condition Checklist'];
+
+let state = {
+  step: 1,
+  unlocked: sessionStorage.getItem('psd_intake_pin') ? true : false,
+  pinInput: '',
+  pinError: '',
+  verifyingPin: false,
+  submitted: false,
+  submitting: false,
+  errorMsg: '',
+  gp_account_name: '', gp_account_number: '', owner_name: '', phone: '', email: '',
+  farm_address: '', city: '', state: '', zip: '', county: '', year_built: '',
+  op_broiler: false, op_breeder: false, op_layer: false, op_pullet: false, op_other: false, op_other_text: '',
+  total_barns: '', total_fans: '',
+  fan_rows: [{ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }],
+  fan_blades_condition: '', fans_mounted_secure: '', shutters_operate: '',
+  hardware_no_rust: '', hardware_removable: '',
+  belts_inspected: '', spare_belts_onhand: '',
+  tensioners_good: '', bearings_good: '', tensioner_option: '',
+  motors_upright: '', motor_hardware_accessible: '',
+  confirmation_initials: ''
+};
+
+function render() {
+  const root = document.getElementById('app');
+  if (!state.unlocked) { root.innerHTML = renderPinGate(); return; }
+  if (state.submitted) { root.innerHTML = renderSuccess(); return; }
+
+  let html = '';
+  html += '<div class="progress">';
+  for (let i = 1; i <= TOTAL_STEPS; i++) html += `<div class="seg ${i <= state.step ? 'done' : ''}"></div>`;
+  html += '</div>';
+  html += `<div class="step-label">STEP ${state.step} OF ${TOTAL_STEPS} — ${STEP_LABELS[state.step - 1].toUpperCase()}</div>`;
+  html += '<div class="card">';
+  if (state.step === 1) html += renderStep1();
+  if (state.step === 2) html += renderStep2();
+  if (state.step === 3) html += renderStep3();
+  if (state.step === 4) html += renderStep4();
+  if (state.errorMsg) html += `<div class="error-text">${state.errorMsg}</div>`;
+  html += '<div class="btn-row">';
+  if (state.step > 1) html += `<button class="btn btn-secondary" onclick="goBack()">Back</button>`;
+  if (state.step < TOTAL_STEPS) html += `<button class="btn btn-primary" onclick="goNext()">Continue</button>`;
+  if (state.step === TOTAL_STEPS) html += `<button class="btn btn-primary" ${state.submitting ? 'disabled' : ''} onclick="submitForm()">${state.submitting ? 'Submitting…' : 'Submit Survey'}</button>`;
+  html += '</div>';
+  html += '</div>';
+  root.innerHTML = html;
+}
+
+function renderStep1() {
+  return `
+    <h2>Farm &amp; Contact Information</h2>
+    <div class="sub">Basic details so we can identify your account and location.</div>
+    <div class="field"><label>Georgia Power Account Name</label><input type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
+    <div class="field"><label>Georgia Power Account #</label><input type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
+    <div class="field"><label>Owner / Contact Name</label><input type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
+    <div class="row2">
+      <div class="field"><label>Phone Number</label><input type="tel" value="${state.phone}" oninput="update('phone', this.value)"></div>
+      <div class="field"><label>Email Address</label><input type="email" value="${state.email}" oninput="update('email', this.value)"></div>
+    </div>
+    <div class="field"><label>Farm Address</label><input type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
+    <div class="row3">
+      <div class="field"><label>City</label><input type="text" value="${state.city}" oninput="update('city', this.value)"></div>
+      <div class="field"><label>State</label><input type="text" value="${state.state}" oninput="update('state', this.value)"></div>
+      <div class="field"><label>ZIP</label><input type="text" value="${state.zip}" oninput="update('zip', this.value)"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>County</label><input type="text" value="${state.county}" oninput="update('county', this.value)"></div>
+      <div class="field"><label>Year Farm Was Built</label><input type="number" value="${state.year_built}" oninput="update('year_built', this.value)"></div>
+    </div>
+  `;
+}
+
+function renderStep2() {
+  const opts = [
+    ['op_broiler', 'Broiler'], ['op_breeder', 'Breeder'],
+    ['op_layer', 'Layer / Egg Production'], ['op_pullet', 'Pullet']
+  ];
+  let html = `<h2>Type of Poultry Operation</h2><div class="sub">Check all that apply.</div><div class="check-group">`;
+  opts.forEach(([key, label]) => {
+    html += `<label class="check-item"><input type="checkbox" ${state[key] ? 'checked' : ''} onchange="update('${key}', this.checked)"><span>${label}</span></label>`;
+  });
+  html += `<label class="check-item"><input type="checkbox" ${state.op_other ? 'checked' : ''} onchange="update('op_other', this.checked)"><span>Other</span></label>`;
+  if (state.op_other) html += `<div class="other-input"><input type="text" placeholder="Please specify" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
+  html += `</div>`;
+  return html;
+}
+
+function renderStep3() {
+  let html = `
+    <h2>Barn &amp; Fan Inventory</h2>
+    <div class="sub">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
+    <div class="row2">
+      <div class="field"><label>Total Number of Barns</label><input type="number" value="${state.total_barns}" oninput="update('total_barns', this.value)"></div>
+      <div class="field"><label>Total Number of Fans</label><input type="number" value="${state.total_fans}" oninput="update('total_fans', this.value)"></div>
+    </div>
+    <table class="fan-table">
+      <thead><tr><th>&#35; Fans</th><th>Brand</th><th>Size (in)</th><th>Motor (HP)</th><th>Pulley (in/AK)</th><th></th></tr></thead>
+      <tbody>`;
+  state.fan_rows.forEach((row, i) => {
+    html += `<tr>
+      <td><input type="number" value="${row.num_fans}" oninput="updateRow(${i}, 'num_fans', this.value)"></td>
+      <td><input type="text" value="${row.brand}" oninput="updateRow(${i}, 'brand', this.value)"></td>
+      <td><input type="text" value="${row.size}" oninput="updateRow(${i}, 'size', this.value)"></td>
+      <td><input type="text" value="${row.motor_hp}" oninput="updateRow(${i}, 'motor_hp', this.value)"></td>
+      <td><input type="text" value="${row.pulley_size}" oninput="updateRow(${i}, 'pulley_size', this.value)"></td>
+      <td>${state.fan_rows.length > 1 ? `<button class="remove-row" onclick="removeRow(${i})">&times;</button>` : ''}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>
+    <button class="add-row-btn" onclick="addRow()">+ Add Fan Configuration</button>`;
+  return html;
+}
+
+function ynQuestion(key, question) {
+  return `<div class="yn-item">
+    <div class="q">${question}</div>
+    <div class="yn-opts">
+      <label class="yes"><input type="radio" name="${key}" value="Yes" ${state[key] === 'Yes' ? 'checked' : ''} onchange="update('${key}', 'Yes')"><span>Yes</span></label>
+      <label class="no"><input type="radio" name="${key}" value="No" ${state[key] === 'No' ? 'checked' : ''} onchange="update('${key}', 'No')"><span>No</span></label>
+    </div>
+  </div>`;
+}
+
+function renderStep4() {
+  let html = `<h2>Equipment &amp; Condition Checklist</h2><div class="sub">Please answer honestly — this helps us plan a smooth installation.</div>`;
+  html += `<div class="part-title">Part A — Fan Condition</div>`;
+  html += ynQuestion('fan_blades_condition', 'All fan blades are in good condition — no warping or visible damage');
+  html += ynQuestion('fans_mounted_secure', 'All fans are securely mounted and structurally sound');
+  html += ynQuestion('shutters_operate', 'Fan shutters open and close freely');
+
+  html += `<div class="part-title">Part B — Hardware Condition</div>`;
+  html += ynQuestion('hardware_no_rust', 'Hardware (bolts and nuts) shows no heavy rust or corrosion');
+  html += ynQuestion('hardware_removable', 'Hardware can be removed without grinding or heavy torquing');
+
+  html += `<div class="part-title">Part C — Belts</div>`;
+  html += ynQuestion('belts_inspected', 'All belts have been thoroughly inspected prior to submitting this form');
+  html += ynQuestion('spare_belts_onhand', 'Spare belts are on hand and ready on the day of installation');
+
+  html += `<div class="part-title">Part D — Tensioners &amp; Bearings</div>`;
+  html += ynQuestion('tensioners_good', 'All tensioners are in good working condition');
+  html += ynQuestion('bearings_good', 'All bearings are in good condition — no excessive noise or play');
+
+  const tensionerOpts = [
+    ['not_applicable', 'Not applicable — all tensioners are in good condition.'],
+    ['customer_supply', 'I will supply and replace tensioners prior to the installation date.'],
+    ['psd_supply', 'I would like PSD to supply replacement tensioners at an additional cost. A quote will be provided and must be approved before your installation date.']
+  ];
+  html += `<div style="font-size:13px; margin-bottom:8px;">If tensioners need replacement, please select one option:</div>`;
+  tensionerOpts.forEach(([val, label]) => {
+    html += `<label class="radio-opt"><input type="radio" name="tensioner_option" value="${val}" ${state.tensioner_option === val ? 'checked' : ''} onchange="update('tensioner_option', '${val}')"><span>${label}</span></label>`;
+  });
+
+  html += `<div class="part-title">Part E — Motor Accessibility &amp; Mounting</div>`;
+  html += ynQuestion('motors_upright', 'All fan motors are mounted in a standard upright position');
+  html += ynQuestion('motor_hardware_accessible', 'All motor hardware and mounting points are fully accessible for removal');
+
+  html += `<div class="part-title">Part F — Overall Readiness Confirmation</div>`;
+  html += `<div class="confirm-box">By initialing below, I confirm that I have read and answered this checklist honestly and to the best of my knowledge. I understand that PSD will review this form and reserves the right to accept or decline this project based on the condition of my equipment. I also understand that any unresolved conditions on this checklist may result in postponement or cancellation of the installation, with no obligation on the part of PSD.</div>`;
+  html += `<div class="field"><label>Initials (confirms Yes)</label><input type="text" maxlength="6" value="${state.confirmation_initials}" oninput="update('confirmation_initials', this.value)"></div>`;
+  return html;
+}
+
+function renderSuccess() {
+  return `<div class="card success">
+    <div class="icon">&#9989;</div>
+    <h2>Survey Submitted</h2>
+    <p>Thank you — your farm survey has been received. A PSD team member will follow up if any information needs clarification.</p>
+  </div>`;
+}
+
+function renderPinGate() {
+  return `<div class="card pin-gate">
+    <h2>Enter Access PIN</h2>
+    <p>Please enter the PIN provided by your PSD representative to access this survey.</p>
+    <input type="password" inputmode="numeric" maxlength="8" value="${state.pinInput}" oninput="updatePin(this.value)" onkeydown="if(event.key==='Enter') verifyPin();" autofocus>
+    ${state.pinError ? `<div class="error-text">${state.pinError}</div>` : ''}
+    <div class="btn-row">
+      <button class="btn btn-primary" ${state.verifyingPin ? 'disabled' : ''} onclick="verifyPin()">${state.verifyingPin ? 'Checking…' : 'Unlock'}</button>
+    </div>
+  </div>`;
+}
+
+function updatePin(val) { state.pinInput = val; state.pinError = ''; render(); }
+
+async function verifyPin() {
+  if (!state.pinInput) { state.pinError = 'Please enter your PIN.'; render(); return; }
+  state.verifyingPin = true; state.pinError = ''; render();
+  try {
+    const res = await fetch('/customer-intake-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: state.pinInput })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Invalid PIN');
+    sessionStorage.setItem('psd_intake_pin', state.pinInput);
+    state.unlocked = true;
+  } catch (e) {
+    state.pinError = e.message || 'Invalid PIN';
+  }
+  state.verifyingPin = false;
+  render();
+}
+
+function update(key, val) { state[key] = val; state.errorMsg = ''; render(); }
+function updateRow(i, key, val) { state.fan_rows[i][key] = val; render(); }
+function addRow() { state.fan_rows.push({ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }); render(); }
+function removeRow(i) { state.fan_rows.splice(i, 1); render(); }
+
+function validateStep() {
+  if (state.step === 1) {
+    const required = ['gp_account_name', 'gp_account_number', 'owner_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
+    if (required.some(k => !state[k])) return 'Please complete all required fields.';
+  }
+  if (state.step === 2) {
+    if (!(state.op_broiler || state.op_breeder || state.op_layer || state.op_pullet || state.op_other)) return 'Please select at least one operation type.';
+    if (state.op_other && !state.op_other_text) return 'Please specify the other operation type.';
+  }
+  if (state.step === 3) {
+    if (!state.total_barns || !state.total_fans) return 'Please enter total barns and total fans.';
+  }
+  return '';
+}
+
+function goNext() {
+  const err = validateStep();
+  if (err) { state.errorMsg = err; render(); return; }
+  state.step++;
+  render();
+}
+function goBack() { state.step--; state.errorMsg = ''; render(); }
+
+async function submitForm() {
+  const requiredYN = ['fan_blades_condition', 'fans_mounted_secure', 'shutters_operate', 'hardware_no_rust', 'hardware_removable',
+    'belts_inspected', 'spare_belts_onhand', 'tensioners_good', 'bearings_good', 'motors_upright', 'motor_hardware_accessible'];
+  if (requiredYN.some(k => !state[k])) { state.errorMsg = 'Please answer every Yes/No question.'; render(); return; }
+  if (!state.tensioner_option) { state.errorMsg = 'Please select a tensioner replacement option.'; render(); return; }
+  if (!state.confirmation_initials) { state.errorMsg = 'Please enter your initials to confirm.'; render(); return; }
+
+  state.submitting = true; state.errorMsg = ''; render();
+  try {
+    const res = await fetch('/submit-customer-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({}, state, { access_pin: sessionStorage.getItem('psd_intake_pin') || '' }))
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Submission failed');
+    state.submitted = true;
+  } catch (e) {
+    state.errorMsg = e.message || 'Something went wrong. Please try again.';
+  }
+  state.submitting = false;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
