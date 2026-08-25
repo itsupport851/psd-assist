@@ -20,10 +20,11 @@
   .card .sub { font-size: 12px; color: #6b8fa8; margin-bottom: 16px; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 12px; color: #8ab4cc; font-weight: 600; margin-bottom: 5px; }
-  .field input[type=text], .field input[type=email], .field input[type=tel], .field input[type=number], .field select {
+  .field input[type=text], .field input[type=email], .field input[type=tel], .field input[type=number], .field input[type=date], .field select {
     width: 100%; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 10px 12px; color: #e8edf2; font-size: 14px; outline: none; font-family: inherit;
   }
   .field input:focus, .field select:focus { border-color: #25a35a; }
+  .field input[type=date] { color-scheme: dark; }
   .other-input input[type=text] {
     width: 100%; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 10px 12px; color: #e8edf2; font-size: 14px; outline: none; font-family: inherit;
   }
@@ -106,7 +107,7 @@ let state = {
   tensioners_good: '', bearings_good: '', tensioner_option: '',
   motors_upright: '', motor_hardware_accessible: '',
   confirmation_initials: '',
-  installation_month: '', install_window_from: '', install_window_to: '', flock_cycle_weeks: '', scheduling_restrictions: ''
+  install_window_from: '', install_window_to: '', flock_cycle_weeks: '', scheduling_restrictions: ''
 };
 
 function render() {
@@ -165,11 +166,11 @@ function renderStep1() {
         <option value="Entergy Louisiana" ${state.power_company === 'Entergy Louisiana' ? 'selected' : ''}>Entergy Louisiana</option>
       </select>
     </div>
-    <div class="field"><label>Georgia Power Account Name</label><input id="f-gp_account_name" type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
-    <div class="field"><label>Georgia Power Account #</label><input id="f-gp_account_number" type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
+    <div class="field"><label>Account Name</label><input id="f-gp_account_name" type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
+    <div class="field"><label>Account #</label><input id="f-gp_account_number" type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
     <div class="field"><label>Owner / Contact Name</label><input id="f-owner_name" type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
     <div class="row2">
-      <div class="field"><label>Phone Number</label><input id="f-phone" type="tel" value="${state.phone}" oninput="update('phone', this.value)"></div>
+      <div class="field"><label>Phone Number</label><input id="f-phone" type="tel" inputmode="numeric" placeholder="(555) 555-5555" value="${state.phone}" oninput="update('phone', formatPhoneNumber(this.value))"></div>
       <div class="field"><label>Email Address</label><input id="f-email" type="text" inputmode="email" autocomplete="email" value="${state.email}" oninput="update('email', this.value)"></div>
     </div>
     <div class="field"><label>Farm Address</label><input id="f-farm_address" type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
@@ -276,20 +277,13 @@ function renderStep4() {
 }
 
 function renderStep5() {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   let html = `<h2>Installation Scheduling</h2><div class="sub">Help us plan the right time window for your installation.</div>`;
-  html += `<div class="field"><label>Installation Month</label>
-    <select id="f-installation_month" onchange="update('installation_month', this.value)">
-      <option value="" ${state.installation_month === '' ? 'selected' : ''}>Select month…</option>
-      ${months.map(m => `<option value="${m}" ${state.installation_month === m ? 'selected' : ''}>${m}</option>`).join('')}
-    </select>
-  </div>`;
   html += `<div class="row2">
     <div class="field"><label>Available Installation Window From</label><input id="f-install_window_from" type="date" value="${state.install_window_from}" oninput="update('install_window_from', this.value)"></div>
     <div class="field"><label>Available Installation Window To</label><input id="f-install_window_to" type="date" value="${state.install_window_to}" oninput="update('install_window_to', this.value)"></div>
   </div>`;
   html += `<div class="field"><label>Flock Cycle (weeks between flocks)</label><input id="f-flock_cycle_weeks" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.flock_cycle_weeks}" oninput="update('flock_cycle_weeks', this.value)"></div>`;
-  html += ynQuestion('scheduling_restrictions', 'Any Scheduling Restrictions?');
+  html += `<div class="field"><label>Any Scheduling Restrictions</label><input id="f-scheduling_restrictions" type="text" placeholder="Describe any restrictions, or leave blank if none" value="${state.scheduling_restrictions}" oninput="update('scheduling_restrictions', this.value)"></div>`;
   return html;
 }
 
@@ -340,6 +334,13 @@ function updateRow(i, key, val) { state.fan_rows[i][key] = val; render(); }
 function addRow() { state.fan_rows.push({ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }); render(); }
 function removeRow(i) { state.fan_rows.splice(i, 1); render(); }
 
+function formatPhoneNumber(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length < 4) return digits;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function validateStep() {
   if (state.step === 1) {
     const required = ['power_company', 'gp_account_name', 'gp_account_number', 'owner_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
@@ -371,7 +372,7 @@ function goNext() {
 function goBack() { state.step--; state.errorMsg = ''; render(); }
 
 async function submitForm() {
-  if (!state.installation_month || !state.install_window_from || !state.install_window_to || !state.flock_cycle_weeks || !state.scheduling_restrictions) {
+  if (!state.install_window_from || !state.install_window_to || !state.flock_cycle_weeks) {
     state.errorMsg = 'Please complete all installation scheduling fields.'; render(); return;
   }
 
