@@ -1124,8 +1124,6 @@ def submit_customer_form():
                 'city': data.get('city', ''),
                 'state': data.get('state', ''),
                 'zip': data.get('zip', ''),
-                'ower_name': data.get('owner_name', ''),
-                'georgia_power_account': str(data.get('gp_account_number', '')),
             }
         }
         contact_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=contact_payload, headers=HUBSPOT_HEADERS())

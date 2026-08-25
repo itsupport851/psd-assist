@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PSD Pre-Installation Farm Survey</title>
+<title>PSD Customer Information Form</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0f1923; font-family: 'Inter', system-ui, sans-serif; color: #e8edf2; min-height: 100vh; padding: 24px 16px; }
@@ -75,7 +75,7 @@
 <body>
 <div class="wrap">
   <div class="header">
-    <h1>PSD Pre-Installation Farm Survey</h1>
+    <h1>PSD Customer Information Form</h1>
     <p>Please complete all sections before your scheduled installation date.</p>
   </div>
   <div id="app"></div>
@@ -145,7 +145,7 @@ function renderInner() {
   html += '<div class="btn-row">';
   if (state.step > 1) html += `<button class="btn btn-secondary" onclick="goBack()">Back</button>`;
   if (state.step < TOTAL_STEPS) html += `<button class="btn btn-primary" onclick="goNext()">Continue</button>`;
-  if (state.step === TOTAL_STEPS) html += `<button class="btn btn-primary" ${state.submitting ? 'disabled' : ''} onclick="submitForm()">${state.submitting ? 'Submitting…' : 'Submit Survey'}</button>`;
+  if (state.step === TOTAL_STEPS) html += `<button class="btn btn-primary" ${state.submitting ? 'disabled' : ''} onclick="submitForm()">${state.submitting ? 'Submitting…' : 'Submit'}</button>`;
   html += '</div>';
   html += '</div>';
   root.innerHTML = html;
