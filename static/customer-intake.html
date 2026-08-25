@@ -24,6 +24,10 @@
     width: 100%; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 10px 12px; color: #e8edf2; font-size: 14px; outline: none; font-family: inherit;
   }
   .field input:focus, .field select:focus { border-color: #25a35a; }
+  .other-input input[type=text] {
+    width: 100%; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 10px 12px; color: #e8edf2; font-size: 14px; outline: none; font-family: inherit;
+  }
+  .other-input input[type=text]:focus { border-color: #25a35a; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
   .check-group { display: flex; flex-direction: column; gap: 10px; }
@@ -156,7 +160,7 @@ function renderStep1() {
     <div class="field"><label>Owner / Contact Name</label><input id="f-owner_name" type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
     <div class="row2">
       <div class="field"><label>Phone Number</label><input id="f-phone" type="tel" value="${state.phone}" oninput="update('phone', this.value)"></div>
-      <div class="field"><label>Email Address</label><input id="f-email" type="email" value="${state.email}" oninput="update('email', this.value)"></div>
+      <div class="field"><label>Email Address</label><input id="f-email" type="text" inputmode="email" autocomplete="email" value="${state.email}" oninput="update('email', this.value)"></div>
     </div>
     <div class="field"><label>Farm Address</label><input id="f-farm_address" type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
     <div class="row3">
@@ -166,7 +170,7 @@ function renderStep1() {
     </div>
     <div class="row2">
       <div class="field"><label>County</label><input id="f-county" type="text" value="${state.county}" oninput="update('county', this.value)"></div>
-      <div class="field"><label>Year Farm Was Built</label><input id="f-year_built" type="number" value="${state.year_built}" oninput="update('year_built', this.value)"></div>
+      <div class="field"><label>Year Farm Was Built</label><input id="f-year_built" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.year_built}" oninput="update('year_built', this.value)"></div>
     </div>
   `;
 }
@@ -191,15 +195,15 @@ function renderStep3() {
     <h2>Barn &amp; Fan Inventory</h2>
     <div class="sub">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
     <div class="row2">
-      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="number" value="${state.total_barns}" oninput="update('total_barns', this.value)"></div>
-      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="number" value="${state.total_fans}" oninput="update('total_fans', this.value)"></div>
+      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_barns}" oninput="update('total_barns', this.value)"></div>
+      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_fans}" oninput="update('total_fans', this.value)"></div>
     </div>
     <table class="fan-table">
       <thead><tr><th>&#35; Fans</th><th>Brand</th><th>Size (in)</th><th>Motor (HP)</th><th>Pulley (in/AK)</th><th></th></tr></thead>
       <tbody>`;
   state.fan_rows.forEach((row, i) => {
     html += `<tr>
-      <td><input id="f-row${i}-num_fans" type="number" value="${row.num_fans}" oninput="updateRow(${i}, 'num_fans', this.value)"></td>
+      <td><input id="f-row${i}-num_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${row.num_fans}" oninput="updateRow(${i}, 'num_fans', this.value)"></td>
       <td><input id="f-row${i}-brand" type="text" value="${row.brand}" oninput="updateRow(${i}, 'brand', this.value)"></td>
       <td><input id="f-row${i}-size" type="text" value="${row.size}" oninput="updateRow(${i}, 'size', this.value)"></td>
       <td><input id="f-row${i}-motor_hp" type="text" value="${row.motor_hp}" oninput="updateRow(${i}, 'motor_hp', this.value)"></td>
