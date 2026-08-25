@@ -104,6 +104,25 @@ let state = {
 };
 
 function render() {
+  const active = document.activeElement;
+  const activeId = active && active.id ? active.id : null;
+  const selStart = active && 'selectionStart' in active ? active.selectionStart : null;
+  const selEnd = active && 'selectionEnd' in active ? active.selectionEnd : null;
+
+  renderInner();
+
+  if (activeId) {
+    const el = document.getElementById(activeId);
+    if (el) {
+      el.focus();
+      if (selStart !== null && el.setSelectionRange) {
+        try { el.setSelectionRange(selStart, selEnd); } catch (e) {}
+      }
+    }
+  }
+}
+
+function renderInner() {
   const root = document.getElementById('app');
   if (!state.unlocked) { root.innerHTML = renderPinGate(); return; }
   if (state.submitted) { root.innerHTML = renderSuccess(); return; }
@@ -132,22 +151,22 @@ function renderStep1() {
   return `
     <h2>Farm &amp; Contact Information</h2>
     <div class="sub">Basic details so we can identify your account and location.</div>
-    <div class="field"><label>Georgia Power Account Name</label><input type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
-    <div class="field"><label>Georgia Power Account #</label><input type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
-    <div class="field"><label>Owner / Contact Name</label><input type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
+    <div class="field"><label>Georgia Power Account Name</label><input id="f-gp_account_name" type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
+    <div class="field"><label>Georgia Power Account #</label><input id="f-gp_account_number" type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
+    <div class="field"><label>Owner / Contact Name</label><input id="f-owner_name" type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
     <div class="row2">
-      <div class="field"><label>Phone Number</label><input type="tel" value="${state.phone}" oninput="update('phone', this.value)"></div>
-      <div class="field"><label>Email Address</label><input type="email" value="${state.email}" oninput="update('email', this.value)"></div>
+      <div class="field"><label>Phone Number</label><input id="f-phone" type="tel" value="${state.phone}" oninput="update('phone', this.value)"></div>
+      <div class="field"><label>Email Address</label><input id="f-email" type="email" value="${state.email}" oninput="update('email', this.value)"></div>
     </div>
-    <div class="field"><label>Farm Address</label><input type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
+    <div class="field"><label>Farm Address</label><input id="f-farm_address" type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
     <div class="row3">
-      <div class="field"><label>City</label><input type="text" value="${state.city}" oninput="update('city', this.value)"></div>
-      <div class="field"><label>State</label><input type="text" value="${state.state}" oninput="update('state', this.value)"></div>
-      <div class="field"><label>ZIP</label><input type="text" value="${state.zip}" oninput="update('zip', this.value)"></div>
+      <div class="field"><label>City</label><input id="f-city" type="text" value="${state.city}" oninput="update('city', this.value)"></div>
+      <div class="field"><label>State</label><input id="f-state" type="text" value="${state.state}" oninput="update('state', this.value)"></div>
+      <div class="field"><label>ZIP</label><input id="f-zip" type="text" value="${state.zip}" oninput="update('zip', this.value)"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>County</label><input type="text" value="${state.county}" oninput="update('county', this.value)"></div>
-      <div class="field"><label>Year Farm Was Built</label><input type="number" value="${state.year_built}" oninput="update('year_built', this.value)"></div>
+      <div class="field"><label>County</label><input id="f-county" type="text" value="${state.county}" oninput="update('county', this.value)"></div>
+      <div class="field"><label>Year Farm Was Built</label><input id="f-year_built" type="number" value="${state.year_built}" oninput="update('year_built', this.value)"></div>
     </div>
   `;
 }
@@ -162,7 +181,7 @@ function renderStep2() {
     html += `<label class="check-item"><input type="checkbox" ${state[key] ? 'checked' : ''} onchange="update('${key}', this.checked)"><span>${label}</span></label>`;
   });
   html += `<label class="check-item"><input type="checkbox" ${state.op_other ? 'checked' : ''} onchange="update('op_other', this.checked)"><span>Other</span></label>`;
-  if (state.op_other) html += `<div class="other-input"><input type="text" placeholder="Please specify" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
+  if (state.op_other) html += `<div class="other-input"><input id="f-op_other_text" type="text" placeholder="Please specify" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
   html += `</div>`;
   return html;
 }
@@ -172,19 +191,19 @@ function renderStep3() {
     <h2>Barn &amp; Fan Inventory</h2>
     <div class="sub">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
     <div class="row2">
-      <div class="field"><label>Total Number of Barns</label><input type="number" value="${state.total_barns}" oninput="update('total_barns', this.value)"></div>
-      <div class="field"><label>Total Number of Fans</label><input type="number" value="${state.total_fans}" oninput="update('total_fans', this.value)"></div>
+      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="number" value="${state.total_barns}" oninput="update('total_barns', this.value)"></div>
+      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="number" value="${state.total_fans}" oninput="update('total_fans', this.value)"></div>
     </div>
     <table class="fan-table">
       <thead><tr><th>&#35; Fans</th><th>Brand</th><th>Size (in)</th><th>Motor (HP)</th><th>Pulley (in/AK)</th><th></th></tr></thead>
       <tbody>`;
   state.fan_rows.forEach((row, i) => {
     html += `<tr>
-      <td><input type="number" value="${row.num_fans}" oninput="updateRow(${i}, 'num_fans', this.value)"></td>
-      <td><input type="text" value="${row.brand}" oninput="updateRow(${i}, 'brand', this.value)"></td>
-      <td><input type="text" value="${row.size}" oninput="updateRow(${i}, 'size', this.value)"></td>
-      <td><input type="text" value="${row.motor_hp}" oninput="updateRow(${i}, 'motor_hp', this.value)"></td>
-      <td><input type="text" value="${row.pulley_size}" oninput="updateRow(${i}, 'pulley_size', this.value)"></td>
+      <td><input id="f-row${i}-num_fans" type="number" value="${row.num_fans}" oninput="updateRow(${i}, 'num_fans', this.value)"></td>
+      <td><input id="f-row${i}-brand" type="text" value="${row.brand}" oninput="updateRow(${i}, 'brand', this.value)"></td>
+      <td><input id="f-row${i}-size" type="text" value="${row.size}" oninput="updateRow(${i}, 'size', this.value)"></td>
+      <td><input id="f-row${i}-motor_hp" type="text" value="${row.motor_hp}" oninput="updateRow(${i}, 'motor_hp', this.value)"></td>
+      <td><input id="f-row${i}-pulley_size" type="text" value="${row.pulley_size}" oninput="updateRow(${i}, 'pulley_size', this.value)"></td>
       <td>${state.fan_rows.length > 1 ? `<button class="remove-row" onclick="removeRow(${i})">&times;</button>` : ''}</td>
     </tr>`;
   });
@@ -238,7 +257,7 @@ function renderStep4() {
 
   html += `<div class="part-title">Part F — Overall Readiness Confirmation</div>`;
   html += `<div class="confirm-box">By initialing below, I confirm that I have read and answered this checklist honestly and to the best of my knowledge. I understand that PSD will review this form and reserves the right to accept or decline this project based on the condition of my equipment. I also understand that any unresolved conditions on this checklist may result in postponement or cancellation of the installation, with no obligation on the part of PSD.</div>`;
-  html += `<div class="field"><label>Initials (confirms Yes)</label><input type="text" maxlength="6" value="${state.confirmation_initials}" oninput="update('confirmation_initials', this.value)"></div>`;
+  html += `<div class="field"><label>Initials (confirms Yes)</label><input id="f-confirmation_initials" type="text" maxlength="6" value="${state.confirmation_initials}" oninput="update('confirmation_initials', this.value)"></div>`;
   return html;
 }
 
@@ -254,7 +273,7 @@ function renderPinGate() {
   return `<div class="card pin-gate">
     <h2>Enter Access PIN</h2>
     <p>Please enter the PIN provided by your PSD representative to access this survey.</p>
-    <input type="password" inputmode="numeric" maxlength="8" value="${state.pinInput}" oninput="updatePin(this.value)" onkeydown="if(event.key==='Enter') verifyPin();" autofocus>
+    <input id="f-pinInput" type="password" inputmode="numeric" maxlength="8" value="${state.pinInput}" oninput="updatePin(this.value)" onkeydown="if(event.key==='Enter') verifyPin();" autofocus>
     ${state.pinError ? `<div class="error-text">${state.pinError}</div>` : ''}
     <div class="btn-row">
       <button class="btn btn-primary" ${state.verifyingPin ? 'disabled' : ''} onclick="verifyPin()">${state.verifyingPin ? 'Checking…' : 'Unlock'}</button>
