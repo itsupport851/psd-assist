@@ -448,9 +448,13 @@ def hs_create_contact():
         email = str(data.get('email', '')).strip()
         if not email:
             return jsonify({'error': 'email is required'}), 400
-        invitation = str(data.get('invitation', '')).strip()
-        if invitation not in ['Yes', 'No']:
-            return jsonify({'error': 'invitation must be Yes or No'}), 400
+        invitation = str(data.get('invitation', '')).strip().lower()
+        if invitation in ['yes', 'true', '1']:
+            invitation = 'true'
+        elif invitation in ['no', 'false', '0']:
+            invitation = 'false'
+        else:
+            return jsonify({'error': 'invitation must be true or false'}), 400
 
         payload = {
             'properties': {

@@ -1404,7 +1404,7 @@
         if (!form.email || !form.first_name || !form.last_name || !form.state || !form.invitation) { setError('Please complete all fields.'); return; }
         setSaving(true); setError('');
         try {
-          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, form, { invitation: form.invitation === 'yes' ? 'true' : 'false' })) });
           var result = await res.json();
           if (!res.ok || !result.success) throw new Error(result.error || 'Unable to save contact');
           onSubmit(result.updated ? 'Contact updated successfully.' : 'Contact created successfully.');
@@ -1424,8 +1424,8 @@
         React.createElement('div', { className: 'contact-yn' },
           React.createElement('div', { className: 'contact-yn-title' }, 'Send invitation email?'),
           React.createElement('div', { className: 'contact-yn-options' },
-            React.createElement('label', { className: 'yes' }, React.createElement('input', { type: 'radio', name: 'contact_invitation', value: 'Yes', checked: form.invitation === 'Yes', onChange: function() { update('invitation', 'Yes'); } }), React.createElement('span', null, 'Yes')),
-            React.createElement('label', { className: 'no' }, React.createElement('input', { type: 'radio', name: 'contact_invitation', value: 'No', checked: form.invitation === 'No', onChange: function() { update('invitation', 'No'); } }), React.createElement('span', null, 'No'))
+            React.createElement('label', { className: 'yes' }, React.createElement('input', { type: 'radio', name: 'contact_invitation', value: 'yes', checked: form.invitation === 'yes', onChange: function() { update('invitation', 'yes'); } }), React.createElement('span', null, 'Yes')),
+            React.createElement('label', { className: 'no' }, React.createElement('input', { type: 'radio', name: 'contact_invitation', value: 'no', checked: form.invitation === 'no', onChange: function() { update('invitation', 'no'); } }), React.createElement('span', null, 'No'))
           )
         ),
         error && React.createElement('div', { className: 'error-text' }, error),

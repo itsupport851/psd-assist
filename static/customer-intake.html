@@ -56,6 +56,10 @@
   .remove-row { background: none; border: none; color: #e05252; font-size: 18px; cursor: pointer; padding: 4px 8px; }
   .add-row-btn { margin-top: 10px; background: none; border: 1px dashed #2a3d52; color: #25a35a; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; }
   .confirm-box { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin-bottom: 14px; }
+  .confirm-box strong { display: block; color: #e8edf2; margin-bottom: 8px; }
+  .confirm-box p { margin-top: 8px; }
+  .confirm-box ul { padding-left: 18px; margin-top: 6px; }
+  .confirm-box li { margin-bottom: 4px; }
   .info-note { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin-bottom: 14px; }
   .info-note strong { display: block; color: #e8edf2; margin-bottom: 8px; }
   .info-note p { margin-top: 8px; }
@@ -229,12 +233,9 @@ function renderStep2() {
   html += `</tbody></table>
     <button class="add-row-btn" onclick="addRow()">+ Add Fan Configuration</button>`;
   html += `<div class="confirm-box" style="margin-top:20px;">
-    <strong>Inverted Motor Mounting &amp; Accessibility</strong>
-    <p>Some older fan models were built with motors mounted upside down, or in a position where the hardware cannot be easily accessed for removal. PSD will not perform installations where motors are inverted. (Reference Image Below)</p>
-    <p>If this applies to your farm, you still have options:</p>
-    <ul><li>You may still qualify for Power rebate program.</li><li>Equipment can be purchased directly from PSD at standard pricing.</li><li>Your own contractor performs the installation.</li><li>Once installation is complete, Georgia Power will rebate you directly.</li></ul>
-    <p>If you are unsure whether this applies to your farm, please contact your PSD representative before submitting this form.</p>
-    <img src="/Images/Motor%20Sample.png" alt="Motor sample reference image" style="max-width:100%;margin-top:10px;border-radius:8px;" onerror="if(this.src.endsWith('.png')){this.src='/Images/Motor%20Sample.jpg';}else if(this.src.endsWith('.jpg')){this.src='/Images/Motor%20Sample.jpeg';}else{this.style.display='none';}">
+    <strong>Important Pulley Measurement Information</strong>
+    <p>IMPORTANT: Pulley sizes reported on this form must be accurate. When listing your pulleys, use the following guidelines: If your current motor pulley is labeled in the format AK-__-5/8 (e.g., AK44-5/8), provide the exact part number as shown. If your pulley is not an AK-series, provide the accurate diameter in inches.</p>
+    <p>If incorrect pulley sizes are submitted and product is ordered, a charge of $25.00 per incorrectly specified pulley will apply, and the customer will be responsible for purchasing the correct pulleys. PSD is not responsible for errors in reported pulley specifications. Please measure and verify all pulley sizes carefully before submitting this form.</p>
     <div style="margin-top:12px;"><a href="/Docs/Pulley_Measurement_Guide.pdf" target="_blank" rel="noopener noreferrer" style="color:#25a35a;font-weight:600;">Open Pulley Measurement Guide (PDF)</a></div>
     <iframe src="/Docs/Pulley_Measurement_Guide.pdf" title="Pulley Measurement Guide" style="width:100%;height:360px;border:1px solid #1e2d3d;border-radius:8px;margin-top:10px;background:#162130;"></iframe>
   </div>`;
@@ -253,6 +254,7 @@ function ynQuestion(key, question) {
 
 function renderStep3() {
   let html = `<h2>Equipment &amp; Condition Checklist</h2><div class="sub">Please answer honestly — this helps us plan a smooth installation.</div>`;
+  html += `<div class="confirm-box"><strong>Checklist Instructions</strong><p>Please read each item carefully and answer YES or NO honestly. This checklist is used to determine whether PSD can accept your installation. All required conditions must be met before your scheduled service date. If any condition is not resolved in time, PSD reserves the right to postpone or cancel the job.</p></div>`;
   html += `<div class="part-title">Part A — Fan Condition</div>`;
   html += ynQuestion('fan_blades_condition', 'All fan blades are in good condition — no warping or visible damage');
   html += ynQuestion('fans_mounted_secure', 'All fans are securely mounted and structurally sound');
@@ -261,10 +263,12 @@ function renderStep3() {
   html += `<div class="part-title">Part B — Hardware Condition</div>`;
   html += ynQuestion('hardware_no_rust', 'Hardware (bolts and nuts) shows no heavy rust or corrosion');
   html += ynQuestion('hardware_removable', 'Hardware can be removed without grinding or heavy torquing');
+  html += `<div class="confirm-box"><strong>Hardware Fee (Mandatory):</strong><p>Stainless steel hardware (1” bolt and nut per motor) is automatically supplied by PSD at $4.00 per motor and will be invoiced to the customer prior to installation. This fee applies to all projects with no exceptions.</p><p><strong>Rusted or Seized Hardware — Labor Charge</strong><br>If our contractor encounters hardware on site that requires grinding or heavy torquing to remove, a charge of $50.00 per affected motor will be applied for the additional labor. To avoid this charge, we strongly recommend inspecting all hardware before your installation date and removing any motors with problematic hardware ahead of time. Any hardware or materials requested from PSD must be confirmed prior to your installation date so your contractor arrives fully prepared.</p><p><strong>Pre-Installation Motor Removal Requirement</strong><br>In the event that a farm assessment reveals that the majority of fan motors have corroded, rusted, or seized hardware that would prevent standard removal, PSD reserves the right to require that all affected motors be fully removed by the customer prior to the scheduled installation date. If this requirement is communicated to you and motors have not been removed upon arrival of the PSD contractor, the installation will be rescheduled and a trip charge may apply. For isolated cases where only a small number of motors have seized hardware encountered on site, a charge of $50.00 per affected motor will be applied for the additional removal labor.</p></div>`;
 
   html += `<div class="part-title">Part C — Belts</div>`;
   html += ynQuestion('belts_inspected', 'All belts have been thoroughly inspected prior to submitting this form');
   html += ynQuestion('spare_belts_onhand', 'Spare belts are on hand and ready on the day of installation');
+  html += `<div class="confirm-box"><strong>Belt Requirement:</strong><p>Belts are the sole responsibility of the customer. PSD does not supply belts under any circumstances. Please ensure all belts have been inspected and that spare belts are available on site on the day of installation. Motors will not be installed on fans with damaged or improperly sized belts. No exceptions.</p></div>`;
 
   html += `<div class="part-title">Part D — Tensioners &amp; Bearings</div>`;
   html += ynQuestion('tensioners_good', 'All tensioners are in good working condition');
@@ -283,6 +287,7 @@ function renderStep3() {
   html += `<div class="part-title">Part E — Motor Accessibility &amp; Mounting</div>`;
   html += ynQuestion('motors_upright', 'All fan motors are mounted in a standard upright position');
   html += ynQuestion('motor_hardware_accessible', 'All motor hardware and mounting points are fully accessible for removal');
+  html += `<div class="confirm-box" style="margin-top:14px;"><strong>Inverted Motor Mounting &amp; Accessibility</strong><p>Some older fan models were built with motors mounted upside down, or in a position where the hardware cannot be easily accessed for removal. PSD will not perform installations where motors are inverted. (Reference Image Below)</p><p>If this applies to your farm, you still have options:</p><ul><li>You may still qualify for Power rebate program.</li><li>Equipment can be purchased directly from PSD at standard pricing.</li><li>Your own contractor performs the installation.</li><li>Once installation is complete, Georgia Power will rebate you directly.</li></ul><p>If you are unsure whether this applies to your farm, please contact your PSD representative before submitting this form.</p><img src="/Images/Motor%20Sample.png" alt="Motor sample reference image" style="max-width:100%;margin-top:10px;border-radius:8px;" onerror="if(this.src.endsWith('.png')){this.src='/Images/Motor%20Sample.jpg';}else if(this.src.endsWith('.jpg')){this.src='/Images/Motor%20Sample.jpeg';}else{this.style.display='none';}"></div>`;
 
   html += `<div class="part-title">Part F — Overall Readiness Confirmation</div>`;
   html += `<div class="confirm-box">By initialing below, I confirm that I have read and answered this checklist honestly and to the best of my knowledge. I understand that PSD will review this form and reserves the right to accept or decline this project based on the condition of my equipment. I also understand that any unresolved conditions on this checklist may result in postponement or cancellation of the installation, with no obligation on the part of PSD.</div>`;
