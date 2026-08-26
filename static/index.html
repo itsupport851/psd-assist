@@ -64,6 +64,11 @@
     .contact-yn-options input { display: none; }
     .contact-yn-options label.yes:has(input:checked) { background: #1a6b3c; border-color: #25a35a; color: #fff; }
     .contact-yn-options label.no:has(input:checked) { background: #6b1a1a; border-color: #e05252; color: #fff; }
+    .contact-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .contact-actions button { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .contact-actions .yes { background: #1a6b3c; border: 1px solid #25a35a; color: #fff; }
+    .contact-actions .no { background: #6b1a1a; border: 1px solid #e05252; color: #fff; }
+    .contact-actions button:disabled { opacity: .55; cursor: not-allowed; }
     .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .svc-form-btn:hover { opacity: 0.9; }
     .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
@@ -1399,7 +1404,7 @@
         if (!form.email || !form.first_name || !form.last_name || !form.state || !form.invitation) { setError('Please complete all fields.'); return; }
         setSaving(true); setError('');
         try {
-          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, form, { invitation: form.invitation === 'Yes' })) });
           var result = await res.json();
           if (!res.ok || !result.success) throw new Error(result.error || 'Unable to save contact');
           onSubmit(result.updated ? 'Contact updated successfully.' : 'Contact created successfully.');
@@ -1424,9 +1429,9 @@
           )
         ),
         error && React.createElement('div', { className: 'error-text' }, error),
-        React.createElement('div', { style: { display: 'flex', gap: 8, marginTop: 12 } },
-          React.createElement('button', { className: 'svc-form-btn-cancel', style: { marginTop: 0, flex: 1 }, onClick: onCancel }, 'Cancel'),
-          React.createElement('button', { className: 'svc-form-btn', style: { flex: 1 }, disabled: saving, onClick: submit }, saving ? 'Saving...' : 'Submit')
+        React.createElement('div', { className: 'contact-actions' },
+          React.createElement('button', { className: 'no', onClick: onCancel }, 'Cancel'),
+          React.createElement('button', { className: 'yes', disabled: saving, onClick: submit }, saving ? 'Saving...' : 'Submit')
         )
       );
     }
