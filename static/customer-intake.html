@@ -172,7 +172,7 @@ function renderStep1() {
       <div class="field"><label>Last Name</label><input id="f-last_name" type="text" value="${state.last_name}" oninput="update('last_name', this.value)"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>Phone Number</label><input id="f-phone" type="tel" inputmode="numeric" placeholder="(555) 555-5555" value="${state.phone}" oninput="update('phone', formatPhoneNumber(this.value))"></div>
+      <div class="field"><label>Phone Number <span style="color:#6b8fa8;font-weight:400;">(optional)</span></label><input id="f-phone" type="tel" inputmode="numeric" placeholder="(555) 555-5555" value="${state.phone}" oninput="updatePhone(this)"></div>
       <div class="field"><label>Email Address</label><input id="f-email" type="text" inputmode="email" autocomplete="email" value="${state.email}" oninput="update('email', this.value)"></div>
     </div>
     <div class="field"><label>Farm Address</label><input id="f-farm_address" type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
@@ -183,7 +183,7 @@ function renderStep1() {
     </div>
     <div class="row2">
       <div class="field"><label>County</label><input id="f-county" type="text" value="${state.county}" oninput="update('county', this.value)"></div>
-      <div class="field"><label>Year Farm Was Built</label><input id="f-year_built" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.year_built}" oninput="update('year_built', this.value)"></div>
+      <div class="field"><label>Year Farm Was Built <span style="color:#6b8fa8;font-weight:400;">(optional)</span></label><input id="f-year_built" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.year_built}" oninput="update('year_built', digitsOnly(this.value))"></div>
     </div>
   `;
 }
@@ -223,6 +223,16 @@ function renderStep2() {
   });
   html += `</tbody></table>
     <button class="add-row-btn" onclick="addRow()">+ Add Fan Configuration</button>`;
+  html += `<div class="info-note" style="margin-top:20px;">
+    <strong>Inverted Motor Mounting &amp; Accessibility</strong>
+    <p>Some older fan models were built with motors mounted upside down, or in a position where the hardware cannot be easily accessed for removal. PSD will not perform installations where motors are inverted. (Reference Image Below)</p>
+    <p>If this applies to your farm, you still have options:</p>
+    <ul><li>You may still qualify for Power rebate program.</li><li>Equipment can be purchased directly from PSD at standard pricing.</li><li>Your own contractor performs the installation.</li><li>Once installation is complete, Georgia Power will rebate you directly.</li></ul>
+    <p>If you are unsure whether this applies to your farm, please contact your PSD representative before submitting this form.</p>
+    <img src="/Images/Motor%20Sample" alt="Motor sample reference image" style="max-width:100%;margin-top:10px;border-radius:8px;" onerror="this.style.display='none';">
+    <div style="margin-top:12px;"><a href="/Docs/Pulley_Measurement_Guide.pdf" target="_blank" rel="noopener noreferrer" style="color:#25a35a;font-weight:600;">Open Pulley Measurement Guide (PDF)</a></div>
+    <iframe src="/Docs/Pulley_Measurement_Guide.pdf" title="Pulley Measurement Guide" style="width:100%;height:360px;border:1px solid #1e2d3d;border-radius:8px;margin-top:10px;background:#162130;"></iframe>
+  </div>`;
   return html;
 }
 
@@ -329,6 +339,18 @@ async function verifyPin() {
 }
 
 function update(key, val) { state[key] = val; state.errorMsg = ''; render(); }
+function updatePhone(input) {
+  const raw = input.value;
+  const cursor = input.selectionStart || raw.length;
+  const formatted = formatPhoneNumber(raw);
+  update('phone', formatted);
+  const next = document.getElementById('f-phone');
+  if (next) {
+    next.focus();
+    const position = Math.min(cursor + (formatted.length - raw.length), formatted.length);
+    next.setSelectionRange(position, position);
+  }
+}
 function updateRow(i, key, val) { state.fan_rows[i][key] = val; render(); }
 function addRow() { state.fan_rows.push({ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }); render(); }
 function removeRow(i) { state.fan_rows.splice(i, 1); render(); }
@@ -344,7 +366,7 @@ function digitsOnly(value) { return value.replace(/\D/g, ''); }
 
 function validateStep() {
   if (state.step === 1) {
-    const required = ['power_company', 'gp_account_name', 'gp_account_number', 'first_name', 'last_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
+    const required = ['power_company', 'gp_account_name', 'gp_account_number', 'first_name', 'last_name', 'email', 'farm_address', 'city', 'state', 'zip'];
     if (required.some(k => !state[k])) return 'Please complete all required fields.';
   }
   if (state.step === 2) {

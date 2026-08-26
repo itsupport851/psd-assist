@@ -427,30 +427,48 @@ def hs_create_deal():
 def hs_create_contact():
     try:
         data = request.get_json()
+        email = str(data.get('email', '')).strip()
+        if not email:
+            return jsonify({'error': 'email is required'}), 400
+
         payload = {
             'properties': {
-                'email': data.get('email', ''),
-                'firstname': data.get('firstname', ''),
-                'lastname': data.get('lastname', ''),
-                'phone': data.get('phone', ''),
-                'company': data.get('company', ''),
-                'address': data.get('address', ''),
-                'city': data.get('city', ''),
+                'email': email,
+                'firstname': data.get('first_name', data.get('firstname', '')),
+                'lastname': data.get('last_name', data.get('lastname', '')),
                 'state': data.get('state', ''),
-                'zip': data.get('zip', ''),
-                'ower_name': data.get('owner_name', ''),
-                'georgia_power_account': str(data.get('gp_account_number', '')),
+                'invitation': 'true' if data.get('invitation') else 'false',
             }
         }
-        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=payload, headers=HUBSPOT_HEADERS())
-        if res.status_code != 201:
-            return jsonify({'error': res.text}), res.status_code
-        contact = res.json()
+
+        search_payload = {
+            'filterGroups': [{'filters': [{'propertyName': 'email', 'operator': 'EQ', 'value': email}]}],
+            'properties': ['email', 'firstname', 'lastname', 'state', 'invitation'],
+            'limit': 1
+        }
+        search_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/search', json=search_payload, headers=HUBSPOT_HEADERS())
+        existing = search_res.json().get('results', []) if search_res.status_code == 200 else []
+
+        if existing:
+            contact_id = existing[0]['id']
+            res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contact_id}', json=payload, headers=HUBSPOT_HEADERS())
+            if res.status_code not in [200, 204]:
+                return jsonify({'error': res.text}), res.status_code
+            contact = {'id': contact_id, 'properties': payload['properties']}
+            updated = True
+        else:
+            payload['properties']['invitation'] = 'false'
+            res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=payload, headers=HUBSPOT_HEADERS())
+            if res.status_code != 201:
+                return jsonify({'error': res.text}), res.status_code
+            contact = res.json()
+            updated = False
+
         deal_id = data.get('deal_id')
         if deal_id:
             assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': contact['id']}, 'type': 'deal_to_contact'}]}
             requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/contacts/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
-        return jsonify({'success': True, 'contact_id': contact['id'], 'email': contact['properties'].get('email')})
+        return jsonify({'success': True, 'updated': updated, 'contact_id': contact['id'], 'email': email})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1160,10 +1178,24 @@ def submit_customer_form():
                 'total_number_of_fans': str(data.get('total_fans', '')),
             }
         }
-        contact_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=contact_payload, headers=HUBSPOT_HEADERS())
-        if contact_res.status_code != 201:
-            return jsonify({'error': contact_res.text}), contact_res.status_code
-        contact_id = contact_res.json()['id']
+        contact_payload['properties']['invitation'] = 'false'
+        contact_search = {
+            'filterGroups': [{'filters': [{'propertyName': 'email', 'operator': 'EQ', 'value': data.get('email', '')}]}],
+            'properties': ['email'],
+            'limit': 1
+        }
+        search_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/search', json=contact_search, headers=HUBSPOT_HEADERS())
+        existing_contact = search_res.json().get('results', []) if search_res.status_code == 200 else []
+        if existing_contact:
+            contact_id = existing_contact[0]['id']
+            contact_res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contact_id}', json=contact_payload, headers=HUBSPOT_HEADERS())
+            if contact_res.status_code not in [200, 204]:
+                return jsonify({'error': contact_res.text}), contact_res.status_code
+        else:
+            contact_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=contact_payload, headers=HUBSPOT_HEADERS())
+            if contact_res.status_code != 201:
+                return jsonify({'error': contact_res.text}), contact_res.status_code
+            contact_id = contact_res.json()['id']
 
         deal_payload = {
             'properties': {

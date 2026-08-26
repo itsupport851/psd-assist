@@ -105,7 +105,7 @@
       // ── Sales ──
       { icon: "📋", label: "Deal Summary",   desc: "Filter by stage",          message: null, isStageSelector: true,        roles: ["sales","analyst","admin"] },
       { icon: "➕", label: "Add Line Item",  desc: "Add fan to a deal",        isAddLineItem: true, roles: ["sales","admin"] },
-      { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: "I want to create a new contact in HubSpot", roles: ["sales","admin"] },
+      { icon: "👤", label: "New Contact",    desc: "Add a contact",            message: null, isNewContact: true,             roles: ["sales","admin"] },
       { icon: "📤", label: "Submit Form",    desc: "Send customer intake form", message: null, isCustomerForm: true,          roles: ["sales","admin"] },
       { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales","admin"] },
       // ── Operations ──
@@ -1382,6 +1382,44 @@
       );
     }
 
+    function NewContactForm({ onSubmit, onCancel }) {
+      const [form, setForm] = React.useState({ email: '', first_name: '', last_name: '', state: '', invitation: false });
+      const [saving, setSaving] = React.useState(false);
+      const [error, setError] = React.useState('');
+      function update(field, value) { setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); }); }
+      async function submit() {
+        if (!form.email || !form.first_name || !form.last_name || !form.state) { setError('Please complete all fields.'); return; }
+        setSaving(true); setError('');
+        try {
+          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+          var result = await res.json();
+          if (!res.ok || !result.success) throw new Error(result.error || 'Unable to save contact');
+          onSubmit(result.updated ? 'Contact updated successfully.' : 'Contact created successfully.');
+        } catch(e) { setError(e.message); }
+        setSaving(false);
+      }
+      return React.createElement('div', { className: 'svc-form' },
+        React.createElement('div', { className: 'svc-form-title' }, 'New Contact'),
+        ['email', 'first_name', 'last_name', 'state'].map(function(field) {
+          var labels = { email: 'Email', first_name: 'First Name', last_name: 'Last Name', state: 'State' };
+          return React.createElement('div', { className: 'svc-form-row', key: field },
+            React.createElement('div', { className: 'svc-form-label' }, labels[field]),
+            React.createElement('input', { className: 'svc-form-input', type: field === 'email' ? 'email' : 'text', value: form[field], onChange: function(e) { update(field, e.target.value); } })
+          );
+        }),
+        React.createElement('div', { className: 'confirm-box', style: { marginTop: 4 } }, 'By initialing below, this will send an invitation email to the customer.'),
+        React.createElement('label', { className: 'check-item' },
+          React.createElement('input', { type: 'checkbox', checked: form.invitation, onChange: function(e) { update('invitation', e.target.checked); } }),
+          React.createElement('span', null, 'Invitation')
+        ),
+        error && React.createElement('div', { className: 'error-text' }, error),
+        React.createElement('div', { className: 'btn-row' },
+          React.createElement('button', { className: 'btn btn-secondary', onClick: onCancel }, 'Cancel'),
+          React.createElement('button', { className: 'btn btn-primary', disabled: saving, onClick: submit }, saving ? 'Saving...' : 'Submit')
+        )
+      );
+    }
+
     function QuickActions({ onAction, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, onAddLineItem, role }) {
       var SALES_LABELS = ["Deal Summary","Add Line Item","New Contact","Submit Form","Update Pricing"];
       var OPS_LABELS   = ["Services Summary","Display Service","New Service","Farm Map"];
@@ -1416,6 +1454,7 @@
             if (a.isAddLineItem)   { onAddLineItem && onAddLineItem(); return; }
             if (a.isDisplayService) { onDisplayService(); return; }
             if (a.isCustomerForm)   { window.open(CUSTOMER_INTAKE_URL, "_blank"); return; }
+            if (a.isNewContact)     { onAction("NEW_CONTACT_FORM"); return; }
             if (a.isStageSelector)  { onStageSelector(); return; }
             if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
             onAction(a.message);
@@ -1455,6 +1494,11 @@
           onAction(msg + ".");
         },
         onCancel: function() { onAction("Cancelled new service"); }
+      });
+
+      if (content === "NEW_CONTACT_FORM") return React.createElement(NewContactForm, {
+        onSubmit: function(message) { onAction(message); },
+        onCancel: function() { onAction("Cancelled new contact"); }
       });
 
       if (content === "ADD_LINE_ITEM_FORM") return React.createElement(AddLineItemForm, {
@@ -2358,7 +2402,7 @@
           displayMessages.map(function(msg, i) {
             var isLast = i === displayMessages.length - 1;
             var lastContent = displayMessages[displayMessages.length - 1] && displayMessages[displayMessages.length - 1].content;
-            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM","NEW_SERVICE_FORM"].indexOf(lastContent) !== -1
+            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM","NEW_SERVICE_FORM","NEW_CONTACT_FORM"].indexOf(lastContent) !== -1
               || (lastContent && lastContent.startsWith("SERVICE_FORM:"));
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
