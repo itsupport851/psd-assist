@@ -56,6 +56,11 @@
   .remove-row { background: none; border: none; color: #e05252; font-size: 18px; cursor: pointer; padding: 4px 8px; }
   .add-row-btn { margin-top: 10px; background: none; border: 1px dashed #2a3d52; color: #25a35a; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; }
   .confirm-box { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin-bottom: 14px; }
+  .info-note { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin-bottom: 14px; }
+  .info-note strong { display: block; color: #e8edf2; margin-bottom: 8px; }
+  .info-note p { margin-top: 8px; }
+  .info-note ul { padding-left: 18px; margin-top: 6px; }
+  .info-note li { margin-bottom: 4px; }
   .btn-row { display: flex; gap: 10px; margin-top: 20px; }
   .btn { flex: 1; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; }
   .btn-primary { background: linear-gradient(135deg, #1a6b3c, #25a35a); color: #fff; }
@@ -223,13 +228,13 @@ function renderStep2() {
   });
   html += `</tbody></table>
     <button class="add-row-btn" onclick="addRow()">+ Add Fan Configuration</button>`;
-  html += `<div class="info-note" style="margin-top:20px;">
+  html += `<div class="confirm-box" style="margin-top:20px;">
     <strong>Inverted Motor Mounting &amp; Accessibility</strong>
     <p>Some older fan models were built with motors mounted upside down, or in a position where the hardware cannot be easily accessed for removal. PSD will not perform installations where motors are inverted. (Reference Image Below)</p>
     <p>If this applies to your farm, you still have options:</p>
     <ul><li>You may still qualify for Power rebate program.</li><li>Equipment can be purchased directly from PSD at standard pricing.</li><li>Your own contractor performs the installation.</li><li>Once installation is complete, Georgia Power will rebate you directly.</li></ul>
     <p>If you are unsure whether this applies to your farm, please contact your PSD representative before submitting this form.</p>
-    <img src="/Images/Motor%20Sample" alt="Motor sample reference image" style="max-width:100%;margin-top:10px;border-radius:8px;" onerror="this.style.display='none';">
+    <img src="/Images/Motor%20Sample.png" alt="Motor sample reference image" style="max-width:100%;margin-top:10px;border-radius:8px;" onerror="if(this.src.endsWith('.png')){this.src='/Images/Motor%20Sample.jpg';}else if(this.src.endsWith('.jpg')){this.src='/Images/Motor%20Sample.jpeg';}else{this.style.display='none';}">
     <div style="margin-top:12px;"><a href="/Docs/Pulley_Measurement_Guide.pdf" target="_blank" rel="noopener noreferrer" style="color:#25a35a;font-weight:600;">Open Pulley Measurement Guide (PDF)</a></div>
     <iframe src="/Docs/Pulley_Measurement_Guide.pdf" title="Pulley Measurement Guide" style="width:100%;height:360px;border:1px solid #1e2d3d;border-radius:8px;margin-top:10px;background:#162130;"></iframe>
   </div>`;

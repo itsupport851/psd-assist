@@ -169,15 +169,19 @@ def customer_intake_page():
 
 @app.route('/Images/<path:filename>', methods=['GET'])
 def image_asset(filename):
+    filename = filename.replace('\\', '/')
     for directory in ['Images', os.path.join(app.static_folder, 'Images')]:
-        if os.path.isfile(os.path.join(directory, filename)):
+        candidate = os.path.abspath(os.path.join(directory, filename))
+        if candidate.startswith(os.path.abspath(directory) + os.sep) and os.path.isfile(candidate):
             return send_from_directory(directory, filename)
     return jsonify({'error': 'Image asset not found'}), 404
 
 @app.route('/Docs/<path:filename>', methods=['GET'])
 def document_asset(filename):
+    filename = filename.replace('\\', '/')
     for directory in ['Docs', os.path.join(app.static_folder, 'Docs')]:
-        if os.path.isfile(os.path.join(directory, filename)):
+        candidate = os.path.abspath(os.path.join(directory, filename))
+        if candidate.startswith(os.path.abspath(directory) + os.sep) and os.path.isfile(candidate):
             return send_from_directory(directory, filename)
     return jsonify({'error': 'Document asset not found'}), 404
 

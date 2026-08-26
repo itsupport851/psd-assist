@@ -1424,9 +1424,9 @@
           )
         ),
         error && React.createElement('div', { className: 'error-text' }, error),
-        React.createElement('div', { className: 'btn-row' },
-          React.createElement('button', { className: 'btn btn-secondary', onClick: onCancel }, 'Cancel'),
-          React.createElement('button', { className: 'btn btn-primary', disabled: saving, onClick: submit }, saving ? 'Saving...' : 'Submit')
+        React.createElement('div', { style: { display: 'flex', gap: 8, marginTop: 12 } },
+          React.createElement('button', { className: 'svc-form-btn-cancel', style: { marginTop: 0, flex: 1 }, onClick: onCancel }, 'Cancel'),
+          React.createElement('button', { className: 'svc-form-btn', style: { flex: 1 }, disabled: saving, onClick: submit }, saving ? 'Saving...' : 'Submit')
         )
       );
     }
@@ -1509,7 +1509,7 @@
 
       if (content === "NEW_CONTACT_FORM") return React.createElement(NewContactForm, {
         onSubmit: function(message) { onAction(message); },
-        onCancel: function() { onAction("Cancelled new contact"); }
+        onCancel: function() { onAction("SHOW_OPTIONS"); }
       });
 
       if (content === "ADD_LINE_ITEM_FORM") return React.createElement(AddLineItemForm, {
@@ -2122,6 +2122,13 @@
         var text = (overrideText || input).trim();
         if (!text) return;
         setShowActions(false);
+
+        if (text === "SHOW_OPTIONS") {
+          setShowActions(true);
+          setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
+          setInput("");
+          return;
+        }
 
         // Handle direct selection actions for display service flow
         if (text.startsWith("SHOW_TEAM_SERVICES:")) {
