@@ -348,7 +348,12 @@ async function verifyPin() {
   render();
 }
 
-function update(key, val) { state[key] = val; state.errorMsg = ''; render(); }
+function update(key, val) {
+  state[key] = val;
+  state.errorMsg = '';
+  if (state.step === 2 && key !== 'operation_type') return;
+  render();
+}
 function updatePhone(input) {
   const raw = input.value;
   const cursor = input.selectionStart || raw.length;
@@ -361,7 +366,7 @@ function updatePhone(input) {
     next.setSelectionRange(position, position);
   }
 }
-function updateRow(i, key, val) { state.fan_rows[i][key] = val; render(); }
+function updateRow(i, key, val) { state.fan_rows[i][key] = val; }
 function addRow() { state.fan_rows.push({ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }); render(); }
 function removeRow(i) { state.fan_rows.splice(i, 1); render(); }
 
