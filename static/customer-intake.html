@@ -209,7 +209,7 @@ function renderStep2() {
       ${opts.map(([val, label]) => `<option value="${val}" ${state.operation_type === val ? 'selected' : ''}>${label}</option>`).join('')}
     </select>
   </div>`;
-  if (state.operation_type === 'Other') html += `<div class="field"><label>Please specify</label><input id="f-op_other_text" type="text" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
+  html += `<div id="f-op-other-field" class="field" style="display:${state.operation_type === 'Other' ? 'block' : 'none'}"><label>Please specify</label><input id="f-op_other_text" type="text" value="${state.op_other_text}" oninput="update('op_other_text', this.value)"></div>`;
 
   html += `
     <div class="row2">
@@ -351,6 +351,13 @@ async function verifyPin() {
 function update(key, val) {
   state[key] = val;
   state.errorMsg = '';
+  if (key === 'power_company' || key === 'operation_type') {
+    if (key === 'operation_type') {
+      const otherField = document.getElementById('f-op-other-field');
+      if (otherField) otherField.style.display = val === 'Other' ? 'block' : 'none';
+    }
+    return;
+  }
   if (state.step === 2 && key !== 'operation_type') return;
   render();
 }

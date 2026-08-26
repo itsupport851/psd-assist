@@ -482,7 +482,6 @@ def hs_create_contact():
             contact = {'id': contact_id, 'properties': payload['properties']}
             updated = True
         else:
-            payload['properties']['invitation'] = 'false'
             res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/contacts', json=payload, headers=HUBSPOT_HEADERS())
             if res.status_code != 201:
                 return jsonify({'error': res.text}), res.status_code
