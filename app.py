@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import openpyxl
 import requests
@@ -166,6 +166,20 @@ def map_page():
 @app.route('/customer-intake', methods=['GET'])
 def customer_intake_page():
     return app.send_static_file('customer-intake.html')
+
+@app.route('/Images/<path:filename>', methods=['GET'])
+def image_asset(filename):
+    for directory in ['Images', os.path.join(app.static_folder, 'Images')]:
+        if os.path.isfile(os.path.join(directory, filename)):
+            return send_from_directory(directory, filename)
+    return jsonify({'error': 'Image asset not found'}), 404
+
+@app.route('/Docs/<path:filename>', methods=['GET'])
+def document_asset(filename):
+    for directory in ['Docs', os.path.join(app.static_folder, 'Docs')]:
+        if os.path.isfile(os.path.join(directory, filename)):
+            return send_from_directory(directory, filename)
+    return jsonify({'error': 'Document asset not found'}), 404
 
 @app.route('/customer-intake-auth', methods=['POST'])
 def customer_intake_auth():
@@ -430,6 +444,7 @@ def hs_create_contact():
         email = str(data.get('email', '')).strip()
         if not email:
             return jsonify({'error': 'email is required'}), 400
+        send_invitation = str(data.get('invitation', '')).strip().lower() in ['yes', 'true', '1']
 
         payload = {
             'properties': {
@@ -437,7 +452,7 @@ def hs_create_contact():
                 'firstname': data.get('first_name', data.get('firstname', '')),
                 'lastname': data.get('last_name', data.get('lastname', '')),
                 'state': data.get('state', ''),
-                'invitation': 'true' if data.get('invitation') else 'false',
+                'invitation': 'true' if send_invitation else 'false',
             }
         }
 

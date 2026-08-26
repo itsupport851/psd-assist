@@ -56,6 +56,14 @@
     .svc-form-input { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
     .svc-form-input:focus { border-color: #25a35a; }
     .svc-form-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
+    .contact-confirm-note { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin: 10px 0; }
+    .contact-yn { background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px 14px; }
+    .contact-yn-title { font-size: 13px; margin-bottom: 8px; }
+    .contact-yn-options { display: flex; gap: 10px; }
+    .contact-yn-options label { flex: 1; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #1e2d3d; font-size: 13px; font-weight: 600; cursor: pointer; color: #8ab4cc; }
+    .contact-yn-options input { display: none; }
+    .contact-yn-options label.yes:has(input:checked) { background: #1a6b3c; border-color: #25a35a; color: #fff; }
+    .contact-yn-options label.no:has(input:checked) { background: #6b1a1a; border-color: #e05252; color: #fff; }
     .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .svc-form-btn:hover { opacity: 0.9; }
     .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
@@ -1383,12 +1391,12 @@
     }
 
     function NewContactForm({ onSubmit, onCancel }) {
-      const [form, setForm] = React.useState({ email: '', first_name: '', last_name: '', state: '', invitation: false });
+      const [form, setForm] = React.useState({ email: '', first_name: '', last_name: '', state: '', invitation: '' });
       const [saving, setSaving] = React.useState(false);
       const [error, setError] = React.useState('');
       function update(field, value) { setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); }); }
       async function submit() {
-        if (!form.email || !form.first_name || !form.last_name || !form.state) { setError('Please complete all fields.'); return; }
+        if (!form.email || !form.first_name || !form.last_name || !form.state || !form.invitation) { setError('Please complete all fields.'); return; }
         setSaving(true); setError('');
         try {
           var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
@@ -1407,10 +1415,13 @@
             React.createElement('input', { className: 'svc-form-input', type: field === 'email' ? 'email' : 'text', value: form[field], onChange: function(e) { update(field, e.target.value); } })
           );
         }),
-        React.createElement('div', { className: 'confirm-box', style: { marginTop: 4 } }, 'By initialing below, this will send an invitation email to the customer.'),
-        React.createElement('label', { className: 'check-item' },
-          React.createElement('input', { type: 'checkbox', checked: form.invitation, onChange: function(e) { update('invitation', e.target.checked); } }),
-          React.createElement('span', null, 'Invitation')
+        React.createElement('div', { className: 'contact-confirm-note' }, 'By initialing below, this will send an invitation email to the customer.'),
+        React.createElement('div', { className: 'contact-yn' },
+          React.createElement('div', { className: 'contact-yn-title' }, 'Send invitation email?'),
+          React.createElement('div', { className: 'contact-yn-options' },
+            React.createElement('label', { className: 'yes' }, React.createElement('input', { type: 'radio', name: 'contact_invitation', value: 'Yes', checked: form.invitation === 'Yes', onChange: function() { update('invitation', 'Yes'); } }), React.createElement('span', null, 'Yes')),
+            React.createElement('label', { className: 'no' }, React.createElement('input', { type: 'radio', name: 'contact_invitation', value: 'No', checked: form.invitation === 'No', onChange: function() { update('invitation', 'No'); } }), React.createElement('span', null, 'No'))
+          )
         ),
         error && React.createElement('div', { className: 'error-text' }, error),
         React.createElement('div', { className: 'btn-row' },
