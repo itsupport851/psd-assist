@@ -1404,7 +1404,7 @@
         if (!form.email || !form.first_name || !form.last_name || !form.state || !form.invitation) { setError('Please complete all fields.'); return; }
         setSaving(true); setError('');
         try {
-          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, form, { invitation: form.invitation === 'Yes' })) });
+          var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
           var result = await res.json();
           if (!res.ok || !result.success) throw new Error(result.error || 'Unable to save contact');
           onSubmit(result.updated ? 'Contact updated successfully.' : 'Contact created successfully.');
