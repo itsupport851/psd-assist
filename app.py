@@ -26,6 +26,7 @@ POWER_COMPANY_PIPELINE_MAP = {
 }
 CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
 UNIT_PRICE = os.environ.get('UNIT_PRICE', '0')
+OWNER_ID = os.environ.get('OWNER_ID', '167151077')
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
@@ -1186,7 +1187,7 @@ def submit_customer_form():
                 'customer_email': data.get('email', ''),
                 'year_farm_built': str(data.get('year_built', '')),
                 'type_of_poultry_opperation': operation_type,
-                'hubspot_owner_id': 'itsupport@psdmotorco.com',
+                'hubspot_owner_id': OWNER_ID,
             }
         }
         deal_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=deal_payload, headers=HUBSPOT_HEADERS())
