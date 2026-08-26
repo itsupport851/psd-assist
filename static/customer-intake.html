@@ -96,7 +96,7 @@ let state = {
   submitting: false,
   errorMsg: '',
   power_company: '',
-  gp_account_name: '', gp_account_number: '', owner_name: '', phone: '', email: '',
+  gp_account_name: '', gp_account_number: '', first_name: '', last_name: '', phone: '', email: '',
   farm_address: '', city: '', state: '', zip: '', county: '', year_built: '',
   operation_type: '', op_other_text: '',
   total_barns: '', total_fans: '',
@@ -167,7 +167,10 @@ function renderStep1() {
     </div>
     <div class="field"><label>Account Name</label><input id="f-gp_account_name" type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
     <div class="field"><label>Account #</label><input id="f-gp_account_number" type="text" value="${state.gp_account_number}" oninput="update('gp_account_number', this.value)"></div>
-    <div class="field"><label>Owner / Contact Name</label><input id="f-owner_name" type="text" value="${state.owner_name}" oninput="update('owner_name', this.value)"></div>
+    <div class="row2">
+      <div class="field"><label>First Name</label><input id="f-first_name" type="text" value="${state.first_name}" oninput="update('first_name', this.value)"></div>
+      <div class="field"><label>Last Name</label><input id="f-last_name" type="text" value="${state.last_name}" oninput="update('last_name', this.value)"></div>
+    </div>
     <div class="row2">
       <div class="field"><label>Phone Number</label><input id="f-phone" type="tel" inputmode="numeric" placeholder="(555) 555-5555" value="${state.phone}" oninput="update('phone', formatPhoneNumber(this.value))"></div>
       <div class="field"><label>Email Address</label><input id="f-email" type="text" inputmode="email" autocomplete="email" value="${state.email}" oninput="update('email', this.value)"></div>
@@ -341,7 +344,7 @@ function digitsOnly(value) { return value.replace(/\D/g, ''); }
 
 function validateStep() {
   if (state.step === 1) {
-    const required = ['power_company', 'gp_account_name', 'gp_account_number', 'owner_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
+    const required = ['power_company', 'gp_account_name', 'gp_account_number', 'first_name', 'last_name', 'phone', 'email', 'farm_address', 'city', 'state', 'zip'];
     if (required.some(k => !state[k])) return 'Please complete all required fields.';
   }
   if (state.step === 2) {

@@ -1129,13 +1129,13 @@ def submit_customer_form():
             return jsonify({'error': 'No JSON data provided'}), 400
         if CUSTOMER_INTAKE_PIN and str(data.get('access_pin', '')) != CUSTOMER_INTAKE_PIN:
             return jsonify({'error': 'Invalid or missing access PIN'}), 401
-        required = ['gp_account_name', 'gp_account_number', 'owner_name', 'email', 'farm_address', 'power_company']
+        required = ['gp_account_name', 'gp_account_number', 'first_name', 'last_name', 'email', 'farm_address', 'power_company']
         missing = [f for f in required if not data.get(f)]
         if missing:
             return jsonify({'error': f'Missing required fields: {missing}'}), 400
 
-        owner_name = data.get('owner_name', '').strip()
-        first_name, _, last_name = owner_name.partition(' ')
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
         operation_type = data.get('operation_type', '')
         if operation_type == 'Other' and data.get('op_other_text'):
             operation_type = data['op_other_text']
@@ -1152,7 +1152,7 @@ def submit_customer_form():
                 'state': data.get('state', ''),
                 'zip': data.get('zip', ''),
                 'gp_account_number': str(data.get('gp_account_number', '')),
-                'farm_name': owner_name,
+                'farm_name': data.get('gp_account_name', ''),
                 'farm_county': data.get('county', ''),
                 'year_farm_built': str(data.get('year_built', '')),
                 'total_number_of_barns': str(data.get('total_barns', '')),
@@ -1186,6 +1186,7 @@ def submit_customer_form():
                 'customer_email': data.get('email', ''),
                 'year_farm_built': str(data.get('year_built', '')),
                 'type_of_poultry_opperation': operation_type,
+                'hubspot_owner_id': 'itsupport@psdmotorco.com',
             }
         }
         deal_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/deals', json=deal_payload, headers=HUBSPOT_HEADERS())
@@ -1214,15 +1215,22 @@ def submit_customer_form():
             pass
 
         # Fan configuration rows → line items (best-effort, does not block submission)
+        total_fans_qty = 0
+        total_line_amount = 0.0
         for row in data.get('fan_rows', []):
             if not (row.get('brand') or row.get('size')):
                 continue
+            try:
+                qty = int(row.get('num_fans') or 1)
+            except (TypeError, ValueError):
+                qty = 1
+            total_fans_qty += qty
             try:
                 name_parts = [row.get('brand', ''), row.get('size', ''), row.get('motor_hp', ''), row.get('pulley_size', '')]
                 li_payload = {
                     'properties': {
                         'name': ' '.join(p for p in name_parts if p),
-                        'quantity': str(row.get('num_fans') or 1),
+                        'quantity': str(qty),
                         'price': UNIT_PRICE,
                         'fan_brand': row.get('brand', ''),
                         'fan_size': str(row.get('size', '')),
@@ -1238,8 +1246,42 @@ def submit_customer_form():
                         json={'inputs': [{'from': {'id': deal_id}, 'to': {'id': li_id}, 'type': 'deal_to_line_item'}]},
                         headers=HUBSPOT_HEADERS()
                     )
+                    total_line_amount += qty * float(UNIT_PRICE)
             except Exception:
                 pass
+
+        # Installation charges line item, quantity = total fans across all lines (best-effort)
+        try:
+            install_qty = total_fans_qty or 1
+            install_unit_price = 4
+            install_payload = {
+                'properties': {
+                    'name': 'Installation Charges',
+                    'quantity': str(install_qty),
+                    'price': str(install_unit_price),
+                }
+            }
+            install_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=install_payload, headers=HUBSPOT_HEADERS())
+            if install_res.status_code == 201:
+                install_id = install_res.json()['id']
+                requests.post(
+                    f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create',
+                    json={'inputs': [{'from': {'id': deal_id}, 'to': {'id': install_id}, 'type': 'deal_to_line_item'}]},
+                    headers=HUBSPOT_HEADERS()
+                )
+                total_line_amount += install_qty * install_unit_price
+        except Exception:
+            pass
+
+        # Update deal amount to reflect all line items (best-effort)
+        try:
+            requests.patch(
+                f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}',
+                json={'properties': {'amount': str(total_line_amount)}},
+                headers=HUBSPOT_HEADERS()
+            )
+        except Exception:
+            pass
 
         # Checklist + survey details → note on the deal and contact (best-effort)
         try:
