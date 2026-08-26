@@ -27,6 +27,7 @@ POWER_COMPANY_PIPELINE_MAP = {
 CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
 UNIT_PRICE = os.environ.get('UNIT_PRICE', '0')
 OWNER_ID = os.environ.get('OWNER_ID', '167151077')
+CUSTOMER_INTAKE_INVITATION = 'false'
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
@@ -448,10 +449,10 @@ def hs_create_contact():
         email = str(data.get('email', '')).strip()
         if not email:
             return jsonify({'error': 'email is required'}), 400
-        invitation = str(data.get('invitation', '')).strip().lower()
-        if invitation in ['yes', 'true', '1']:
+        invitation_input = str(data.get('invitation', '')).strip().lower()
+        if invitation_input in ['yes', 'true', '1']:
             invitation = 'true'
-        elif invitation in ['no', 'false', '0']:
+        elif invitation_input in ['no', 'false', '0']:
             invitation = 'false'
         else:
             return jsonify({'error': 'invitation must be true or false'}), 400
@@ -1202,7 +1203,7 @@ def submit_customer_form():
                 'total_number_of_fans': str(data.get('total_fans', '')),
             }
         }
-        contact_payload['properties']['invitation'] = 'false'
+        contact_payload['properties']['invitation'] = CUSTOMER_INTAKE_INVITATION
         contact_search = {
             'filterGroups': [{'filters': [{'propertyName': 'email', 'operator': 'EQ', 'value': data.get('email', '')}]}],
             'properties': ['email'],
