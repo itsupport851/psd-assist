@@ -192,7 +192,7 @@ function renderStep1() {
     </div>
     <div class="row2">
       <div class="field"><label>County</label><input id="f-county" type="text" value="${state.county}" oninput="update('county', this.value)"></div>
-      <div class="field"><label>Year Farm Was Built <span style="color:#6b8fa8;font-weight:400;">(optional)</span></label><input id="f-year_built" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.year_built}" oninput="update('year_built', digitsOnly(this.value))"></div>
+      <div class="field"><label>Year Farm Was Built <span style="color:#6b8fa8;font-weight:400;">(optional)</span></label><input id="f-year_built" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.year_built}" oninput="updateDigits(this, 'year_built')"></div>
     </div>
   `;
 }
@@ -213,8 +213,8 @@ function renderStep2() {
 
   html += `
     <div class="row2">
-      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_barns}" oninput="update('total_barns', digitsOnly(this.value))"></div>
-      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_fans}" oninput="update('total_fans', digitsOnly(this.value))"></div>
+      <div class="field"><label>Total Number of Barns</label><input id="f-total_barns" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_barns}" oninput="updateDigits(this, 'total_barns')"></div>
+      <div class="field"><label>Total Number of Fans</label><input id="f-total_fans" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.total_fans}" oninput="updateDigits(this, 'total_fans')"></div>
     </div>
     <div class="sub" style="margin-top:10px;">List each unique fan configuration on your farm. Most farms have 1 to 3 different setups.</div>
     <table class="fan-table">
@@ -326,7 +326,13 @@ function renderPinGate() {
   </div>`;
 }
 
-function updatePin(val) { state.pinInput = val; state.pinError = ''; render(); }
+function updatePin(val) {
+  state.pinInput = val;
+  if (!state.pinError) return;
+  state.pinError = '';
+  const el = document.querySelector('#app .error-text');
+  if (el) el.remove();
+}
 
 async function verifyPin() {
   if (!state.pinInput) { state.pinError = 'Please enter your PIN.'; render(); return; }
@@ -348,30 +354,49 @@ async function verifyPin() {
   render();
 }
 
+// Remove the error banner in place instead of re-rendering the whole form.
+// A full render() on every keystroke destroys the focused input, which breaks
+// date inputs (picker closes, segment focus resets) and causes visible flicker.
+function clearErrorText() {
+  if (!state.errorMsg) return;
+  state.errorMsg = '';
+  const el = document.querySelector('#app .error-text');
+  if (el) el.remove();
+}
+
 function update(key, val) {
   state[key] = val;
-  state.errorMsg = '';
-  if (key === 'power_company' || key === 'operation_type') {
-    if (key === 'operation_type') {
-      const otherField = document.getElementById('f-op-other-field');
-      if (otherField) otherField.style.display = val === 'Other' ? 'block' : 'none';
-    }
-    return;
+  clearErrorText();
+  if (key === 'operation_type') {
+    const otherField = document.getElementById('f-op-other-field');
+    if (otherField) otherField.style.display = val === 'Other' ? 'block' : 'none';
   }
-  if (state.step === 2 && key !== 'operation_type') return;
-  render();
 }
+
+// Fields that reformat as you type must write back to the live input, since
+// there is no re-render to push state into the DOM.
+function setInputValue(input, formatted, cursor) {
+  if (input.value === formatted) return;
+  const delta = formatted.length - input.value.length;
+  input.value = formatted;
+  const position = Math.max(0, Math.min((cursor === null ? formatted.length : cursor) + delta, formatted.length));
+  try { input.setSelectionRange(position, position); } catch (e) {}
+}
+
 function updatePhone(input) {
-  const raw = input.value;
-  const cursor = input.selectionStart || raw.length;
-  const formatted = formatPhoneNumber(raw);
-  update('phone', formatted);
-  const next = document.getElementById('f-phone');
-  if (next) {
-    next.focus();
-    const position = Math.min(cursor + (formatted.length - raw.length), formatted.length);
-    next.setSelectionRange(position, position);
-  }
+  const cursor = input.selectionStart;
+  const formatted = formatPhoneNumber(input.value);
+  state.phone = formatted;
+  clearErrorText();
+  setInputValue(input, formatted, cursor);
+}
+
+function updateDigits(input, key) {
+  const cursor = input.selectionStart;
+  const clean = digitsOnly(input.value);
+  state[key] = clean;
+  clearErrorText();
+  setInputValue(input, clean, cursor);
 }
 function updateRow(i, key, val) { state.fan_rows[i][key] = val; }
 function addRow() { state.fan_rows.push({ num_fans: '', brand: '', size: '', motor_hp: '', pulley_size: '' }); render(); }

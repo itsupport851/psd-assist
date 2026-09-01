@@ -4,6 +4,7 @@ A Flask-based service for:
 - Filling a Dropbox-hosted GPC Commercial Workbook template with customer data
 - Exposing HubSpot CRM utility endpoints for deals, line items, contacts, teams, and service records
 - Serving a static React-like portal UI for sales, operations, and service workflows
+- Hosting a customer-facing pre-installation intake form that creates HubSpot records
 - Proxying webhook and Claude requests for external integrations
 
 ## Main features
@@ -12,8 +13,9 @@ A Flask-based service for:
 - HubSpot CRM object endpoints for:
   - deals, line items, contacts, teams
   - service creation, updates, pipelines, and debug inspection
-- Static frontends served at `/`, `/sales`, `/operations`, `/service`, and `/map`
+- Static frontends served at `/`, `/sales`, `/operations`, `/service`, `/map`, and `/customer-intake`
 - PIN-based role authentication with admin, sales, analyst, operations, and installer roles
+- A separate PIN-gated customer intake form that provisions a contact, deal, appointment, and line items in HubSpot
 
 ## Environment variables
 Required values are typically set in Railway or your deployment environment.
@@ -24,12 +26,22 @@ Required values are typically set in Railway or your deployment environment.
 - `TEMPLATE_PATH`: path to workbook template in Dropbox
 - `HUBSPOT_API_KEY`: HubSpot private app access token
 - `SERVICE_PIPELINE_ID`: HubSpot service pipeline ID to use for service creation
+- `ANTHROPIC_API_KEY`: API key used by the `/claude` proxy endpoint
 - `GOOGLE_MAPS_API_KEY`: optional for map page support
+- `PORTAL_ID`: HubSpot portal ID
+- `OWNER_ID`: HubSpot owner ID assigned to deals created by the intake form
+- `UNIT_PRICE`: default unit price applied to line items created from fan configuration rows
 - `PIN_ADMIN`: admin PIN for portal access
 - `PIN_SALES`: sales PIN
 - `PIN_ANALYST`: analyst PIN for portal access
 - `PIN_OPERATIONS`: operations PIN
 - `PIN_INSTALLER_{team_id}`: installer PIN for each HubSpot team ID
+
+### Customer intake form
+- `CUSTOMER_INTAKE_PIN`: PIN customers enter to unlock `/customer-intake`. If unset, the form is not PIN-gated
+- `DEALSTAGE_CUSTOMER_FORM_SENT`: deal stage applied to deals created from an intake submission (default `appointmentscheduled`)
+- `PIPELINE_GEORGIA_POWER`: HubSpot deal pipeline for Georgia Power submissions (default `default`)
+- `PIPELINE_ENTERGY_LOUISIANA`: HubSpot deal pipeline for Entergy Louisiana submissions (default `default`)
 
 ## App routes
 
@@ -66,6 +78,8 @@ Example payload for `/fill-workbook`:
 - `POST /hubspot/deals`
 - `POST /hubspot/contacts`
 - `GET /hubspot/teams`
+- `GET /hubspot/team-services/<team_id>`
+- `GET /hubspot/service-details/<service_id>`
 - `GET /hubspot/service-stages`
 - `GET /hubspot/service-debug/<service_id>`
 - `GET /hubspot/service-properties`
@@ -75,6 +89,15 @@ Example payload for `/fill-workbook`:
 - `GET /hubspot/services/<deal_id>`
 - `POST /hubspot/services`
 - `PATCH /hubspot/services/<service_id>`
+
+### Customer intake endpoints
+- `POST /auth`
+  - Validates a portal PIN and returns the matching role
+- `POST /customer-intake-auth`
+  - Validates `CUSTOMER_INTAKE_PIN` before the form is unlocked
+- `POST /submit-customer-form`
+  - Accepts the completed intake payload plus `access_pin`
+  - Requires `gp_account_name`, `gp_account_number`, `first_name`, `last_name`, `email`, `farm_address`, and `power_company`
 
 ### Proxy endpoints
 - `POST /proxy`
@@ -88,7 +111,29 @@ Example payload for `/fill-workbook`:
 - `/operations` — operations portal
 - `/service` — service portal
 - `/map` — map page
+- `/customer-intake` — customer-facing pre-installation intake form
 - `/maps-key` — returns `GOOGLE_MAPS_API_KEY`
+- `/Images/<path>` and `/Docs/<path>` — static assets referenced by the portals and intake form
+
+## Customer intake form
+
+`static/customer-intake.html` is a self-contained, PIN-gated survey sent to customers before installation. It collects farm and contact details, poultry operation and fan inventory, an equipment readiness checklist, and an installation scheduling window across four steps.
+
+On submit, `POST /submit-customer-form` performs the following against HubSpot:
+1. Creates the contact, or patches it if one already exists with the same email
+2. Creates a deal on the pipeline mapped from the selected power company, at `DEALSTAGE_CUSTOMER_FORM_SENT`, and associates it with the contact
+3. Best-effort: creates an appointment spanning the installation window and associates it with the deal
+4. Best-effort: converts each fan configuration row into a line item priced at `UNIT_PRICE`, then updates the deal amount
+
+Steps 3 and 4 are best-effort — a failure there does not fail the submission.
+
+### Frontend notes
+The page renders itself by assigning to `#app.innerHTML`. **Do not call `render()` from an input handler.** Doing so destroys and recreates the focused element on every keystroke, which makes `<input type="date">` unusable (the picker closes and segment focus resets) and causes visible flicker. Instead:
+
+- `update()` records state only; the browser already reflects what the user typed
+- `clearErrorText()` removes the error banner in place rather than re-rendering
+- Handlers that reformat as you type (`updatePhone`, `updateDigits`) write the value back to the live input via `setInputValue()` and restore the caret
+- `render()` is reserved for structural changes: step navigation, adding/removing fan rows, submit, and PIN verification
 
 ## HubSpot service behavior
 - Service creation and update operations normalize `status` values to HubSpot-approved options
