@@ -40,7 +40,7 @@ Required values are typically set in Railway or your deployment environment.
 ### Customer intake form
 - `CUSTOMER_INTAKE_PIN`: PIN customers enter to unlock `/customer-intake`. If unset, the form is not PIN-gated
 - `DEALSTAGE_CUSTOMER_FORM_SENT`: deal stage applied to deals created from an intake submission (default `appointmentscheduled`)
-- `HUBSPOT_FILES_URL`: HubSpot Files API endpoint for customer document uploads (default `https://api.hubapi.com/files/2026-03/files`)
+- `HUBSPOT_FILES_URL`: HubSpot Files API endpoint for customer document uploads (default `https://api.hubapi.com/files/v3/files`). The Files API is versioned `v3`; a dated segment such as `/files/2026-03/files` appears in some doc samples as a placeholder and returns 404
 - `INTAKE_FILES_FOLDER`: root file-manager folder for uploaded documents (default `/customer-intake`); each submission gets a subfolder named after the account
 
 Intake deals are always created on the `default` deal pipeline, regardless of power company.
@@ -142,9 +142,11 @@ The State field is derived from the selected power company and is not editable:
 | --- | --- |
 | Georgia Power | GA |
 | Entergy Louisiana | LA |
-| Entergy Arkansas | AR |
+| Entergy Arkansas | A |
 
-The form renders State read-only, and `POWER_COMPANY_STATE_MAP` in `app.py` re-derives it server-side so a hand-edited payload cannot override it. Adding a power company means updating `POWER_COMPANIES` in `customer-intake.html` and `POWER_COMPANY_STATE_MAP` in `app.py`.
+Entergy Arkansas maps to `A`, not the USPS code `AR`, as specified by the business owner.
+
+The form renders State read-only, and `POWER_COMPANY_STATE_MAP` in `app.py` re-derives it server-side so a hand-edited payload cannot override it. The portal's New Contact form (`index.html`) carries its own copy in `POWER_COMPANIES` and derives State the same way, though it does not send `power_company` to HubSpot. Adding a power company means updating all three lists.
 
 ### Document uploads
 Step 4 accepts up to 10 optional files of 20 MB each. They are sent only after `/submit-customer-form` returns a `deal_id`, in a second `multipart/form-data` request to `/customer-intake-upload`. Each file is posted to the HubSpot Files API with `{"access": "PRIVATE"}` under `INTAKE_FILES_FOLDER/<account name>`, and the resulting file ids are attached to the deal as one note:
@@ -165,7 +167,33 @@ Step 4 accepts up to 10 optional files of 20 MB each. They are sent only after `
 
 Association type `214` is HubSpot's `note → deal` type. (`202` is `note → contact` and will not attach a note to a deal.)
 
-Because uploads happen after the deal exists, an upload failure never discards a successful submission — the success screen shows a warning naming the files that did not attach.
+Because uploads happen after the deal exists, an upload failure never discards a successful submission — the success screen shows a warning naming the files that did not attach and why. Each failure is also logged server-side with HubSpot's own message, so the two common causes are distinguishable: a **404** means `HUBSPOT_FILES_URL` is wrong, and a **403** means the private app token is missing the `files` scope.
+
+## Theme
+
+All three static pages use a single light palette. Colors are literal hex values in each page's `<style>` block and in the inline React style objects in `index.html` — there are no CSS variables, so a palette change means a sweep across all three files.
+
+| Role | Value |
+| --- | --- |
+| Page background | `#f4f6f9` |
+| Card / input / chrome surface | `#ffffff` |
+| Inset or read-only surface | `#eef2f6` |
+| Border | `#dce3ea` (dashed `#c3cedb`) |
+| Primary text | `#16212c` |
+| Label / secondary text | `#3d6076` |
+| Muted text | `#64798c` |
+| Brand green (fills, borders) | `#25a35a` / `#1a6b3c` |
+| Green text on a light tint | `#1a6b3c` |
+| Green tint background | `#e9f7ef` |
+| Error | `#c62828` |
+| Warning | `#a86a00` |
+
+Two rules matter when editing:
+
+- `color: #fff` is only ever correct on a **saturated fill** — the green gradient buttons, a selected Yes/No pill, a stage pill. On a light tint it is invisible.
+- `#25a35a` is a fill and border color. As *text* on `#e9f7ef` it lands at 2.94:1, so use `#1a6b3c` there instead.
+
+Map marker `stroke` values in `map.html` are deliberately left dark; they outline saturated markers against the light Google basemap. The floating map panels carry a `box-shadow` because a border alone no longer separates a white panel from a light map.
 
 ### Frontend notes
 The page renders itself by assigning to `#app.innerHTML`. **Do not call `render()` from an input handler.** Doing so destroys and recreates the focused element on every keystroke, which makes `<input type="date">` unusable (the picker closes and segment focus resets) and causes visible flicker. Instead:

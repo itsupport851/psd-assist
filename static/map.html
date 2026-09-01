@@ -6,21 +6,21 @@
   <title>PSD Farm Map</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', system-ui, sans-serif; background: #0f1923; color: #e8edf2; height: 100vh; display: flex; flex-direction: column; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f4f6f9; color: #16212c; height: 100vh; display: flex; flex-direction: column; }
 
     /* ── Header ── */
-    #header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: #0d1520; border-bottom: 1px solid #1e2d3d; flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
+    #header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: #ffffff; border-bottom: 1px solid #dce3ea; flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
     #header-left { display: flex; align-items: center; gap: 10px; }
     #logo { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #1a6b3c, #25a35a); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0; }
     #title { font-weight: 600; font-size: 14px; }
-    #subtitle { font-size: 11px; color: #4a9a6b; margin-top: 1px; }
-    #back-btn { padding: 6px 14px; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; color: #8ab4cc; font-size: 12px; cursor: pointer; text-decoration: none; white-space: nowrap; }
-    #back-btn:hover { background: #1e2d3d; }
+    #subtitle { font-size: 11px; color: #25a35a; margin-top: 1px; }
+    #back-btn { padding: 6px 14px; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; color: #3d6076; font-size: 12px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+    #back-btn:hover { background: #dce3ea; }
 
     /* ── Stage filter bar ── */
-    #filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #0d1520; border-bottom: 1px solid #1e2d3d; flex-shrink: 0; flex-wrap: wrap; }
-    #filter-bar .filter-label { font-size: 11px; color: #6b8fa8; margin-right: 4px; white-space: nowrap; }
-    .stage-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid #1e2d3d; background: #162130; color: #8ab4cc; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    #filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #ffffff; border-bottom: 1px solid #dce3ea; flex-shrink: 0; flex-wrap: wrap; }
+    #filter-bar .filter-label { font-size: 11px; color: #64798c; margin-right: 4px; white-space: nowrap; }
+    .stage-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid #dce3ea; background: #ffffff; color: #3d6076; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .stage-btn:hover { border-color: #25a35a; }
     .stage-btn.active { color: #fff; border-color: transparent; }
     .stage-btn .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -28,17 +28,17 @@
     /* stage colors */
     .color-all          { background: #6366f1; }
     .color-scheduled    { background: #a855f7; }
-    .color-qualified    { background: #f59e0b; }
+    .color-qualified    { background: #c77700; }
     .color-presentation { background: #3b82f6; }
-    .color-decision     { background: #ef4444; }
+    .color-decision     { background: #dc2626; }
     .color-contract     { background: #06b6d4; }
     .color-won          { background: #10b981; }
 
     .stage-btn.active.btn-all          { background: #6366f1; }
     .stage-btn.active.btn-scheduled    { background: #a855f7; }
-    .stage-btn.active.btn-qualified    { background: #f59e0b; }
+    .stage-btn.active.btn-qualified    { background: #c77700; }
     .stage-btn.active.btn-presentation { background: #3b82f6; }
-    .stage-btn.active.btn-decision     { background: #ef4444; }
+    .stage-btn.active.btn-decision     { background: #dc2626; }
     .stage-btn.active.btn-contract     { background: #06b6d4; }
     .stage-btn.active.btn-won          { background: #10b981; }
 
@@ -48,49 +48,49 @@
 
     /* ── Loading ── */
     #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 10; }
-    #loading-text { color: #6b8fa8; font-size: 14px; margin-top: 12px; }
-    .spinner { width: 36px; height: 36px; border: 3px solid #1e2d3d; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    #loading-text { color: #64798c; font-size: 14px; margin-top: 12px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #dce3ea; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Sidebar ── */
-    #sidebar { position: absolute; top: 12px; right: 12px; width: 290px; background: #0d1520ee; border: 1px solid #1e2d3d; border-radius: 12px; overflow: hidden; max-height: calc(100% - 24px); display: flex; flex-direction: column; backdrop-filter: blur(6px); }
-    #sidebar-header { padding: 10px 14px; background: #162130; border-bottom: 1px solid #1e2d3d; font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+    #sidebar { position: absolute; top: 12px; right: 12px; width: 290px; background: #ffffffee; border: 1px solid #dce3ea; border-radius: 12px; overflow: hidden; max-height: calc(100% - 24px); display: flex; flex-direction: column; backdrop-filter: blur(6px); box-shadow: 0 4px 16px rgba(20,35,50,.18); }
+    #sidebar-header { padding: 10px 14px; background: #ffffff; border-bottom: 1px solid #dce3ea; font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
     #deals-list { overflow-y: auto; flex: 1; }
     #deals-list::-webkit-scrollbar { width: 4px; }
-    #deals-list::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 2px; }
-    .deal-card { padding: 10px 14px; border-bottom: 1px solid #1e2d3d; cursor: pointer; transition: background 0.12s; border-left: 3px solid transparent; }
-    .deal-card:hover { background: #162130; }
-    .deal-card.active { background: #0f2318; }
-    .deal-card-name { font-size: 12px; font-weight: 600; color: #e8edf2; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .deal-card-address { font-size: 11px; color: #6b8fa8; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #deals-list::-webkit-scrollbar-thumb { background: #dce3ea; border-radius: 2px; }
+    .deal-card { padding: 10px 14px; border-bottom: 1px solid #dce3ea; cursor: pointer; transition: background 0.12s; border-left: 3px solid transparent; }
+    .deal-card:hover { background: #ffffff; }
+    .deal-card.active { background: #e9f7ef; }
+    .deal-card-name { font-size: 12px; font-weight: 600; color: #16212c; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .deal-card-address { font-size: 11px; color: #64798c; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .deal-card-meta { display: flex; gap: 6px; font-size: 10px; align-items: center; flex-wrap: wrap; }
-    .meta-tag { background: #1e2d3d; padding: 2px 6px; border-radius: 8px; color: #8ab4cc; }
+    .meta-tag { background: #dce3ea; padding: 2px 6px; border-radius: 8px; color: #3d6076; }
     .stage-pill { padding: 2px 7px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #fff; }
 
-    #stats-bar { padding: 8px 14px; background: #162130; border-top: 1px solid #1e2d3d; font-size: 11px; color: #6b8fa8; display: flex; gap: 14px; flex-wrap: wrap; }
+    #stats-bar { padding: 8px 14px; background: #ffffff; border-top: 1px solid #dce3ea; font-size: 11px; color: #64798c; display: flex; gap: 14px; flex-wrap: wrap; }
     .stat { display: flex; gap: 4px; }
     .stat-value { color: #25a35a; font-weight: 600; }
 
     /* ── Detail panel ── */
-    #detail-panel { position: absolute; bottom: 12px; left: 12px; width: 300px; background: #0d1520ee; border: 1px solid #1e2d3d; border-radius: 12px; padding: 14px; display: none; backdrop-filter: blur(6px); }
+    #detail-panel { position: absolute; bottom: 12px; left: 12px; width: 300px; background: #ffffffee; border: 1px solid #dce3ea; border-radius: 12px; padding: 14px; display: none; backdrop-filter: blur(6px); box-shadow: 0 4px 16px rgba(20,35,50,.18); }
     #detail-panel.visible { display: block; }
-    .detail-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; color: #e8edf2; padding-right: 20px; }
+    .detail-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; color: #16212c; padding-right: 20px; }
     .detail-stage { display: inline-block; margin-bottom: 10px; }
-    .detail-address { font-size: 11px; color: #6b8fa8; margin-bottom: 10px; }
-    .detail-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #1a2535; }
+    .detail-address { font-size: 11px; color: #64798c; margin-bottom: 10px; }
+    .detail-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #f4f6f9; }
     .detail-row:last-of-type { border-bottom: none; }
-    .detail-label { color: #6b8fa8; }
-    .detail-value { color: #e8edf2; font-weight: 500; }
-    #close-detail { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #6b8fa8; cursor: pointer; font-size: 16px; line-height: 1; }
-    #close-detail:hover { color: #e8edf2; }
+    .detail-label { color: #64798c; }
+    .detail-value { color: #16212c; font-weight: 500; }
+    #close-detail { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #64798c; cursor: pointer; font-size: 16px; line-height: 1; }
+    #close-detail:hover { color: #16212c; }
     #assign-btn { width: 100%; margin-top: 10px; padding: 7px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
     #assign-btn:hover { opacity: 0.9; }
 
     /* ── Legend ── */
-    #legend { position: absolute; bottom: 12px; right: 12px; background: #0d1520ee; border: 1px solid #1e2d3d; border-radius: 10px; padding: 10px 14px; font-size: 11px; backdrop-filter: blur(6px); display: none; }
+    #legend { position: absolute; bottom: 12px; right: 12px; background: #ffffffee; border: 1px solid #dce3ea; border-radius: 10px; padding: 10px 14px; font-size: 11px; backdrop-filter: blur(6px); display: none; box-shadow: 0 4px 16px rgba(20,35,50,.18); }
     #legend.visible { display: block; }
-    .legend-title { color: #6b8fa8; font-weight: 600; margin-bottom: 6px; }
-    .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; color: #e8edf2; }
+    .legend-title { color: #64798c; font-weight: 600; margin-bottom: 6px; }
+    .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; color: #16212c; }
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   </style>
 </head>
@@ -161,9 +161,9 @@
   // ── Stage config ──────────────────────────────────────────
   const STAGE_CONFIG = {
     'appointmentscheduled':  { label: 'Scheduled',    color: '#a855f7', stroke: '#220d3a' },
-    'qualifiedtobuy':        { label: 'Qualified',    color: '#f59e0b', stroke: '#3a2000' },
+    'qualifiedtobuy':        { label: 'Qualified',    color: '#c77700', stroke: '#3a2000' },
     'presentationscheduled': { label: 'Presentation', color: '#3b82f6', stroke: '#0d1f3a' },
-    'decisionmakerboughtin': { label: 'Decision',     color: '#ef4444', stroke: '#3a0d0d' },
+    'decisionmakerboughtin': { label: 'Decision',     color: '#dc2626', stroke: '#3a0d0d' },
     'contractsent':          { label: 'Contract',     color: '#06b6d4', stroke: '#012530' },
     'closedwon':             { label: 'Won',          color: '#10b981', stroke: '#003322' },
   };

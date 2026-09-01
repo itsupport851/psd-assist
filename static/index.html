@@ -9,99 +9,99 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0f1923; font-family: 'Inter', system-ui, sans-serif; color: #e8edf2; height: 100vh; overflow: hidden; }
+    body { background: #f4f6f9; font-family: 'Inter', system-ui, sans-serif; color: #16212c; height: 100vh; overflow: hidden; }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 3px; }
-    textarea::placeholder { color: #3a5a70; }
+    ::-webkit-scrollbar-thumb { background: #dce3ea; border-radius: 3px; }
+    textarea::placeholder { color: #a9b8c7; }
     @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
     .deal-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-    .deal-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
-    .deal-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
+    .deal-table th { background: #dce3ea; color: #3d6076; padding: 7px 10px; text-align: left; font-weight: 600; }
+    .deal-table td { padding: 7px 10px; border-bottom: 1px solid #f4f6f9; }
     .deal-table tr:last-child td { border-bottom: none; }
-    .deal-table tr:hover td { background: #1a2535; }
+    .deal-table tr:hover td { background: #f4f6f9; }
     .line-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-    .line-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
-    .line-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; }
+    .line-table th { background: #dce3ea; color: #3d6076; padding: 7px 10px; text-align: left; font-weight: 600; }
+    .line-table td { padding: 7px 10px; border-bottom: 1px solid #f4f6f9; }
     .line-table tr:last-child td { border-bottom: none; }
-    .line-table .total-row td { border-top: 2px solid #25a35a; font-weight: 700; color: #25a35a; background: #0d1f15; }
+    .line-table .total-row td { border-top: 2px solid #25a35a; font-weight: 700; color: #1a6b3c; background: #e9f7ef; }
     .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-    .tag-scheduled { background: #1a3a5c; color: #5ab4f0; }
-    .tag-won { background: #0d3320; color: #25a35a; }
-    .tag-lost { background: #3a1a1a; color: #e05252; }
-    .tag-qualified { background: #2a1a3a; color: #a87af0; }
-    .tag-svc-new { background: #1a2535; color: #8ab4cc; }
-    .tag-svc-inprogress { background: #1a3a5c; color: #5ab4f0; }
-    .tag-svc-closed { background: #0d3320; color: #25a35a; }
-    .tag-svc-ontrack { background: #0d3320; color: #25a35a; }
-    .tag-svc-atrisk { background: #2a1a00; color: #f59e0b; }
-    .tag-svc-behind { background: #3a1a1a; color: #e05252; }
-    .tag-svc-complete { background: #0d2030; color: #5ab4f0; }
+    .tag-scheduled { background: #e4eefb; color: #1d7fc4; }
+    .tag-won { background: #e9f7ef; color: #1a6b3c; }
+    .tag-lost { background: #fdeaea; color: #c62828; }
+    .tag-qualified { background: #f3ebfd; color: #7c3aed; }
+    .tag-svc-new { background: #f4f6f9; color: #3d6076; }
+    .tag-svc-inprogress { background: #e4eefb; color: #1d7fc4; }
+    .tag-svc-closed { background: #e9f7ef; color: #1a6b3c; }
+    .tag-svc-ontrack { background: #e9f7ef; color: #1a6b3c; }
+    .tag-svc-atrisk { background: #fdf3e0; color: #c77700; }
+    .tag-svc-behind { background: #fdeaea; color: #c62828; }
+    .tag-svc-complete { background: #eef2f6; color: #1d7fc4; }
     .svc-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-    .svc-table th { background: #1e2d3d; color: #8ab4cc; padding: 7px 10px; text-align: left; font-weight: 600; }
-    .svc-table td { padding: 7px 10px; border-bottom: 1px solid #1a2535; vertical-align: middle; }
+    .svc-table th { background: #dce3ea; color: #3d6076; padding: 7px 10px; text-align: left; font-weight: 600; }
+    .svc-table td { padding: 7px 10px; border-bottom: 1px solid #f4f6f9; vertical-align: middle; }
     .svc-table tr:last-child td { border-bottom: none; }
-    .svc-table tr:hover td { background: #1a2535; }
+    .svc-table tr:hover td { background: #f4f6f9; }
     .md-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
-    .md-table th, .md-table td { padding: 8px 10px; border: 1px solid #1a2535; }
-    .md-table th { background: #1e2d3d; color: #8ab4cc; text-align: left; }
-    .md-table td { color: #e8edf2; }
-    .md-table tr:nth-child(even) td { background: #121b24; }
-    .md-table tr:hover td { background: #1a2535; }
-    .svc-form-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
+    .md-table th, .md-table td { padding: 8px 10px; border: 1px solid #f4f6f9; }
+    .md-table th { background: #dce3ea; color: #3d6076; text-align: left; }
+    .md-table td { color: #16212c; }
+    .md-table tr:nth-child(even) td { background: #ffffff; }
+    .md-table tr:hover td { background: #f4f6f9; }
+    .svc-form-title { font-size: 13px; font-weight: 600; color: #3d6076; margin-bottom: 12px; }
     .svc-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-    .svc-form-label { font-size: 11px; color: #6b8fa8; font-weight: 500; }
-    .svc-form-input { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-label { font-size: 11px; color: #64798c; font-weight: 500; }
+    .svc-form-input { background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
     .svc-form-input:focus { border-color: #25a35a; }
-    .svc-form-select { background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 7px 10px; color: #e8edf2; font-size: 13px; outline: none; font-family: inherit; }
-    .contact-confirm-note { background: #0d2218; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #a8d8bc; line-height: 1.5; margin: 10px 0; }
-    .contact-yn { background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px 14px; }
+    .svc-form-select { background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
+    .contact-confirm-note { background: #e9f7ef; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #1e6b3f; line-height: 1.5; margin: 10px 0; }
+    .contact-yn { background: #ffffff; border: 1px solid #dce3ea; border-radius: 10px; padding: 12px 14px; }
     .contact-yn-title { font-size: 13px; margin-bottom: 8px; }
     .contact-yn-options { display: flex; gap: 10px; }
-    .contact-yn-options label { flex: 1; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #1e2d3d; font-size: 13px; font-weight: 600; cursor: pointer; color: #8ab4cc; }
+    .contact-yn-options label { flex: 1; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #dce3ea; font-size: 13px; font-weight: 600; cursor: pointer; color: #3d6076; }
     .contact-yn-options input { display: none; }
     .contact-yn-options label.yes:has(input:checked) { background: #1a6b3c; border-color: #25a35a; color: #fff; }
-    .contact-yn-options label.no:has(input:checked) { background: #6b1a1a; border-color: #e05252; color: #fff; }
+    .contact-yn-options label.no:has(input:checked) { background: #c62828; border-color: #c62828; color: #fff; }
     .contact-actions { display: flex; gap: 10px; margin-top: 12px; }
     .contact-actions button { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .contact-actions .yes { background: #1a6b3c; border: 1px solid #25a35a; color: #fff; }
-    .contact-actions .no { background: #6b1a1a; border: 1px solid #e05252; color: #fff; }
+    .contact-actions .no { background: #c62828; border: 1px solid #c62828; color: #fff; }
     .contact-actions button:disabled { opacity: .55; cursor: not-allowed; }
     .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .svc-form-btn:hover { opacity: 0.9; }
-    .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #1e2d3d; border-radius: 8px; color: #6b8fa8; font-size: 12px; cursor: pointer; margin-top: 6px; }
+    .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #dce3ea; border-radius: 8px; color: #64798c; font-size: 12px; cursor: pointer; margin-top: 6px; }
     .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
     .map-btn:hover { opacity: 0.9; }
     .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; animation: fadeIn 0.3s ease; }
-    .qa-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; color: #e8edf2; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: left; }
-    .qa-btn:hover { background: #1e2d3d; border-color: #25a35a; color: #25a35a; }
+    .qa-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #ffffff; border: 1px solid #dce3ea; border-radius: 10px; color: #16212c; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: left; }
+    .qa-btn:hover { background: #eef2f6; border-color: #25a35a; color: #1a6b3c; }
     .qa-btn .qa-icon { font-size: 16px; flex-shrink: 0; }
     .qa-btn .qa-label { line-height: 1.3; }
-    .qa-btn .qa-desc { font-size: 10px; color: #6b8fa8; margin-top: 1px; }
-    .svcd-card { background: #162130; border: 1px solid #1e2d3d; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; transition: border-color 0.15s; }
-    .svcd-card:hover { border-color: #2a3d52; }
-    .svcd-card.selected { border-color: #25a35a; background: #0d2218; }
+    .qa-btn .qa-desc { font-size: 10px; color: #64798c; margin-top: 1px; }
+    .svcd-card { background: #ffffff; border: 1px solid #dce3ea; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; transition: border-color 0.15s; }
+    .svcd-card:hover { border-color: #c3cedb; }
+    .svcd-card.selected { border-color: #25a35a; background: #e9f7ef; }
     .svcd-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
-    .svcd-card-name { font-size: 14px; font-weight: 600; color: #e8edf2; flex: 1; }
+    .svcd-card-name { font-size: 14px; font-weight: 600; color: #16212c; flex: 1; }
     .svcd-card-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; }
-    .svcd-card-meta span { background: #1e2d3d; padding: 2px 8px; border-radius: 8px; color: #8ab4cc; }
-    .svcd-edit-panel { background: #0d1520; border: 1px solid #1e2d3d; border-radius: 12px; padding: 16px; margin-top: 10px; }
-    .svcd-edit-title { font-size: 13px; font-weight: 600; color: #8ab4cc; margin-bottom: 12px; }
+    .svcd-card-meta span { background: #dce3ea; padding: 2px 8px; border-radius: 8px; color: #3d6076; }
+    .svcd-edit-panel { background: #ffffff; border: 1px solid #dce3ea; border-radius: 12px; padding: 16px; margin-top: 10px; }
+    .svcd-edit-title { font-size: 13px; font-weight: 600; color: #3d6076; margin-bottom: 12px; }
     .svcd-filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-    .svcd-filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #1e2d3d; background: #162130; color: #8ab4cc; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-    .svcd-filter-btn:hover { border-color: #25a35a; color: #e8edf2; }
+    .svcd-filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #dce3ea; background: #ffffff; color: #3d6076; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+    .svcd-filter-btn:hover { border-color: #25a35a; color: #16212c; }
     .svcd-filter-btn.active { background: #25a35a; border-color: #25a35a; color: #fff; }
-    .svcd-empty { text-align: center; padding: 40px 20px; color: #3a5a70; font-size: 13px; }
-    .svcd-spinner { width: 28px; height: 28px; border: 3px solid #1e2d3d; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto; }
+    .svcd-empty { text-align: center; padding: 40px 20px; color: #a9b8c7; font-size: 13px; }
+    .svcd-spinner { width: 28px; height: 28px; border: 3px solid #dce3ea; border-top-color: #25a35a; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 40px auto; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .pin-key { width: 72px; height: 56px; background: #162130; border: 1px solid #1e2d3d; border-radius: 12px; color: #e8edf2; font-size: 20px; font-weight: 600; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; }
-    .pin-key:hover { background: #1e2d3d; border-color: #25a35a; }
+    .pin-key { width: 72px; height: 56px; background: #ffffff; border: 1px solid #dce3ea; border-radius: 12px; color: #16212c; font-size: 20px; font-weight: 600; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; }
+    .pin-key:hover { background: #dce3ea; border-color: #25a35a; }
     .pin-key:active { transform: scale(0.95); }
-    .pin-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #3a5a70; transition: all 0.2s; }
+    .pin-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #a9b8c7; transition: all 0.2s; }
     .pin-dot.filled { background: #25a35a; border-color: #25a35a; }
-    .pin-dot.error { background: #e05252; border-color: #e05252; }
+    .pin-dot.error { background: #c62828; border-color: #c62828; }
   </style>
 </head>
 <body>
@@ -149,9 +149,9 @@
     const MAP_STAGE_BUTTONS = [
       { icon: "🗺",  label: "All Deals",    stage: "",                     color: "#6366f1" },
       { icon: "📅", label: "Scheduled",    stage: "appointmentscheduled",  color: "#a855f7" },
-      { icon: "🎯", label: "Qualified",    stage: "qualifiedtobuy",        color: "#f59e0b" },
+      { icon: "🎯", label: "Qualified",    stage: "qualifiedtobuy",        color: "#c77700" },
       { icon: "📊", label: "Presentation", stage: "presentationscheduled", color: "#3b82f6" },
-      { icon: "🤝", label: "Decision",     stage: "decisionmakerboughtin", color: "#ef4444" },
+      { icon: "🤝", label: "Decision",     stage: "decisionmakerboughtin", color: "#dc2626" },
       { icon: "📄", label: "Contract",     stage: "contractsent",          color: "#06b6d4" },
       { icon: "🏆", label: "Won",          stage: "closedwon",             color: "#10b981" },
     ]; // end MAP_STAGE_BUTTONS
@@ -348,7 +348,7 @@
       var showFinancials = role !== "analyst" && role !== "installer";
 
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deals.length + " deals"),
+        React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 6 } }, data.deals.length + " deals"),
         React.createElement("table", { className: "deal-table" },
           React.createElement("thead", null,
             React.createElement("tr", null,
@@ -364,16 +364,16 @@
           React.createElement("tbody", null,
             data.deals.map(function(d, i) {
               return React.createElement("tr", { key: d.id },
-                React.createElement("td", { style: { color: "#6b8fa8" } }, i + 1),
+                React.createElement("td", { style: { color: "#64798c" } }, i + 1),
                 React.createElement("td", { style: { fontWeight: 500 } }, d.name),
-                React.createElement("td", { style: { color: "#8ab4cc", fontSize: 12 } }, d.operation_type ? d.operation_type.replace(/;/g, ", ") : "—"),
+                React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, d.operation_type ? d.operation_type.replace(/;/g, ", ") : "—"),
                 React.createElement("td", { style: { color: "#25a35a", fontWeight: 600 } }, d.total_fans || "—"),
                 React.createElement("td", { style: { color: "#25a35a", fontWeight: 600 } }, d.total_barns || "—"),
                 showFinancials && React.createElement("td", null, fmt(d.amount)),
                 React.createElement("td", null, React.createElement("span", { className: "tag " + stageColor(d.stage) }, stageLabel(d.stage)))
               );
             }),
-            React.createElement("tr", { style: { background: "#0d1f15" } },
+            React.createElement("tr", { style: { background: "#e9f7ef" } },
               React.createElement("td", { colSpan: showFinancials ? 3 : 3, style: { textAlign: "right", fontWeight: 700, color: "#25a35a", fontSize: 12 } }, "Totals"),
               React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, totalFans),
               React.createElement("td", { style: { fontWeight: 700, color: "#25a35a" } }, totalBarns),
@@ -389,7 +389,7 @@
       var showFinancials = role !== "analyst" && role !== "installer";
       var total = data.items.reduce(function(s, item) { return s + (Number(item.qty) * Number(item.unit_price || 0)); }, 0);
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, data.deal_name + " — " + data.items.length + " line items"),
+        React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 6 } }, data.deal_name + " — " + data.items.length + " line items"),
         React.createElement("table", { className: "line-table" },
           React.createElement("thead", null,
             React.createElement("tr", null,
@@ -478,18 +478,18 @@
 
       return React.createElement('div', null,
         React.createElement('div', { style: { marginBottom: 10 } },
-          React.createElement('div', { style: { fontSize: 12, color: '#6b8fa8', marginBottom: 6 } }, 'Select Deal'),
+          React.createElement('div', { style: { fontSize: 12, color: '#64798c', marginBottom: 6 } }, 'Select Deal'),
           React.createElement('select', { className: 'svc-form-input', value: selectedDeal || '', onChange: function(e){ setSelectedDeal(e.target.value); loadItemsForDeal(e.target.value); } },
             React.createElement('option', { value: '' }, '-- Select deal --'),
             deals.map(function(d){ return React.createElement('option', { key: d.id, value: d.id }, d.name); })
           )
         ),
         selectedDeal && React.createElement('div', null,
-          React.createElement('div', { style: { fontSize: 12, color: '#6b8fa8', marginBottom: 6 } }, 'Existing Line Items'),
+          React.createElement('div', { style: { fontSize: 12, color: '#64798c', marginBottom: 6 } }, 'Existing Line Items'),
           React.createElement(LineItemsTable, { data: { deal_name: deals.find(function(x){return x.id===selectedDeal})?.name || '', items: items }, role: 'sales' })
         ),
         React.createElement('div', { style: { marginTop: 12 } },
-          React.createElement('div', { style: { fontSize: 12, color: '#6b8fa8', marginBottom: 6 } }, 'New Line Item'),
+          React.createElement('div', { style: { fontSize: 12, color: '#64798c', marginBottom: 6 } }, 'New Line Item'),
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 8 } },
             React.createElement('input', { className: 'svc-form-input', placeholder: 'Pulley Size', value: newLine.pulley_size, onChange: function(e){ setNewLine(Object.assign({}, newLine, { pulley_size: e.target.value })); } }),
             React.createElement('input', { className: 'svc-form-input', placeholder: 'Brand', value: newLine.brand, onChange: function(e){ setNewLine(Object.assign({}, newLine, { brand: e.target.value })); } }),
@@ -559,7 +559,7 @@
 
       var svcs = data.services || [];
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 6 } }, svcs.length + " service" + (svcs.length !== 1 ? "s" : "")),
+        React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 6 } }, svcs.length + " service" + (svcs.length !== 1 ? "s" : "")),
         React.createElement("table", { className: "svc-table" },
           React.createElement("thead", null,
             React.createElement("tr", null,
@@ -577,14 +577,14 @@
           React.createElement("tbody", null,
             svcs.map(function(s, i) {
               return React.createElement("tr", { key: s.id || i },
-                React.createElement("td", { style: { color: "#6b8fa8" } }, i + 1),
+                React.createElement("td", { style: { color: "#64798c" } }, i + 1),
                 React.createElement("td", { style: { fontWeight: 500 } }, s.name || "—"),
-                React.createElement("td", { style: { color: "#8ab4cc", fontSize: 12 } }, s.deal_name || "—"),
-                React.createElement("td", { style: { fontSize: 12, color: "#8ab4cc" } }, s.team || "—"),
+                React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, s.deal_name || "—"),
+                React.createElement("td", { style: { fontSize: 12, color: "#3d6076" } }, s.team || "—"),
                 React.createElement("td", null, React.createElement("span", { className: stageClass(s.stage) }, stageLabel(s.stage))),
                 React.createElement("td", null, React.createElement("span", { className: statusClass(s.status) }, statusLabel(s.status))),
-                React.createElement("td", { style: { fontSize: 12, color: "#8ab4cc" } }, fmtDate(s.start_date)),
-                React.createElement("td", { style: { fontSize: 12, color: "#8ab4cc" } }, fmtDate(s.due_date)),
+                React.createElement("td", { style: { fontSize: 12, color: "#3d6076" } }, fmtDate(s.start_date)),
+                React.createElement("td", { style: { fontSize: 12, color: "#3d6076" } }, fmtDate(s.due_date)),
                 showFinancials && React.createElement("td", null, s.total_cost ? fmt(s.total_cost) : "—")
               );
             })
@@ -614,15 +614,15 @@
       return React.createElement("div", null,
         React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
           React.createElement("div", { style: { fontSize: 14, fontWeight: 700, marginBottom: 8 } }, svc.name || 'Service Detail'),
-          svc.deal_name && React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, 'Deal: ' + svc.deal_name),
-          React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 4 } }, svc.team ? 'Team: ' + svc.team : 'Team: —'),
+          svc.deal_name && React.createElement("div", { style: { fontSize: 12, color: '#3d6076', marginBottom: 4 } }, 'Deal: ' + svc.deal_name),
+          React.createElement("div", { style: { fontSize: 12, color: '#3d6076', marginBottom: 4 } }, svc.team ? 'Team: ' + svc.team : 'Team: —'),
           React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 12 } },
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Stage'), React.createElement("div", { style: { marginTop: 4 } }, svc.stage || '—')),
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Status'), React.createElement("div", { style: { marginTop: 4 } }, svc.status || '—')),
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Start Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.start_date))),
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Due Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.due_date)))
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Stage'), React.createElement("div", { style: { marginTop: 4 } }, svc.stage || '—')),
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Status'), React.createElement("div", { style: { marginTop: 4 } }, svc.status || '—')),
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Start Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.start_date))),
+            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Due Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.due_date)))
           ),
-          React.createElement("div", { style: { marginTop: 12, fontSize: 12, color: '#e8edf2' } }, svc.description || 'No service description available.')
+          React.createElement("div", { style: { marginTop: 12, fontSize: 12, color: '#16212c' } }, svc.description || 'No service description available.')
         ),
         contacts.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
           React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Contacts"),
@@ -640,13 +640,13 @@
           tasks.map(function(t) {
             return React.createElement("div", { key: t.id, style: { marginBottom: 20, fontSize: 12 } },
               React.createElement("div", { style: { fontWeight: 600, marginBottom: 6 } }, t.subject || '—'),
-              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 4 } }, 'Status: ' + (t.status || '—')),
-              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 4 } }, 'Priority: ' + (t.priority || '—')),
-              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 4 } }, 'Start: ' + (t.start_date ? fmtDate(t.start_date) : '—')),
-              React.createElement("div", { style: { fontSize: 11, color: '#8ab4cc', marginBottom: 8 } }, 'Due: ' + (t.due_date ? fmtDate(t.due_date) : '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 4 } }, 'Status: ' + (t.status || '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 4 } }, 'Priority: ' + (t.priority || '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 4 } }, 'Start: ' + (t.start_date ? fmtDate(t.start_date) : '—')),
+              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 8 } }, 'Due: ' + (t.due_date ? fmtDate(t.due_date) : '—')),
               React.createElement("div", { style: { fontWeight: 600, marginBottom: 4 } }, 'Notes'),
-              React.createElement("div", { style: { marginBottom: 8, whiteSpace: 'pre-wrap', color: '#e8edf2' } }, stripHtml(t.body) || 'No details'),
-              React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8' } }, 'Created: ' + fmtDate(t.created_date))
+              React.createElement("div", { style: { marginBottom: 8, whiteSpace: 'pre-wrap', color: '#16212c' } }, stripHtml(t.body) || 'No details'),
+              React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Created: ' + fmtDate(t.created_date))
             );
           })
         ),
@@ -666,7 +666,7 @@
 
     function MapStageSelector({ }) {
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Open Farm Map — which deals to show?"),
+        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Open Farm Map — which deals to show?"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           MAP_STAGE_BUTTONS.map(function(s, i) {
             var url = MAP_URL + (s.stage ? "?stage=" + s.stage : "");
@@ -690,7 +690,7 @@
 
     function ServiceStageSelector({ onAction }) {
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Filter services by:"),
+        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Filter services by:"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           SERVICE_STAGE_BUTTONS.map(function(s, i) {
             var payload = { stage: s.stage || "", status: s.status || "" };
@@ -835,20 +835,20 @@
 
       // Line items summary panel
       var lineItemSummary = lineItems.length > 0
-        ? React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
-            React.createElement("div", { style: { color: "#6b8fa8", marginBottom: 4, fontWeight: 600 } }, "📦 Fan Inventory (" + lineItems.length + " line items)"),
+        ? React.createElement("div", { style: { background: "#f4f6f9", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
+            React.createElement("div", { style: { color: "#64798c", marginBottom: 4, fontWeight: 600 } }, "📦 Fan Inventory (" + lineItems.length + " line items)"),
             lineItems.map(function(li, i) {
               var lp = li.properties || {};
               var qty  = lp.quantity || lp.number_of_fans || "?";
               var name = lp.name || ((lp.fan_brand || "") + " " + (lp.fan_size ? lp.fan_size + '"' : "")) || "Fan";
               var hp   = lp.motor_size ? " · " + lp.motor_size + " HP" : "";
-              return React.createElement("div", { key: li.id || i, style: { color: "#e8edf2", padding: "2px 0" } },
+              return React.createElement("div", { key: li.id || i, style: { color: "#16212c", padding: "2px 0" } },
                 "• " + qty + "x " + name.trim() + hp
               );
             })
           )
         : loadingItems
-          ? React.createElement("div", { style: { fontSize: 11, color: "#6b8fa8", marginBottom: 10, fontStyle: "italic" } }, "Loading fan inventory…")
+          ? React.createElement("div", { style: { fontSize: 11, color: "#64798c", marginBottom: 10, fontStyle: "italic" } }, "Loading fan inventory…")
           : null;
 
       return React.createElement("div", { className: "svc-form" },
@@ -959,9 +959,9 @@
     const WIZARD_STAGE_BUTTONS = [
       { icon: "📋", label: "All Open",      stage: "",                      color: "#6366f1" },
       { icon: "📅", label: "Scheduled",     stage: "appointmentscheduled",  color: "#a855f7" },
-      { icon: "🎯", label: "Qualified",     stage: "qualifiedtobuy",        color: "#f59e0b" },
+      { icon: "🎯", label: "Qualified",     stage: "qualifiedtobuy",        color: "#c77700" },
       { icon: "📊", label: "Presentation",  stage: "presentationscheduled", color: "#3b82f6" },
-      { icon: "🤝", label: "Decision",      stage: "decisionmakerboughtin", color: "#ef4444" },
+      { icon: "🤝", label: "Decision",      stage: "decisionmakerboughtin", color: "#dc2626" },
       { icon: "📄", label: "Contract",      stage: "contractsent",          color: "#06b6d4" },
     ];
 
@@ -1066,8 +1066,8 @@
       // ── Step 1: Stage picker ──────────────────────────────────
       if (step === 1) {
         return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 10, fontWeight: 600 } }, "🔧 New Service — Step 1 of 3"),
-          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 10 } }, "Which deals do you want to see?"),
+          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 10, fontWeight: 600 } }, "🔧 New Service — Step 1 of 3"),
+          React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 10 } }, "Which deals do you want to see?"),
           React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
             WIZARD_STAGE_BUTTONS.map(function(s, i) {
               return React.createElement("button", {
@@ -1088,22 +1088,22 @@
       if (step === 2) {
         var allChecked = filteredDeals.length > 0 && filteredDeals.every(function(d) { return selectedIds[d.id]; });
         return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 6, fontWeight: 600 } }, "🔧 New Service — Step 2 of 3"),
-          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 10 } },
+          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 6, fontWeight: 600 } }, "🔧 New Service — Step 2 of 3"),
+          React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 10 } },
             filteredDeals.length + " deal" + (filteredDeals.length !== 1 ? "s" : "") + " — " + selectedStageLabel + ". Select one or more:"
           ),
           filteredDeals.length === 0
-            ? React.createElement("div", { style: { color: "#6b8fa8", fontSize: 12, fontStyle: "italic", marginBottom: 10 } }, "No deals found for this stage.")
+            ? React.createElement("div", { style: { color: "#64798c", fontSize: 12, fontStyle: "italic", marginBottom: 10 } }, "No deals found for this stage.")
             : React.createElement("div", null,
                 // Select all row
                 React.createElement("div", {
-                  style: { display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", marginBottom: 4, cursor: "pointer", borderRadius: 8, background: "#1a2535" },
+                  style: { display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", marginBottom: 4, cursor: "pointer", borderRadius: 8, background: "#f4f6f9" },
                   onClick: toggleAll
                 },
                   React.createElement("div", {
-                    style: { width: 16, height: 16, borderRadius: 4, border: "2px solid " + (allChecked ? "#25a35a" : "#3a5a70"), background: allChecked ? "#25a35a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }
+                    style: { width: 16, height: 16, borderRadius: 4, border: "2px solid " + (allChecked ? "#25a35a" : "#a9b8c7"), background: allChecked ? "#25a35a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }
                   }, allChecked && React.createElement("span", { style: { color: "#fff", fontSize: 10, fontWeight: 700, lineHeight: 1 } }, "✓")),
-                  React.createElement("div", { style: { fontSize: 12, color: "#8ab4cc", fontWeight: 600 } }, "Select all " + filteredDeals.length + " deals")
+                  React.createElement("div", { style: { fontSize: 12, color: "#3d6076", fontWeight: 600 } }, "Select all " + filteredDeals.length + " deals")
                 ),
                 // Deal rows
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 240, overflowY: "auto" } },
@@ -1113,15 +1113,15 @@
                     var stageLabel = STAGE_LABELS[dp.dealstage] || dp.dealstage || '';
                     return React.createElement("div", {
                       key: d.id,
-                      style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: checked ? "#0d2218" : "#162130", border: "1px solid " + (checked ? "#25a35a" : "#1e2d3d"), transition: "all 0.12s" },
+                      style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: checked ? "#e9f7ef" : "#ffffff", border: "1px solid " + (checked ? "#25a35a" : "#dce3ea"), transition: "all 0.12s" },
                       onClick: function() { toggleDeal(d.id); }
                     },
                       React.createElement("div", {
-                        style: { width: 16, height: 16, borderRadius: 4, border: "2px solid " + (checked ? "#25a35a" : "#3a5a70"), background: checked ? "#25a35a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }
+                        style: { width: 16, height: 16, borderRadius: 4, border: "2px solid " + (checked ? "#25a35a" : "#a9b8c7"), background: checked ? "#25a35a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }
                       }, checked && React.createElement("span", { style: { color: "#fff", fontSize: 10, fontWeight: 700, lineHeight: 1 } }, "✓")),
                       React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#e8edf2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, dp.dealname || d.id),
-                        React.createElement("div", { style: { fontSize: 11, color: "#6b8fa8", marginTop: 1 } }, (dp.total_fans || "?") + " fans · " + (dp.total_barns || "?") + " barns" + (stageLabel ? " · " + stageLabel : ""))
+                        React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#16212c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, dp.dealname || d.id),
+                        React.createElement("div", { style: { fontSize: 11, color: "#64798c", marginTop: 1 } }, (dp.total_fans || "?") + " fans · " + (dp.total_barns || "?") + " barns" + (stageLabel ? " · " + stageLabel : ""))
                       )
                     );
                   })
@@ -1143,23 +1143,23 @@
       if (step === 3) {
         // Build fan inventory display across all selected deals
         var inventoryPanel = loadingLineItems
-          ? React.createElement("div", { style: { fontSize: 11, color: "#6b8fa8", fontStyle: "italic", marginBottom: 10 } }, "Loading fan inventory…")
+          ? React.createElement("div", { style: { fontSize: 11, color: "#64798c", fontStyle: "italic", marginBottom: 10 } }, "Loading fan inventory…")
           : Object.keys(lineItemsByDeal).length > 0
-            ? React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
-                React.createElement("div", { style: { color: "#6b8fa8", marginBottom: 6, fontWeight: 600 } }, "📦 Fan Inventory"),
+            ? React.createElement("div", { style: { background: "#f4f6f9", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
+                React.createElement("div", { style: { color: "#64798c", marginBottom: 6, fontWeight: 600 } }, "📦 Fan Inventory"),
                 selectedDeals.map(function(d) {
                   var dp    = d.properties || {};
                   var items = lineItemsByDeal[d.id] || [];
                   return React.createElement("div", { key: d.id, style: { marginBottom: 6 } },
-                    React.createElement("div", { style: { color: "#8ab4cc", fontWeight: 600, marginBottom: 2 } }, dp.dealname || d.id),
+                    React.createElement("div", { style: { color: "#3d6076", fontWeight: 600, marginBottom: 2 } }, dp.dealname || d.id),
                     items.length === 0
-                      ? React.createElement("div", { style: { color: "#3a5a70", fontStyle: "italic" } }, "No line items")
+                      ? React.createElement("div", { style: { color: "#a9b8c7", fontStyle: "italic" } }, "No line items")
                       : items.map(function(li, j) {
                           var lp = li.properties || {};
                           var qty  = lp.quantity || lp.number_of_fans || "?";
                           var name = lp.name || ((lp.fan_brand || "") + (lp.fan_size ? " " + lp.fan_size + '"' : "")).trim() || "Fan";
                           var hp   = lp.motor_size ? " · " + lp.motor_size + " HP" : "";
-                          return React.createElement("div", { key: j, style: { color: "#e8edf2", paddingLeft: 8 } }, "• " + qty + "x " + name + hp);
+                          return React.createElement("div", { key: j, style: { color: "#16212c", paddingLeft: 8 } }, "• " + qty + "x " + name + hp);
                         })
                   );
                 })
@@ -1167,12 +1167,12 @@
             : null;
 
         return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 4, fontWeight: 600 } }, "🔧 New Service — Step 3 of 3"),
-          React.createElement("div", { style: { fontSize: 12, color: "#6b8fa8", marginBottom: 10 } },
+          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 4, fontWeight: 600 } }, "🔧 New Service — Step 3 of 3"),
+          React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 10 } },
             "Set service details for " + selectedCount + " deal" + (selectedCount !== 1 ? "s" : "") + ":"
           ),
           // Selected deals summary
-          React.createElement("div", { style: { background: "#1a2535", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#8ab4cc" } },
+          React.createElement("div", { style: { background: "#f4f6f9", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#3d6076" } },
             selectedDeals.map(function(d) { return (d.properties || {}).dealname || d.id; }).join(", ")
           ),
           // Fan inventory
@@ -1252,17 +1252,17 @@
         var done   = progress.filter(function(p) { return p.status !== 'pending'; }).length;
         var errors = progress.filter(function(p) { return p.status === 'error'; }).length;
         return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 10, fontWeight: 600 } },
+          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 10, fontWeight: 600 } },
             done < progress.length ? "🔧 Creating services…" : (errors === 0 ? "✅ All services created!" : "⚠️ " + (progress.length - errors) + " created, " + errors + " failed")
           ),
           React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } },
             progress.map(function(p, i) {
               var icon = p.status === 'pending' ? "⏳" : p.status === 'ok' ? "✅" : "❌";
-              var color = p.status === 'ok' ? "#25a35a" : p.status === 'error' ? "#e05252" : "#6b8fa8";
+              var color = p.status === 'ok' ? "#25a35a" : p.status === 'error' ? "#c62828" : "#64798c";
               return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: color } },
                 React.createElement("span", null, icon),
                 React.createElement("span", null, (p.deal.properties || {}).dealname || p.deal.id),
-                p.status === 'error' && React.createElement("span", { style: { fontSize: 11, color: "#e05252" } }, "— " + p.error)
+                p.status === 'error' && React.createElement("span", { style: { fontSize: 11, color: "#c62828" } }, "— " + p.error)
               );
             })
           ),
@@ -1345,9 +1345,9 @@
       }, []);
 
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which team should I display services for?"),
-        loading && React.createElement("div", { style: { color: "#8ab4cc", fontSize: 12 } }, "Loading teams..."),
-        error && React.createElement("div", { style: { color: "#e05252", fontSize: 12 } }, error),
+        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Which team should I display services for?"),
+        loading && React.createElement("div", { style: { color: "#3d6076", fontSize: 12 } }, "Loading teams..."),
+        error && React.createElement("div", { style: { color: "#c62828", fontSize: 12 } }, error),
         !loading && !error && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           teams.map(function(t, i) {
             return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('SHOW_TEAM_SERVICES:' + JSON.stringify({ team_id: t.id, team_name: t.name })); } },
@@ -1364,9 +1364,9 @@
 
     function TeamServicesSelector({ team, services, onAction }) {
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Select a service for " + (team.name || 'this team') + ":"),
+        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Select a service for " + (team.name || 'this team') + ":"),
         services.length === 0
-          ? React.createElement("div", { style: { color: "#8ab4cc", fontSize: 12 } }, "No services found for this team.")
+          ? React.createElement("div", { style: { color: "#3d6076", fontSize: 12 } }, "No services found for this team.")
           : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
               services.map(function(s, i) {
                 return React.createElement("button", { key: s.id || i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('DISPLAY_SERVICE_BY_ID:' + JSON.stringify({ service_id: s.id, service_name: s.name })); } },
@@ -1383,7 +1383,7 @@
 
     function StageSelector({ onAction }) {
       return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#8ab4cc", marginBottom: 8 } }, "Which deals do you want to see?"),
+        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Which deals do you want to see?"),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
           STAGE_BUTTONS.map(function(s, i) {
             return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('GET_DEALS:' + (s.stage || '')); } },
@@ -1395,14 +1395,22 @@
       );
     }
 
+    // State is derived from the power company and is not typed by hand.
+    // Mirrors POWER_COMPANY_STATE_MAP in app.py.
+    var POWER_COMPANIES = [['Georgia Power', 'GA'], ['Entergy Louisiana', 'LA'], ['Entergy Arkansas', 'A']];
+    var POWER_COMPANY_STATE = Object.fromEntries(POWER_COMPANIES);
+
     function NewContactForm({ onSubmit, onCancel }) {
-      const [form, setForm] = React.useState({ email: '', first_name: '', last_name: '', state: '', invitation: '' });
+      const [form, setForm] = React.useState({ email: '', first_name: '', last_name: '', power_company: '', state: '', invitation: '' });
       const [saving, setSaving] = React.useState(false);
       const [error, setError] = React.useState('');
       const [submitted, setSubmitted] = React.useState(false);
       function update(field, value) { setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); }); }
+      function updatePowerCompany(value) {
+        setForm(function(prev) { return Object.assign({}, prev, { power_company: value, state: POWER_COMPANY_STATE[value] || '' }); });
+      }
       async function submit() {
-        if (!form.email || !form.first_name || !form.last_name || !form.state || !form.invitation) { setError('Please complete all fields.'); return; }
+        if (!form.email || !form.first_name || !form.last_name || !form.power_company || !form.invitation) { setError('Please complete all fields.'); return; }
         setSaving(true); setError('');
         try {
           var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, form, { invitation: form.invitation === 'yes' ? 'true' : 'false' })) });
@@ -1419,13 +1427,34 @@
 
       return React.createElement('div', { className: 'svc-form' },
         React.createElement('div', { className: 'svc-form-title' }, 'New Contact'),
-        ['email', 'first_name', 'last_name', 'state'].map(function(field) {
-          var labels = { email: 'Email', first_name: 'First Name', last_name: 'Last Name', state: 'State' };
+        ['email', 'first_name', 'last_name'].map(function(field) {
+          var labels = { email: 'Email', first_name: 'First Name', last_name: 'Last Name' };
           return React.createElement('div', { className: 'svc-form-row', key: field },
             React.createElement('div', { className: 'svc-form-label' }, labels[field]),
             React.createElement('input', { className: 'svc-form-input', type: field === 'email' ? 'email' : 'text', value: form[field], onChange: function(e) { update(field, e.target.value); } })
           );
         }),
+        React.createElement('div', { className: 'svc-form-row', key: 'power_company' },
+          React.createElement('div', { className: 'svc-form-label' }, 'Power Company'),
+          React.createElement('select', {
+            className: 'svc-form-input',
+            value: form.power_company,
+            onChange: function(e) { updatePowerCompany(e.target.value); }
+          },
+            React.createElement('option', { value: '' }, 'Select power company…'),
+            POWER_COMPANIES.map(function(pc) {
+              return React.createElement('option', { key: pc[0], value: pc[0] }, pc[0]);
+            })
+          )
+        ),
+        React.createElement('div', { className: 'svc-form-row', key: 'state' },
+          React.createElement('div', { className: 'svc-form-label' }, 'State'),
+          React.createElement('input', {
+            className: 'svc-form-input', type: 'text', value: form.state, readOnly: true, tabIndex: -1,
+            placeholder: '—', title: 'Set automatically from the power company',
+            style: { background: '#eef2f6', color: '#3d6076', cursor: 'not-allowed', borderStyle: 'dashed' }
+          })
+        ),
         React.createElement('div', { className: 'contact-confirm-note' }, 'By initialing below, this will send an invitation email to the customer.'),
         React.createElement('div', { className: 'contact-yn' },
           React.createElement('div', { className: 'contact-yn-title' }, 'Send invitation email?'),
@@ -1492,11 +1521,11 @@
 
       return React.createElement("div", null,
         showSales && React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 4 } }, "Sales"),
+          React.createElement("div", { style: { fontSize: 10, color: "#a9b8c7", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 4 } }, "Sales"),
           React.createElement("div", { className: "quick-actions" }, salesActions.map(renderBtn))
         ),
         showOps && React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 10, color: "#3a5a70", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: showSales ? 12 : 4 } }, "Operations"),
+          React.createElement("div", { style: { fontSize: 10, color: "#a9b8c7", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: showSales ? 12 : 4 } }, "Operations"),
           React.createElement("div", { className: "quick-actions" }, opsActions.map(renderBtn))
         )
       );
@@ -1637,7 +1666,7 @@
               React.createElement("div", { dangerouslySetInnerHTML: { __html: renderMarkdown(content) } }),
               React.createElement("div", { style: { marginTop: 8 } },
                 React.createElement("button", { className: "qa-btn", onClick: function() { onAction("Show me the deals as a table"); } }, "Show as table"),
-                React.createElement("span", { style: { marginLeft: 10, color: '#6b8fa8', fontSize: 12 } }, "or ask: 'Show as table'")
+                React.createElement("span", { style: { marginLeft: 10, color: '#64798c', fontSize: 12 } }, "or ask: 'Show as table'")
               )
             );
           }
@@ -1698,7 +1727,7 @@
           flushList();
           flushTable();
           var level = headingMatch[1].length;
-          html.push('<h' + level + ' style="margin:8px 0 6px;font-size:' + (18 - level * 1) + 'px;color:#e8edf2;">' + parseInline(headingMatch[2]) + '</h' + level + '>');
+          html.push('<h' + level + ' style="margin:8px 0 6px;font-size:' + (18 - level * 1) + 'px;color:#16212c;">' + parseInline(headingMatch[2]) + '</h' + level + '>');
           return;
         }
 
@@ -1726,11 +1755,11 @@
         flushTable();
         if (inList) { html.push('</ul>'); inList = false; }
         if (/^---+$/.test(line)) {
-          html.push('<hr style="border-color:#1a2535;margin:12px 0;">');
+          html.push('<hr style="border-color:#f4f6f9;margin:12px 0;">');
           return;
         }
 
-        html.push('<p style="margin:8px 0;line-height:1.6;color:#e8edf2;">' + parseInline(rawLine) + '</p>');
+        html.push('<p style="margin:8px 0;line-height:1.6;color:#16212c;">' + parseInline(rawLine) + '</p>');
       });
 
       flushList();
@@ -1742,7 +1771,7 @@
     const PORTAL_CONFIG = {
       '/sales':      { title: 'PSD Sales Portal',      subtitle: 'Sales team access', allowedRoles: ['sales','admin'],               accentColor: '#25a35a' },
       '/operations': { title: 'PSD Operations Portal', subtitle: 'Operations team access', allowedRoles: ['operations','admin'],      accentColor: '#3b82f6' },
-      '/service':    { title: 'PSD Service Portal',    subtitle: 'Field installer access', allowedRoles: ['installer','admin'],       accentColor: '#f59e0b' },
+      '/service':    { title: 'PSD Service Portal',    subtitle: 'Field installer access', allowedRoles: ['installer','admin'],       accentColor: '#c77700' },
       '/':           { title: 'PSD Admin Portal',      subtitle: 'Full access', allowedRoles: ['admin','sales','operations','installer','analyst'], accentColor: '#25a35a' },
     };
 
@@ -1782,13 +1811,13 @@
       const STATUS_FILTERS = [
         { key: 'all',      label: 'All Services', color: '#6366f1' },
         { key: 'ON_TRACK', label: 'On Track',      color: '#25a35a' },
-        { key: 'AT_RISK',  label: 'At Risk',        color: '#f59e0b' },
-        { key: 'BEHIND',   label: 'Behind',          color: '#ef4444' },
-        { key: 'COMPLETE', label: 'Completed',       color: '#5ab4f0' },
+        { key: 'AT_RISK',  label: 'At Risk',        color: '#c77700' },
+        { key: 'BEHIND',   label: 'Behind',          color: '#dc2626' },
+        { key: 'COMPLETE', label: 'Completed',       color: '#1d7fc4' },
       ];
 
       const STATUS_LABELS = { ON_TRACK: 'On Track', AT_RISK: 'At Risk', BEHIND: 'Behind', COMPLETE: 'Completed' };
-      const STATUS_COLORS = { ON_TRACK: '#25a35a', AT_RISK: '#f59e0b', BEHIND: '#ef4444', COMPLETE: '#5ab4f0' };
+      const STATUS_COLORS = { ON_TRACK: '#25a35a', AT_RISK: '#c77700', BEHIND: '#dc2626', COMPLETE: '#1d7fc4' };
 
       function showToast(msg) {
         setToast(msg);
@@ -1869,27 +1898,27 @@
         setSaving(false);
       }
 
-      return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f1923' } },
+      return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#f4f6f9' } },
 
         // Header
-        React.createElement("div", { style: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px', borderBottom: '1px solid #1e2d3d', background: '#0d1520', flexShrink: 0 } },
+        React.createElement("div", { style: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px', borderBottom: '1px solid #dce3ea', background: '#ffffff', flexShrink: 0 } },
           React.createElement("div", { style: { position: 'absolute', left: 12 } },
-            React.createElement("button", { onClick: onLock, style: { padding: '6px 12px', background: '#162130', border: '1px solid #1e2d3d', borderRadius: 8, color: '#6b8fa8', fontSize: 11, cursor: 'pointer' } }, "🔒")
+            React.createElement("button", { onClick: onLock, style: { padding: '6px 12px', background: '#ffffff', border: '1px solid #dce3ea', borderRadius: 8, color: '#64798c', fontSize: 11, cursor: 'pointer' } }, "🔒")
           ),
           React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-            React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #1a3a6b, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#fff' } }, "P"),
+            React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #1e40af, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#fff' } }, "P"),
             React.createElement("div", { style: { textAlign: 'center' } },
               React.createElement("div", { style: { fontWeight: 700, fontSize: 14 } }, "PSD Service Portal"),
-              React.createElement("div", { style: { fontSize: 10, color: '#4a7acc', marginTop: 2 } }, "● " + auth.name + " — Field Installer")
+              React.createElement("div", { style: { fontSize: 10, color: '#3b82f6', marginTop: 2 } }, "● " + auth.name + " — Field Installer")
             )
           ),
           React.createElement("div", { style: { position: 'absolute', right: 12 } },
-            React.createElement("button", { onClick: loadServices, style: { padding: '6px 12px', background: '#162130', border: '1px solid #1e2d3d', borderRadius: 8, color: '#8ab4cc', fontSize: 11, cursor: 'pointer' } }, "↻ Refresh")
+            React.createElement("button", { onClick: loadServices, style: { padding: '6px 12px', background: '#ffffff', border: '1px solid #dce3ea', borderRadius: 8, color: '#3d6076', fontSize: 11, cursor: 'pointer' } }, "↻ Refresh")
           )
         ),
 
         // Filter bar
-        React.createElement("div", { style: { padding: '12px 16px 0', background: '#0d1520', borderBottom: '1px solid #1e2d3d', flexShrink: 0 } },
+        React.createElement("div", { style: { padding: '12px 16px 0', background: '#ffffff', borderBottom: '1px solid #dce3ea', flexShrink: 0 } },
           React.createElement("div", { className: 'svcd-filter-bar' },
             STATUS_FILTERS.map(function(f) {
               return React.createElement("button", {
@@ -1918,7 +1947,7 @@
                 )
               : filtered.map(function(svc) {
                   var isSelected = selected && selected.id === svc.id;
-                  var statusColor = STATUS_COLORS[svc.status] || '#6b8fa8';
+                  var statusColor = STATUS_COLORS[svc.status] || '#64798c';
                   var statusLabel = STATUS_LABELS[svc.status] || svc.status || '—';
 
                   return React.createElement("div", { key: svc.id },
@@ -1930,15 +1959,15 @@
                         React.createElement("div", { className: 'svcd-card-name' }, svc.name || '(Unnamed Service)'),
                         React.createElement("span", { style: { background: statusColor + '22', color: statusColor, border: '1px solid ' + statusColor + '55', padding: '2px 9px', borderRadius: 8, fontSize: 11, fontWeight: 600, flexShrink: 0 } }, statusLabel)
                       ),
-                      React.createElement("div", { style: { fontSize: 12, color: '#8ab4cc', marginBottom: 6 } }, svc.deal_name || '—'),
+                      React.createElement("div", { style: { fontSize: 12, color: '#3d6076', marginBottom: 6 } }, svc.deal_name || '—'),
                       React.createElement("div", { className: 'svcd-card-meta' },
                         React.createElement("span", null, "Stage: " + (svc.stage || '—')),
                         svc.start_date && React.createElement("span", null, "Start: " + fmtDate(svc.start_date)),
-                        React.createElement("span", { style: { color: svc.due_date ? '#f59e0b' : '#6b8fa8' } }, "Due: " + fmtDate(svc.due_date)),
+                        React.createElement("span", { style: { color: svc.due_date ? '#c77700' : '#64798c' } }, "Due: " + fmtDate(svc.due_date)),
                         svc.total_cost && React.createElement("span", null, "$" + Number(svc.total_cost).toLocaleString())
                       ),
-                      svc.description && React.createElement("div", { style: { fontSize: 11, color: '#6b8fa8', marginTop: 8, lineHeight: 1.5, borderTop: '1px solid #1e2d3d', paddingTop: 8 } }, svc.description),
-                      React.createElement("div", { style: { marginTop: 8, fontSize: 11, color: isSelected ? '#25a35a' : '#3a5a70' } }, isSelected ? "▲ Close" : "▼ Update status or due date")
+                      svc.description && React.createElement("div", { style: { fontSize: 11, color: '#64798c', marginTop: 8, lineHeight: 1.5, borderTop: '1px solid #dce3ea', paddingTop: 8 } }, svc.description),
+                      React.createElement("div", { style: { marginTop: 8, fontSize: 11, color: isSelected ? '#25a35a' : '#a9b8c7' } }, isSelected ? "▲ Close" : "▼ Update status or due date")
                     ),
 
                     // Inline edit panel
@@ -1957,9 +1986,9 @@
                               onClick: function() { setEditForm(function(prev) { return Object.assign({}, prev, { status: st }); }); },
                               style: {
                                 padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                                border: '1px solid ' + (active ? col : '#1e2d3d'),
-                                background: active ? col + '33' : '#162130',
-                                color: active ? col : '#6b8fa8',
+                                border: '1px solid ' + (active ? col : '#dce3ea'),
+                                background: active ? col + '33' : '#ffffff',
+                                color: active ? col : '#64798c',
                                 transition: 'all 0.15s'
                               }
                             }, STATUS_LABELS[st]);
@@ -1998,7 +2027,7 @@
 
         // Toast
         toast && React.createElement("div", {
-          style: { position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#162130', border: '1px solid #1e2d3d', color: '#e8edf2', padding: '9px 18px', borderRadius: 8, fontSize: 13, zIndex: 100, whiteSpace: 'nowrap' }
+          style: { position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#ffffff', border: '1px solid #dce3ea', color: '#16212c', padding: '9px 18px', borderRadius: 8, fontSize: 13, zIndex: 100, whiteSpace: 'nowrap' }
         }, toast)
       );
     }
@@ -2049,21 +2078,21 @@
 
       var keys = [["1","2","3"],["4","5","6"],["7","8","9"],["del","0","✓"]];
 
-      return React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0f1923", gap: 32 } },
+      return React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#f4f6f9", gap: 32 } },
         React.createElement("div", { style: { textAlign: "center" } },
-          React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, background: "linear-gradient(135deg, #1a4a2a, " + portal.accentColor + ")", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 auto 16px" } }, "P"),
+          React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, background: "linear-gradient(135deg, #1a6b3c, " + portal.accentColor + ")", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 auto 16px" } }, "P"),
           React.createElement("div", { style: { fontSize: 20, fontWeight: 700, marginBottom: 4 } }, portal.title),
-          React.createElement("div", { style: { fontSize: 13, color: "#6b8fa8" } }, portal.subtitle),
-          React.createElement("div", { style: { fontSize: 11, color: "#3a5a70", marginTop: 6 } }, "Enter your PIN to continue")
+          React.createElement("div", { style: { fontSize: 13, color: "#64798c" } }, portal.subtitle),
+          React.createElement("div", { style: { fontSize: 11, color: "#a9b8c7", marginTop: 6 } }, "Enter your PIN to continue")
         ),
         React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center" } }, dots),
-        error && React.createElement("div", { style: { fontSize: 12, color: "#e05252" } }, "Invalid PIN for this portal"),
+        error && React.createElement("div", { style: { fontSize: 12, color: "#c62828" } }, "Invalid PIN for this portal"),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 72px)", gap: 10 } },
           keys.map(function(row, ri) {
             return row.map(function(k, ki) {
               return React.createElement("button", { key: ri + "-" + ki, className: "pin-key",
                 onClick: function() { pressKey(k); },
-                style: k === "✓" ? { background: "linear-gradient(135deg, #1a4a2a, " + portal.accentColor + ")", color: "#fff", border: "none" } : k === "del" ? { fontSize: 16 } : {}
+                style: k === "✓" ? { background: "linear-gradient(135deg, #1a6b3c, " + portal.accentColor + ")", color: "#fff", border: "none" } : k === "del" ? { fontSize: 16 } : {}
               }, k === "del" ? "⌫" : k);
             });
           })
@@ -2395,15 +2424,15 @@
 
       var displayMessages = messages.filter(function(m) { return m.display; });
 
-      return React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#0f1923" } },
+      return React.createElement("div", { style: { display: "flex", flexDirection: "column", height: "100vh", background: "#f4f6f9" } },
 
         // Header
-        React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 16px", borderBottom: "1px solid #1e2d3d", background: "#0d1520", flexShrink: 0 } },
+        React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 16px", borderBottom: "1px solid #dce3ea", background: "#ffffff", flexShrink: 0 } },
           // Left — Lock button
           React.createElement("div", { style: { position: "absolute", left: 12, display: "flex", gap: 6 } },
             React.createElement("button", {
               onClick: function() { setAuth(null); setMessages([]); },
-              style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#6b8fa8", fontSize: 11, cursor: "pointer" }
+              style: { padding: "6px 12px", background: "#ffffff", border: "1px solid #dce3ea", borderRadius: 8, color: "#64798c", fontSize: 11, cursor: "pointer" }
             }, "🔒")
           ),
           // Center — Logo + Title
@@ -2411,7 +2440,7 @@
             React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, color: "#fff", flexShrink: 0 } }, "P"),
             React.createElement("div", { style: { textAlign: "center" } },
               React.createElement("div", { style: { fontWeight: 700, fontSize: 14, lineHeight: 1.2 } }, getPortalConfig().title),
-              React.createElement("div", { style: { fontSize: 10, color: "#4a9a6b", marginTop: 2 } }, "● " + auth.name + " — " + (auth.role.charAt(0).toUpperCase() + auth.role.slice(1)))
+              React.createElement("div", { style: { fontSize: 10, color: "#25a35a", marginTop: 2 } }, "● " + auth.name + " — " + (auth.role.charAt(0).toUpperCase() + auth.role.slice(1)))
             )
           ),
           // Right — Options button
@@ -2421,7 +2450,7 @@
                 setShowActions(true);
                 setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
               },
-              style: { padding: "6px 12px", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 8, color: "#8ab4cc", fontSize: 11, cursor: "pointer" }
+              style: { padding: "6px 12px", background: "#ffffff", border: "1px solid #dce3ea", borderRadius: 8, color: "#3d6076", fontSize: 11, cursor: "pointer" }
             }, "⚡ Options")
           )
         ),
@@ -2435,8 +2464,8 @@
               || (lastContent && lastContent.startsWith("SERVICE_FORM:"));
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
-                msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1a4a6b, #256a9a)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
-                React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#0d1f2d" : "#162130", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#6b8fa8" : "#e8edf2", border: msg.role === "user" ? "none" : "1px solid #1e2d3d", fontStyle: msg.isThinking ? "italic" : "normal" } },
+                msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1d5f8a, #1d7fc4)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
+                React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#eef2f6" : "#ffffff", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#64798c" : "#16212c", border: msg.role === "user" ? "none" : "1px solid #dce3ea", fontStyle: msg.isThinking ? "italic" : "normal" } },
                   msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, onAddLineItem: triggerAddLineItem, role: auth.role })
                 )
               ),
@@ -2449,7 +2478,7 @@
           loading && !messages.some(function(m) { return m.isThinking; }) &&
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } },
               React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" } }, "P"),
-              React.createElement("div", { style: { display: "flex", gap: 5, padding: "9px 13px", background: "#162130", borderRadius: "15px 15px 15px 4px", border: "1px solid #1e2d3d" } },
+              React.createElement("div", { style: { display: "flex", gap: 5, padding: "9px 13px", background: "#ffffff", borderRadius: "15px 15px 15px 4px", border: "1px solid #dce3ea" } },
                 [0,1,2].map(function(j) { return React.createElement("div", { key: j, style: { width: 7, height: 7, borderRadius: "50%", background: "#25a35a", animation: "bounce 1.2s infinite", animationDelay: (j * 0.2) + "s" } }); })
               )
             ),
@@ -2457,19 +2486,19 @@
         ),
 
         // Input
-        React.createElement("div", { style: { padding: "10px 16px 18px", borderTop: "1px solid #1e2d3d", background: "#0d1520", display: "flex", gap: 9, alignItems: "flex-end" } },
+        React.createElement("div", { style: { padding: "10px 16px 18px", borderTop: "1px solid #dce3ea", background: "#ffffff", display: "flex", gap: 9, alignItems: "flex-end" } },
           React.createElement("textarea", {
             value: input,
             onChange: function(e) { setInput(e.target.value); },
             onKeyDown: handleKey,
             placeholder: "Ask me anything...",
             rows: 1,
-            style: { flex: 1, resize: "none", background: "#162130", border: "1px solid #1e2d3d", borderRadius: 11, padding: "9px 13px", color: "#e8edf2", fontSize: 13, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
+            style: { flex: 1, resize: "none", background: "#ffffff", border: "1px solid #dce3ea", borderRadius: 11, padding: "9px 13px", color: "#16212c", fontSize: 13, lineHeight: 1.5, outline: "none", fontFamily: "inherit", maxHeight: 120, overflowY: "auto" }
           }),
           React.createElement("button", {
             onClick: function() { sendMessage(); },
             disabled: loading || !input.trim(),
-            style: { width: 38, height: 38, borderRadius: 9, border: "none", background: loading || !input.trim() ? "#162130" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || !input.trim() ? "#3a5a70" : "#fff", cursor: loading || !input.trim() ? "not-allowed" : "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+            style: { width: 38, height: 38, borderRadius: 9, border: "none", background: loading || !input.trim() ? "#ffffff" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || !input.trim() ? "#a9b8c7" : "#fff", cursor: loading || !input.trim() ? "not-allowed" : "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
           }, "➤")
         )
       );

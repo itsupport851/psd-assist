@@ -28,14 +28,15 @@ CUSTOMER_INTAKE_PIPELINE = 'default'
 POWER_COMPANY_STATE_MAP = {
     'Georgia Power': 'GA',
     'Entergy Louisiana': 'LA',
-    'Entergy Arkansas': 'AR',
+    'Entergy Arkansas': 'A',
 }
 CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
 UNIT_PRICE = os.environ.get('UNIT_PRICE', '0')
 OWNER_ID = os.environ.get('OWNER_ID', '167151077')
 CUSTOMER_INTAKE_INVITATION = 'false'
-# Customer-uploaded intake documents
-HUBSPOT_FILES_URL = os.environ.get('HUBSPOT_FILES_URL', 'https://api.hubapi.com/files/2026-03/files')
+# Customer-uploaded intake documents. The Files API is versioned v3; a dated
+# segment such as /files/2026-03/files is a docs placeholder and 404s.
+HUBSPOT_FILES_URL = os.environ.get('HUBSPOT_FILES_URL', 'https://api.hubapi.com/files/v3/files')
 INTAKE_FILES_FOLDER = os.environ.get('INTAKE_FILES_FOLDER', '/customer-intake')
 # HUBSPOT_DEFINED association: note -> deal. (202 is note -> contact.)
 NOTE_TO_DEAL_ASSOCIATION_TYPE_ID = 214
@@ -1377,6 +1378,16 @@ def _safe_folder_segment(value):
     return cleaned[:60]
 
 
+def _hubspot_error(res):
+    """Best-effort human-readable reason from a failed HubSpot response."""
+    try:
+        body = res.json()
+        detail = body.get('message') or body.get('error') or res.text
+    except ValueError:
+        detail = res.text
+    return f'HubSpot returned {res.status_code}: {str(detail)[:300]}'
+
+
 @app.errorhandler(413)
 def payload_too_large(_e):
     return jsonify({'error': 'Upload is too large.'}), 413
@@ -1411,11 +1422,19 @@ def customer_intake_upload():
 
         uploaded = []
         failed = []
+
+        def fail(name, reason):
+            app.logger.warning('Intake upload failed for %s (deal %s): %s', name, deal_id, reason)
+            failed.append({'name': name, 'reason': reason})
+
         for upload in uploads:
             filename = os.path.basename(upload.filename)
             blob = upload.read()
-            if not blob or len(blob) > MAX_UPLOAD_BYTES:
-                failed.append(filename)
+            if not blob:
+                fail(filename, 'File is empty')
+                continue
+            if len(blob) > MAX_UPLOAD_BYTES:
+                fail(filename, 'File exceeds the size limit')
                 continue
             try:
                 res = requests.post(
@@ -1428,13 +1447,23 @@ def customer_intake_upload():
                     },
                     timeout=120
                 )
-                file_id = str(res.json().get('id', '')) if res.status_code in (200, 201) else ''
-                if file_id:
-                    uploaded.append({'id': file_id, 'name': filename})
-                else:
-                    failed.append(filename)
-            except Exception:
-                failed.append(filename)
+            except Exception as e:
+                fail(filename, f'Could not reach HubSpot: {e}')
+                continue
+
+            if res.status_code not in (200, 201):
+                # Surface HubSpot's own message — a 404 means HUBSPOT_FILES_URL is
+                # wrong, a 403 means the private app token lacks the `files` scope.
+                fail(filename, _hubspot_error(res))
+                continue
+            try:
+                file_id = str(res.json().get('id', ''))
+            except ValueError:
+                file_id = ''
+            if file_id:
+                uploaded.append({'id': file_id, 'name': filename})
+            else:
+                fail(filename, 'HubSpot did not return a file id')
 
         note_id = None
         if uploaded:
@@ -1457,7 +1486,9 @@ def customer_intake_upload():
             }
             note_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/notes', json=note_payload, headers=HUBSPOT_HEADERS())
             if note_res.status_code != 201:
-                return jsonify({'error': f'Files uploaded but could not be attached to the deal: {note_res.text}'}), 502
+                reason = _hubspot_error(note_res)
+                app.logger.warning('Intake note failed for deal %s: %s', deal_id, reason)
+                return jsonify({'error': f'Files uploaded but could not be attached to the deal. {reason}'}), 502
             note_id = note_res.json().get('id')
 
         return jsonify({
