@@ -20,14 +20,28 @@ TEMPLATE_PATH = os.environ.get('TEMPLATE_PATH', '/PSD Customers/GPC_Commercial_W
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 HUBSPOT_API_KEY = os.environ.get('HUBSPOT_API_KEY', '')
 CUSTOMER_INTAKE_PIN = os.environ.get('CUSTOMER_INTAKE_PIN', '')
-POWER_COMPANY_PIPELINE_MAP = {
-    'Georgia Power': os.environ.get('PIPELINE_GEORGIA_POWER', 'default'),
-    'Entergy Louisiana': os.environ.get('PIPELINE_ENTERGY_LOUISIANA', 'default'),
+# Intake deals always land on the default pipeline, regardless of power company.
+CUSTOMER_INTAKE_PIPELINE = 'default'
+# The state on an intake submission is derived from the power company, never
+# taken from the client — the form renders it read-only, but the payload is not
+# trustworthy on its own.
+POWER_COMPANY_STATE_MAP = {
+    'Georgia Power': 'GA',
+    'Entergy Louisiana': 'LA',
+    'Entergy Arkansas': 'AR',
 }
 CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
 UNIT_PRICE = os.environ.get('UNIT_PRICE', '0')
 OWNER_ID = os.environ.get('OWNER_ID', '167151077')
 CUSTOMER_INTAKE_INVITATION = 'false'
+# Customer-uploaded intake documents
+HUBSPOT_FILES_URL = os.environ.get('HUBSPOT_FILES_URL', 'https://api.hubapi.com/files/2026-03/files')
+INTAKE_FILES_FOLDER = os.environ.get('INTAKE_FILES_FOLDER', '/customer-intake')
+# HUBSPOT_DEFINED association: note -> deal. (202 is note -> contact.)
+NOTE_TO_DEAL_ASSOCIATION_TYPE_ID = 214
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_UPLOAD_FILES = 10
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_BYTES * MAX_UPLOAD_FILES + 5 * 1024 * 1024
 HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
@@ -1145,7 +1159,7 @@ def _build_checklist_note(data):
         f"Motors mounted upright: {data.get('motors_upright', '')}",
         f"Motor hardware accessible: {data.get('motor_hardware_accessible', '')}",
         "",
-        f"Confirmed by initials: {data.get('confirmation_initials', '')}",
+        f"Overall readiness confirmed: {data.get('readiness_confirmed', '') or 'No'}",
         "",
         "<strong>Installation Scheduling:</strong>",
         f"Available Window: {data.get('install_window_from', '')} to {data.get('install_window_to', '')}",
@@ -1180,6 +1194,7 @@ def submit_customer_form():
 
         first_name = data.get('first_name', '').strip()
         last_name = data.get('last_name', '').strip()
+        farm_state = POWER_COMPANY_STATE_MAP.get(data.get('power_company', ''), data.get('state', ''))
         operation_type = data.get('operation_type', '')
         if operation_type == 'Other' and data.get('op_other_text'):
             operation_type = data['op_other_text']
@@ -1193,7 +1208,7 @@ def submit_customer_form():
                 'company': data.get('gp_account_name', ''),
                 'address': data.get('farm_address', ''),
                 'city': data.get('city', ''),
-                'state': data.get('state', ''),
+                'state': farm_state,
                 'zip': data.get('zip', ''),
                 'gp_account_number': str(data.get('gp_account_number', '')),
                 'farm_name': data.get('gp_account_name', ''),
@@ -1226,7 +1241,7 @@ def submit_customer_form():
             'properties': {
                 'dealname': f"{data.get('gp_account_name', '')} — {data.get('city', '')}",
                 'dealstage': CUSTOMER_FORM_SENT_STAGE,
-                'pipeline': POWER_COMPANY_PIPELINE_MAP.get(data.get('power_company', ''), 'default'),
+                'pipeline': CUSTOMER_INTAKE_PIPELINE,
                 'total_number_of_barns': str(data.get('total_barns', '')),
                 'total_number_of_fans': str(data.get('total_fans', '')),
                 'install_window_from': data.get('install_window_from', ''),
@@ -1236,7 +1251,7 @@ def submit_customer_form():
                 'farm_name': data.get('gp_account_name', ''),
                 'farm_county': data.get('county', ''),
                 'farm_address': data.get('farm_address', ''),
-                'state': data.get('state', ''),
+                'state': farm_state,
                 'farm_zip': data.get('zip', ''),
                 'first_name': first_name,
                 'last_name': last_name,
@@ -1353,6 +1368,105 @@ def submit_customer_form():
             pass
 
         return jsonify({'success': True, 'contact_id': contact_id, 'deal_id': deal_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _safe_folder_segment(value):
+    cleaned = re.sub(r'[^A-Za-z0-9 _-]', '', str(value or '')).strip().replace(' ', '_')
+    return cleaned[:60]
+
+
+@app.errorhandler(413)
+def payload_too_large(_e):
+    return jsonify({'error': 'Upload is too large.'}), 413
+
+
+@app.route('/customer-intake-upload', methods=['POST'])
+def customer_intake_upload():
+    """Upload optional intake documents to HubSpot Files and attach them to the deal.
+
+    Called after /submit-customer-form has created the deal. Files land in the
+    HubSpot file manager as PRIVATE, then a single note carrying every file id
+    in hs_attachment_ids is associated to the deal.
+    """
+    try:
+        if CUSTOMER_INTAKE_PIN and str(request.form.get('access_pin', '')) != CUSTOMER_INTAKE_PIN:
+            return jsonify({'error': 'Invalid or missing access PIN'}), 401
+
+        deal_id = str(request.form.get('deal_id', '')).strip()
+        if not deal_id.isdigit():
+            return jsonify({'error': 'A valid deal_id is required'}), 400
+
+        uploads = [f for f in request.files.getlist('files') if f and f.filename]
+        if not uploads:
+            return jsonify({'error': 'No files provided'}), 400
+        if len(uploads) > MAX_UPLOAD_FILES:
+            return jsonify({'error': f'At most {MAX_UPLOAD_FILES} files may be uploaded at once'}), 400
+
+        folder_name = _safe_folder_segment(request.form.get('account_name', '')) or deal_id
+        folder_path = f'{INTAKE_FILES_FOLDER}/{folder_name}'
+        # Content-Type is deliberately omitted so requests sets the multipart boundary.
+        auth_header = {'Authorization': f'Bearer {HUBSPOT_API_KEY}'}
+
+        uploaded = []
+        failed = []
+        for upload in uploads:
+            filename = os.path.basename(upload.filename)
+            blob = upload.read()
+            if not blob or len(blob) > MAX_UPLOAD_BYTES:
+                failed.append(filename)
+                continue
+            try:
+                res = requests.post(
+                    HUBSPOT_FILES_URL,
+                    headers=auth_header,
+                    files={'file': (filename, io.BytesIO(blob), upload.mimetype or 'application/octet-stream')},
+                    data={
+                        'options': json.dumps({'access': 'PRIVATE'}),
+                        'folderPath': folder_path,
+                    },
+                    timeout=120
+                )
+                file_id = str(res.json().get('id', '')) if res.status_code in (200, 201) else ''
+                if file_id:
+                    uploaded.append({'id': file_id, 'name': filename})
+                else:
+                    failed.append(filename)
+            except Exception:
+                failed.append(filename)
+
+        note_id = None
+        if uploaded:
+            note_body = '<br>'.join(
+                ['<strong>Customer-uploaded documents</strong>'] + [f"- {f['name']}" for f in uploaded]
+            )
+            note_payload = {
+                'associations': [{
+                    'to': {'id': deal_id},
+                    'types': [{
+                        'associationCategory': 'HUBSPOT_DEFINED',
+                        'associationTypeId': NOTE_TO_DEAL_ASSOCIATION_TYPE_ID
+                    }]
+                }],
+                'properties': {
+                    'hs_note_body': note_body,
+                    'hs_timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    'hs_attachment_ids': ';'.join(f['id'] for f in uploaded),
+                }
+            }
+            note_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/notes', json=note_payload, headers=HUBSPOT_HEADERS())
+            if note_res.status_code != 201:
+                return jsonify({'error': f'Files uploaded but could not be attached to the deal: {note_res.text}'}), 502
+            note_id = note_res.json().get('id')
+
+        return jsonify({
+            'success': True,
+            'deal_id': deal_id,
+            'note_id': note_id,
+            'uploaded': [f['name'] for f in uploaded],
+            'failed': failed,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

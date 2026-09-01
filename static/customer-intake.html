@@ -80,6 +80,28 @@
   .pin-gate p { font-size: 13px; color: #6b8fa8; margin-bottom: 18px; }
   .pin-gate input { width: 100%; max-width: 220px; text-align: center; letter-spacing: 6px; font-size: 22px; background: #162130; border: 1px solid #1e2d3d; border-radius: 10px; padding: 12px; color: #e8edf2; outline: none; margin-bottom: 14px; }
   .pin-gate input:focus { border-color: #25a35a; }
+  /* Readiness confirmation toggle */
+  .yes-toggle { display: inline-flex; align-items: center; gap: 10px; background: #162130; border: 1px solid #1e2d3d; border-radius: 999px; padding: 8px 18px 8px 8px; cursor: pointer; font-family: inherit; }
+  .yes-toggle .track { width: 44px; height: 24px; border-radius: 999px; background: #1e2d3d; position: relative; transition: background .18s; flex: none; }
+  .yes-toggle .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #6b8fa8; transition: transform .18s, background .18s; }
+  .yes-toggle .lbl { font-size: 14px; font-weight: 700; color: #8ab4cc; }
+  .yes-toggle.on { border-color: #25a35a; background: #0d2218; }
+  .yes-toggle.on .track { background: #1a6b3c; }
+  .yes-toggle.on .track::after { transform: translateX(20px); background: #fff; }
+  .yes-toggle.on .lbl { color: #fff; }
+  /* Auto-filled, non-editable fields */
+  .field input[readonly] { background: #101a25; color: #8ab4cc; cursor: not-allowed; border-style: dashed; }
+  .field input[readonly]:focus { border-color: #1e2d3d; }
+  .field .hint { font-size: 11px; color: #6b8fa8; font-weight: 400; }
+  /* Document upload */
+  .upload-btn { display: block; width: 100%; text-align: center; background: none; border: 1px dashed #2a3d52; color: #25a35a; border-radius: 8px; padding: 14px 12px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .upload-btn:hover { border-color: #25a35a; }
+  .file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .file-item { display: flex; align-items: center; gap: 10px; background: #162130; border: 1px solid #1e2d3d; border-radius: 8px; padding: 10px 12px; }
+  .file-item .nm { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-item .sz { font-size: 11px; color: #6b8fa8; flex: none; }
+  .file-item button { background: none; border: none; color: #e05252; font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; }
+  .warn-text { color: #e0a852; font-size: 12px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -94,6 +116,21 @@
 <script>
 const TOTAL_STEPS = 4;
 const STEP_LABELS = ['Farm & Contact Info', 'Operation & Fan Inventory', 'Equipment & Condition Checklist', 'Installation Scheduling'];
+
+// The state field is derived from the power company and is not user-editable.
+const POWER_COMPANIES = [
+  ['Georgia Power', 'GA'],
+  ['Entergy Louisiana', 'LA'],
+  ['Entergy Arkansas', 'AR']
+];
+const POWER_COMPANY_STATE = Object.fromEntries(POWER_COMPANIES);
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+const MAX_UPLOAD_FILES = 10;
+// Selected File objects live outside `state` so that (a) JSON.stringify(state)
+// on submit does not choke on them and (b) a full render() cannot lose them —
+// a file input's value cannot be restored programmatically.
+let selectedFiles = [];
 
 let state = {
   step: 1,
@@ -115,8 +152,9 @@ let state = {
   belts_inspected: '', spare_belts_onhand: '',
   tensioners_good: '', bearings_good: '', tensioner_option: '',
   motors_upright: '', motor_hardware_accessible: '',
-  confirmation_initials: '',
-  install_window_from: '', install_window_to: '', flock_cycle_weeks: '', scheduling_restrictions: ''
+  readiness_confirmed: '',
+  install_window_from: '', install_window_to: '', flock_cycle_weeks: '', scheduling_restrictions: '',
+  uploadWarning: ''
 };
 
 function render() {
@@ -170,8 +208,7 @@ function renderStep1() {
     <div class="field"><label>Power Company</label>
       <select id="f-power_company" onchange="update('power_company', this.value)">
         <option value="" ${state.power_company === '' ? 'selected' : ''}>Select power company…</option>
-        <option value="Georgia Power" ${state.power_company === 'Georgia Power' ? 'selected' : ''}>Georgia Power</option>
-        <option value="Entergy Louisiana" ${state.power_company === 'Entergy Louisiana' ? 'selected' : ''}>Entergy Louisiana</option>
+        ${POWER_COMPANIES.map(([name]) => `<option value="${name}" ${state.power_company === name ? 'selected' : ''}>${name}</option>`).join('')}
       </select>
     </div>
     <div class="field"><label>Account Name</label><input id="f-gp_account_name" type="text" value="${state.gp_account_name}" oninput="update('gp_account_name', this.value)"></div>
@@ -187,7 +224,7 @@ function renderStep1() {
     <div class="field"><label>Farm Address</label><input id="f-farm_address" type="text" value="${state.farm_address}" oninput="update('farm_address', this.value)"></div>
     <div class="row3">
       <div class="field"><label>City</label><input id="f-city" type="text" value="${state.city}" oninput="update('city', this.value)"></div>
-      <div class="field"><label>State</label><input id="f-state" type="text" value="${state.state}" oninput="update('state', this.value)"></div>
+      <div class="field"><label>State <span class="hint">(auto)</span></label><input id="f-state" type="text" value="${state.state}" readonly tabindex="-1" placeholder="—" title="Set automatically from your power company"></div>
       <div class="field"><label>ZIP</label><input id="f-zip" type="text" value="${state.zip}" oninput="update('zip', this.value)"></div>
     </div>
     <div class="row2">
@@ -290,8 +327,10 @@ function renderStep3() {
   html += `<div class="confirm-box" style="margin-top:14px;"><strong>Inverted Motor Mounting &amp; Accessibility</strong><p>Some older fan models were built with motors mounted upside down, or in a position where the hardware cannot be easily accessed for removal. PSD will not perform installations where motors are inverted. (Reference Image Below)</p><p>If this applies to your farm, you still have options:</p><ul><li>You may still qualify for Power rebate program.</li><li>Equipment can be purchased directly from PSD at standard pricing.</li><li>Your own contractor performs the installation.</li><li>Once installation is complete, Georgia Power will rebate you directly.</li></ul><p>If you are unsure whether this applies to your farm, please contact your PSD representative before submitting this form.</p><img src="/Images/Motor%20Sample.png" alt="Motor sample reference image" style="max-width:100%;margin-top:10px;border-radius:8px;" onerror="if(this.src.endsWith('.png')){this.src='/Images/Motor%20Sample.jpg';}else if(this.src.endsWith('.jpg')){this.src='/Images/Motor%20Sample.jpeg';}else{this.style.display='none';}"></div>`;
 
   html += `<div class="part-title">Part F — Overall Readiness Confirmation</div>`;
-  html += `<div class="confirm-box">By initialing below, I confirm that I have read and answered this checklist honestly and to the best of my knowledge. I understand that PSD will review this form and reserves the right to accept or decline this project based on the condition of my equipment. I also understand that any unresolved conditions on this checklist may result in postponement or cancellation of the installation, with no obligation on the part of PSD.</div>`;
-  html += `<div class="field"><label>Initials (confirms Yes)</label><input id="f-confirmation_initials" type="text" maxlength="6" value="${state.confirmation_initials}" oninput="update('confirmation_initials', this.value)"></div>`;
+  html += `<div class="confirm-box">By switching the toggle below to Yes, I confirm that I have read and answered this checklist honestly and to the best of my knowledge. I understand that PSD will review this form and reserves the right to accept or decline this project based on the condition of my equipment. I also understand that any unresolved conditions on this checklist may result in postponement or cancellation of the installation, with no obligation on the part of PSD.</div>`;
+  html += `<div class="field"><label>Confirm the statement above</label>
+    <button type="button" id="f-readiness_confirmed" class="yes-toggle ${state.readiness_confirmed === 'Yes' ? 'on' : ''}" aria-pressed="${state.readiness_confirmed === 'Yes'}" onclick="toggleReadiness(this)"><span class="track"></span><span class="lbl">Yes</span></button>
+  </div>`;
   return html;
 }
 
@@ -303,7 +342,54 @@ function renderStep4() {
   </div>`;
   html += `<div class="field"><label>Flock Cycle (weeks between flocks)</label><input id="f-flock_cycle_weeks" type="text" inputmode="numeric" pattern="[0-9]*" value="${state.flock_cycle_weeks}" oninput="update('flock_cycle_weeks', this.value)"></div>`;
   html += `<div class="field"><label>Any Scheduling Restrictions</label><input id="f-scheduling_restrictions" type="text" placeholder="Describe any restrictions, or leave blank if none" value="${state.scheduling_restrictions}" oninput="update('scheduling_restrictions', this.value)"></div>`;
+
+  html += `<div class="part-title">Supporting Documents (Optional)</div>`;
+  html += `<div class="sub">Attach anything that helps us prepare — utility bills, equipment photos, site diagrams, or prior quotes. You may skip this.</div>`;
+  html += `<input id="f-docs" type="file" multiple style="display:none" onchange="addFiles(this)">
+    <button type="button" class="upload-btn" onclick="document.getElementById('f-docs').click()">+ Choose files</button>
+    <div id="file-list" class="file-list">${fileListHtml()}</div>
+    <div class="sub" style="margin-top:8px;">Up to ${MAX_UPLOAD_FILES} files, ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB each.</div>`;
   return html;
+}
+
+function fileListHtml() {
+  return selectedFiles.map((f, i) =>
+    `<div class="file-item"><span class="nm">${escapeHtml(f.name)}</span><span class="sz">${formatBytes(f.size)}</span><button type="button" title="Remove" onclick="removeFile(${i})">&times;</button></div>`
+  ).join('');
+}
+
+// Patch only the file list container — a full render() would recreate the file
+// input, and a file input's selection cannot be restored programmatically.
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  if (el) el.innerHTML = fileListHtml();
+}
+
+function addFiles(input) {
+  clearErrorText();
+  const rejected = [];
+  for (const file of Array.from(input.files || [])) {
+    if (file.size > MAX_UPLOAD_BYTES) { rejected.push(`${file.name} (too large)`); continue; }
+    if (selectedFiles.length >= MAX_UPLOAD_FILES) { rejected.push(`${file.name} (limit reached)`); continue; }
+    if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) continue;
+    selectedFiles.push(file);
+  }
+  // Reset so re-picking the same file still fires onchange.
+  input.value = '';
+  renderFileList();
+  if (rejected.length) showError(`Skipped: ${rejected.join(', ')}`);
+}
+
+function removeFile(i) { selectedFiles.splice(i, 1); renderFileList(); }
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function renderSuccess() {
@@ -311,6 +397,7 @@ function renderSuccess() {
     <div class="icon">&#9989;</div>
     <h2>Customer Information Form Submitted Successfully</h2>
     <p>Thank you — your information has been received. A PSD team member will follow up if any information needs clarification.</p>
+    ${state.uploadWarning ? `<div class="warn-text">${escapeHtml(state.uploadWarning)}</div>` : ''}
   </div>`;
 }
 
@@ -364,6 +451,20 @@ function clearErrorText() {
   if (el) el.remove();
 }
 
+// Insert or update the error banner in place, for the same reason.
+function showError(msg) {
+  state.errorMsg = msg;
+  const card = document.querySelector('#app .card');
+  if (!card) return;
+  let el = card.querySelector('.error-text');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'error-text';
+    card.insertBefore(el, card.querySelector('.btn-row'));
+  }
+  el.textContent = msg;
+}
+
 function update(key, val) {
   state[key] = val;
   clearErrorText();
@@ -371,6 +472,20 @@ function update(key, val) {
     const otherField = document.getElementById('f-op-other-field');
     if (otherField) otherField.style.display = val === 'Other' ? 'block' : 'none';
   }
+  if (key === 'power_company') {
+    // State is derived from the power company and never entered by hand.
+    state.state = POWER_COMPANY_STATE[val] || '';
+    const stateInput = document.getElementById('f-state');
+    if (stateInput) stateInput.value = state.state;
+  }
+}
+
+function toggleReadiness(btn) {
+  const on = state.readiness_confirmed !== 'Yes';
+  state.readiness_confirmed = on ? 'Yes' : '';
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  clearErrorText();
 }
 
 // Fields that reformat as you type must write back to the live input, since
@@ -426,7 +541,7 @@ function validateStep() {
       'belts_inspected', 'spare_belts_onhand', 'tensioners_good', 'bearings_good', 'motors_upright', 'motor_hardware_accessible'];
     if (requiredYN.some(k => !state[k])) return 'Please answer every Yes/No question.';
     if (!state.tensioner_option) return 'Please select a tensioner replacement option.';
-    if (!state.confirmation_initials) return 'Please enter your initials to confirm.';
+    if (state.readiness_confirmed !== 'Yes') return 'Please switch the readiness confirmation toggle to Yes.';
   }
   return '';
 }
@@ -444,15 +559,36 @@ async function submitForm() {
     state.errorMsg = 'Please complete all installation scheduling fields.'; render(); return;
   }
 
-  state.submitting = true; state.errorMsg = ''; render();
+  state.submitting = true; state.errorMsg = ''; state.uploadWarning = ''; render();
+  const pin = sessionStorage.getItem('psd_intake_pin') || '';
   try {
     const res = await fetch('/submit-customer-form', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({}, state, { access_pin: sessionStorage.getItem('psd_intake_pin') || '' }))
+      body: JSON.stringify(Object.assign({}, state, { access_pin: pin }))
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Submission failed');
+
+    // Uploads run after the deal exists. A failure here must not discard the
+    // submission that already succeeded — surface it as a warning instead.
+    if (selectedFiles.length && result.deal_id) {
+      try {
+        const fd = new FormData();
+        fd.append('deal_id', result.deal_id);
+        fd.append('access_pin', pin);
+        fd.append('account_name', state.gp_account_name);
+        selectedFiles.forEach(f => fd.append('files', f, f.name));
+        const upRes = await fetch('/customer-intake-upload', { method: 'POST', body: fd });
+        const upResult = await upRes.json();
+        if (!upRes.ok) throw new Error(upResult.error || 'Upload failed');
+        if (upResult.failed && upResult.failed.length) {
+          state.uploadWarning = `These files could not be attached: ${upResult.failed.join(', ')}. Your form was submitted — please email them to your PSD representative.`;
+        }
+      } catch (e) {
+        state.uploadWarning = `Your form was submitted, but the documents could not be attached (${e.message}). Please email them to your PSD representative.`;
+      }
+    }
     state.submitted = true;
   } catch (e) {
     state.errorMsg = e.message || 'Something went wrong. Please try again.';
