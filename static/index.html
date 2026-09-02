@@ -50,16 +50,20 @@
     .md-table td { color: #16212c; }
     .md-table tr:nth-child(even) td { background: #ffffff; }
     .md-table tr:hover td { background: #f4f6f9; }
-    .svc-form-title { font-size: 13px; font-weight: 600; color: #3d6076; margin-bottom: 12px; }
-    .svc-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    /* Portal form controls mirror the customer intake form's .card scale so
+       every form in the app looks the same: 16px/700 title, 12px/600 labels,
+       10px 12px inputs at 14px, 14px row rhythm. */
+    .svc-form-title { font-size: 16px; font-weight: 700; color: #16212c; margin-bottom: 16px; }
+    .svc-form-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
     /* Label typography matches .field label on the customer intake form so
        every form in the app reads the same. */
     .svc-form-label { display: block; font-size: 12px; color: #3d6076; font-weight: 600; }
-    .svc-form-input { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-label .hint { font-size: 11px; color: #64798c; font-weight: 400; }
+    .svc-form-input { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 10px 12px; color: #16212c; font-size: 14px; outline: none; font-family: inherit; }
     .svc-form-input:focus { border-color: #25a35a; }
     .svc-form-input[readonly] { background: #eef2f6; color: #3d6076; cursor: not-allowed; border-style: dashed; }
     .svc-form-input[readonly]:focus { border-color: #dce3ea; }
-    .svc-form-select { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-select { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 10px 12px; color: #16212c; font-size: 14px; outline: none; font-family: inherit; }
     .svc-form-select:focus { border-color: #25a35a; }
     .contact-confirm-note { background: #e9f7ef; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #1e6b3f; line-height: 1.5; margin: 10px 0; }
     .contact-yn { background: #ffffff; border: 1px solid #dce3ea; border-radius: 10px; padding: 12px 14px; }
@@ -69,14 +73,17 @@
     .contact-yn-options input { display: none; }
     .contact-yn-options label.yes:has(input:checked) { background: #1a6b3c; border-color: #25a35a; color: #fff; }
     .contact-yn-options label.no:has(input:checked) { background: #c62828; border-color: #c62828; color: #fff; }
-    .contact-actions { display: flex; gap: 10px; margin-top: 12px; }
-    .contact-actions button { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .contact-actions .yes { background: #1a6b3c; border: 1px solid #25a35a; color: #fff; }
-    .contact-actions .no { background: #c62828; border: 1px solid #c62828; color: #fff; }
-    .contact-actions button:disabled { opacity: .55; cursor: not-allowed; }
-    .svc-form-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    /* Matches .btn / .btn-primary / .btn-secondary on the intake form. Cancel is
+       a neutral secondary, not a red fill — it is not a destructive action. */
+    .contact-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .contact-actions button { flex: 1; text-align: center; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; }
+    .contact-actions .yes { background: linear-gradient(135deg, #1a6b3c, #25a35a); color: #fff; }
+    .contact-actions .no { background: #ffffff; color: #3d6076; border: 1px solid #dce3ea; }
+    .contact-actions button:disabled { opacity: .5; cursor: not-allowed; }
+    .svc-form-btn { width: 100%; padding: 13px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px; font-family: inherit; }
     .svc-form-btn:hover { opacity: 0.9; }
-    .svc-form-btn-cancel { width: 100%; padding: 8px; background: none; border: 1px solid #dce3ea; border-radius: 8px; color: #64798c; font-size: 12px; cursor: pointer; margin-top: 6px; }
+    .svc-form-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .svc-form-btn-cancel { width: 100%; padding: 13px; background: #ffffff; border: 1px solid #dce3ea; border-radius: 10px; color: #3d6076; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; font-family: inherit; }
     .map-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: linear-gradient(135deg, #1a6b3c, #25a35a); border-radius: 10px; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600; margin-top: 8px; }
     .map-btn:hover { opacity: 0.9; }
     .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; animation: fadeIn 0.3s ease; }
@@ -1460,7 +1467,8 @@
           )
         ),
         React.createElement('div', { className: 'svc-form-row', key: 'state' },
-          React.createElement('div', { className: 'svc-form-label' }, 'State'),
+          React.createElement('div', { className: 'svc-form-label' }, 'State ',
+            React.createElement('span', { className: 'hint' }, '(auto)')),
           React.createElement('input', {
             className: 'svc-form-input', type: 'text', value: form.state, readOnly: true, tabIndex: -1,
             placeholder: '—', title: 'Set automatically from the power company'

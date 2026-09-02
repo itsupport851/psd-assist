@@ -190,7 +190,21 @@ All three static pages use a single light palette. Colors are literal hex values
 | Error | `#c62828` |
 | Warning | `#a86a00` |
 
-Form controls share one set of classes across the portal — `.svc-form-row`, `.svc-form-label`, `.svc-form-input`, `.svc-form-select` — whose label typography matches `.field label` on the intake form, so every form in the app reads the same. Use `.svc-form-select` for selects and `readOnly` for derived fields (`.svc-form-input[readonly]` carries the dashed, inset treatment); prefer these classes over inline style objects so the next theme change stays a one-file edit.
+### Forms
+Form controls share one set of classes across the portal — `.svc-form-row`, `.svc-form-label`, `.svc-form-input`, `.svc-form-select`, `.svc-form-btn`, `.svc-form-btn-cancel` — deliberately matched to the customer intake form's `.card` scale so every form in the app reads the same:
+
+| | Value |
+| --- | --- |
+| Form title | 16px / 700 / `#16212c` |
+| Field label | 12px / 600 / `#3d6076`, `.hint` child 11px / 400 / `#64798c` |
+| Input, select | full width, `10px 12px`, 14px, radius 8px |
+| Row rhythm | `margin-bottom: 14px`, label gap 5px |
+| Primary button | `padding: 13px`, radius 10px, 14px / 700, green gradient |
+| Secondary / Cancel | same metrics, white on `#dce3ea` border, `#3d6076` text |
+
+Cancel is a **neutral secondary, never a red fill** — it is not a destructive action. Use `.svc-form-select` for selects and `readOnly` for derived fields (`.svc-form-input[readonly]` carries the dashed inset treatment). Prefer these classes over inline style objects so the next theme change stays a one-file edit.
+
+`box-sizing: border-box` is global in all three pages, so `width: 100%` plus padding is safe in the grid layouts the service wizard uses.
 
 Two rules matter when editing:
 
