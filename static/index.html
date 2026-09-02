@@ -1414,6 +1414,11 @@
       );
     }
 
+    // Markers that render an interactive panel rather than chat text. These must
+    // be pushed as assistant messages — the "user" role paints the green bubble.
+    var INTERACTIVE_MARKERS = ["SHOW_OPTIONS", "STAGE_SELECTOR", "SERVICE_STAGE_SELECTOR", "MAP_STAGE_SELECTOR",
+      "ADD_LINE_ITEM_FORM", "NEW_SERVICE_FORM", "NEW_CONTACT_FORM"];
+
     // State is derived from the power company and is not typed by hand.
     // Mirrors POWER_COMPANY_STATE_MAP in app.py.
     var POWER_COMPANIES = [['Georgia Power', 'GA'], ['Entergy Louisiana', 'LA'], ['Entergy Arkansas', 'A']];
@@ -2182,9 +2187,13 @@
         if (!text) return;
         setShowActions(false);
 
-        if (text === "SHOW_OPTIONS") {
-          setShowActions(true);
-          setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SHOW_OPTIONS", display: true }]); });
+        // Interactive markers render as assistant messages so they sit in the
+        // white bubble. Anything reaching the default path below becomes a
+        // "user" message, which is the green bubble — a form rendered there
+        // showed up on a green background with washed-out labels.
+        if (INTERACTIVE_MARKERS.indexOf(text) !== -1) {
+          if (text === "SHOW_OPTIONS") setShowActions(true);
+          setMessages(function(prev) { return prev.concat([{ role: "assistant", content: text, display: true }]); });
           setInput("");
           return;
         }
@@ -2481,12 +2490,12 @@
           displayMessages.map(function(msg, i) {
             var isLast = i === displayMessages.length - 1;
             var lastContent = displayMessages[displayMessages.length - 1] && displayMessages[displayMessages.length - 1].content;
-            var lastIsSelector = ["SHOW_OPTIONS","STAGE_SELECTOR","SERVICE_STAGE_SELECTOR","MAP_STAGE_SELECTOR","ADD_LINE_ITEM_FORM","NEW_SERVICE_FORM","NEW_CONTACT_FORM"].indexOf(lastContent) !== -1
+            var lastIsSelector = INTERACTIVE_MARKERS.indexOf(lastContent) !== -1
               || (lastContent && lastContent.startsWith("SERVICE_FORM:"));
             return React.createElement("div", { key: i },
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1d5f8a, #1d7fc4)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
-                React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#eef2f6" : "#ffffff", fontSize: 13, lineHeight: 1.6, color: msg.isThinking ? "#64798c" : "#16212c", border: msg.role === "user" ? "none" : "1px solid #dce3ea", fontStyle: msg.isThinking ? "italic" : "normal" } },
+                React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#eef2f6" : "#ffffff", fontSize: 13, lineHeight: 1.6, color: msg.role === "user" ? "#fff" : msg.isThinking ? "#64798c" : "#16212c", border: msg.role === "user" ? "none" : "1px solid #dce3ea", fontStyle: msg.isThinking ? "italic" : "normal" } },
                   msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, onAddLineItem: triggerAddLineItem, role: auth.role })
                 )
               ),
@@ -2519,7 +2528,7 @@
           React.createElement("button", {
             onClick: function() { sendMessage(); },
             disabled: loading || !input.trim(),
-            style: { width: 38, height: 38, borderRadius: 9, border: "none", background: loading || !input.trim() ? "#ffffff" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || !input.trim() ? "#a9b8c7" : "#fff", cursor: loading || !input.trim() ? "not-allowed" : "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+            style: { width: 38, height: 38, borderRadius: 9, border: "none", background: loading || !input.trim() ? "#ffffff" : "linear-gradient(135deg, #1a6b3c, #25a35a)", color: loading || !input.trim() ? "#8a97a5" : "#fff", cursor: loading || !input.trim() ? "not-allowed" : "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
           }, "➤")
         )
       );
