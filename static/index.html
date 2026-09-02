@@ -1424,11 +1424,12 @@
     var POWER_COMPANIES = [['Georgia Power', 'GA'], ['Entergy Louisiana', 'LA'], ['Entergy Arkansas', 'A']];
     var POWER_COMPANY_STATE = Object.fromEntries(POWER_COMPANIES);
 
-    function NewContactForm({ onSubmit, onCancel }) {
+    function NewContactForm({ onCancel }) {
       const [form, setForm] = React.useState({ email: '', first_name: '', last_name: '', power_company: '', state: '', invitation: '' });
       const [saving, setSaving] = React.useState(false);
       const [error, setError] = React.useState('');
-      const [submitted, setSubmitted] = React.useState(false);
+      // Holds the confirmation text once saved; the form is replaced by it.
+      const [doneMsg, setDoneMsg] = React.useState('');
       function update(field, value) { setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); }); }
       function updatePowerCompany(value) {
         setForm(function(prev) { return Object.assign({}, prev, { power_company: value, state: POWER_COMPANY_STATE[value] || '' }); });
@@ -1440,13 +1441,14 @@
           var res = await fetch('/hubspot/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, form, { invitation: form.invitation === 'yes' ? 'true' : 'false' })) });
           var result = await res.json();
           if (!res.ok || !result.success) throw new Error(result.error || 'Unable to save contact');
-          setSubmitted(true);
-          onSubmit(result.updated ? 'Contact updated successfully.' : 'Contact created successfully.');
+          // Confirmed in place only. Reporting it through onSubmit as well
+          // posted a second, redundant chat message.
+          setDoneMsg(result.updated ? 'Contact updated successfully.' : 'Contact created successfully.');
         } catch(e) { setError(e.message); }
         setSaving(false);
       }
-      if (submitted) return React.createElement('div', { className: 'svc-form' },
-        React.createElement('div', { className: 'contact-confirm-note', style: { textAlign: 'center' } }, 'Contact created successfully.')
+      if (doneMsg) return React.createElement('div', { className: 'svc-form' },
+        React.createElement('div', { className: 'contact-confirm-note', style: { textAlign: 'center' } }, doneMsg)
       );
 
       return React.createElement('div', { className: 'svc-form' },
@@ -1572,7 +1574,6 @@
       });
 
       if (content === "NEW_CONTACT_FORM") return React.createElement(NewContactForm, {
-        onSubmit: function(message) { onAction(message); },
         onCancel: function() { onAction("SHOW_OPTIONS"); }
       });
 
