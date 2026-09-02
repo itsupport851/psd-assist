@@ -244,11 +244,83 @@ def fill_workbook_endpoint():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ── Deal property aliases ───────────────────────────────────
+# Deals reach HubSpot from two paths that historically used different property
+# names for the same facts: the portal's create-deal call writes total_fans /
+# total_barns / operation_type, while the customer intake form writes
+# total_number_of_fans / total_number_of_barns / type_of_poultry_opperation.
+# Read both and normalize to the canonical name the frontends already use.
+DEAL_PROPERTY_ALIASES = {
+    'total_fans': ['total_fans', 'total_number_of_fans', 'number_of_fans', 'total_fans_count'],
+    'total_barns': ['total_barns', 'total_number_of_barns', 'number_of_barns'],
+    'operation_type': ['operation_type', 'type_of_poultry_opperation', 'type_of_poultry_operation', 'farm_type'],
+    'farm_address': ['farm_address', 'psd_farm_address'],
+    'farm_city': ['city', 'psd_city'],
+    'farm_state': ['state', 'psd_state'],
+    'farm_zip': ['farm_zip', 'psd_zip', 'zip'],
+}
+_DEAL_PROPS_CACHE = {'names': None}
+
+
+def _known_deal_properties():
+    """Names of every property that exists on the deal object, cached per process.
+
+    Requesting a property HubSpot does not know can fail the whole read, so the
+    alias lists above are filtered through this before being sent.
+    """
+    if _DEAL_PROPS_CACHE['names'] is None:
+        try:
+            res = requests.get(f'{HUBSPOT_BASE}/crm/v3/properties/deals', headers=HUBSPOT_HEADERS(), timeout=30)
+            if res.status_code == 200:
+                _DEAL_PROPS_CACHE['names'] = {p['name'] for p in res.json().get('results', [])}
+            else:
+                app.logger.warning('Could not list deal properties: %s', _hubspot_error(res))
+                _DEAL_PROPS_CACHE['names'] = set()
+        except Exception as e:
+            app.logger.warning('Could not list deal properties: %s', e)
+            _DEAL_PROPS_CACHE['names'] = set()
+    return _DEAL_PROPS_CACHE['names']
+
+
+# Requested even when property discovery is unavailable: these three were
+# already being read successfully before aliasing was introduced. Everything
+# else is only requested once confirmed to exist, since naming a property the
+# portal does not have can fail the entire read.
+_ALIASES_SAFE_WITHOUT_DISCOVERY = {'total_fans', 'total_barns', 'operation_type'}
+
+
+def _deal_props_param(base):
+    """Comma-joined property list: `base` plus every alias that actually exists."""
+    known = _known_deal_properties()
+    names = list(base)
+    for aliases in DEAL_PROPERTY_ALIASES.values():
+        for alias in aliases:
+            if alias in names:
+                continue
+            if alias in known or (not known and alias in _ALIASES_SAFE_WITHOUT_DISCOVERY):
+                names.append(alias)
+    return ','.join(names)
+
+
+def _normalize_deal_props(props):
+    """Collapse alias properties onto their canonical names, in place."""
+    for canonical, aliases in DEAL_PROPERTY_ALIASES.items():
+        value = ''
+        for alias in aliases:
+            candidate = props.get(alias)
+            if candidate not in (None, ''):
+                value = candidate
+                break
+        if value != '' or canonical not in props:
+            props[canonical] = value
+    return props
+
+
 # ── HubSpot: Get open deals ──────────────────────────────────
 @app.route('/hubspot/deals', methods=['GET'])
 def hs_get_deals():
     try:
-        props = 'dealname,amount,dealstage,closedate,hs_object_id,total_fans,total_barns,operation_type'
+        props = _deal_props_param(['dealname', 'amount', 'dealstage', 'closedate', 'hs_object_id'])
         stage_filter = request.args.get('stage', None)
         url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=50&properties={props}'
         res = requests.get(url, headers=HUBSPOT_HEADERS())
@@ -257,7 +329,7 @@ def hs_get_deals():
         data = res.json()
         deals = []
         for d in data.get('results', []):
-            props_data = d.get('properties', {})
+            props_data = _normalize_deal_props(d.get('properties', {}))
             if stage_filter and props_data.get('dealstage') != stage_filter:
                 continue
             deals.append({
@@ -305,13 +377,28 @@ def hs_get_line_items(deal_id):
 def hs_deals_with_addresses():
     try:
         stage_filter = request.args.get('stage', None)  # None = all deals
-        props = 'dealname,amount,dealstage,total_fans,total_barns,hs_object_id'
-        url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=100&properties={props}'
-        res = requests.get(url, headers=HUBSPOT_HEADERS())
-        if res.status_code != 200:
-            return jsonify({'error': res.text}), res.status_code
+        props = _deal_props_param(['dealname', 'amount', 'dealstage', 'hs_object_id'])
 
-        all_deals = res.json().get('results', [])
+        # Page through every deal. A single limit=100 read returned only the
+        # oldest 100 objects, so deals created after that point — including all
+        # customer intake submissions — never reached the map.
+        all_deals = []
+        after = None
+        for _ in range(20):  # hard stop at 2000 deals
+            url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=100&properties={props}'
+            if after:
+                url += f'&after={after}'
+            res = requests.get(url, headers=HUBSPOT_HEADERS())
+            if res.status_code != 200:
+                return jsonify({'error': res.text}), res.status_code
+            body = res.json()
+            all_deals.extend(body.get('results', []))
+            after = body.get('paging', {}).get('next', {}).get('after')
+            if not after:
+                break
+        else:
+            app.logger.warning('deals-with-addresses stopped at the 2000-deal page cap')
+
         if stage_filter:
             all_deals = [d for d in all_deals if d.get('properties', {}).get('dealstage') == stage_filter]
         else:
@@ -323,20 +410,29 @@ def hs_deals_with_addresses():
 
         for deal in all_deals:
             deal_id = deal['id']
+            dp = _normalize_deal_props(deal.get('properties', {}))
+
+            contact = {}
             assoc_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}/associations/contacts', headers=HUBSPOT_HEADERS())
-            if assoc_res.status_code != 200:
-                continue
-            contacts = assoc_res.json().get('results', [])
-            if not contacts:
-                continue
+            if assoc_res.status_code == 200:
+                contacts = assoc_res.json().get('results', [])
+                if contacts:
+                    contact_res = requests.get(
+                        f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contacts[0]["id"]}?properties={contact_props}',
+                        headers=HUBSPOT_HEADERS()
+                    )
+                    if contact_res.status_code == 200:
+                        contact = contact_res.json().get('properties', {})
 
-            contact_id = contacts[0]['id']
-            contact_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contact_id}?properties={contact_props}', headers=HUBSPOT_HEADERS())
-            if contact_res.status_code != 200:
-                continue
-
-            contact = contact_res.json().get('properties', {})
-            dp = deal.get('properties', {})
+            # Fall back to the deal's own farm_* properties. Intake deals carry
+            # the address on the deal, and a deal with no contact used to be
+            # dropped entirely rather than plotted.
+            address = contact.get('address', '') or dp.get('farm_address', '')
+            city = contact.get('city', '') or dp.get('farm_city', '')
+            state = contact.get('state', '') or dp.get('farm_state', '')
+            zip_code = contact.get('zip', '') or dp.get('farm_zip', '')
+            if not (address or city or zip_code):
+                continue  # nothing to geocode
 
             result.append({
                 'deal_id': deal_id,
@@ -345,12 +441,13 @@ def hs_deals_with_addresses():
                 'amount': dp.get('amount', ''),
                 'total_fans': dp.get('total_fans', ''),
                 'total_barns': dp.get('total_barns', ''),
-                'company': contact.get('company', ''),
+                'operation_type': dp.get('operation_type', ''),
+                'company': contact.get('company', '') or dp.get('dealname', ''),
                 'owner': contact.get('ower_name', '') or contact.get('firstname', ''),
-                'address': contact.get('address', ''),
-                'city': contact.get('city', ''),
-                'state': contact.get('state', ''),
-                'zip': contact.get('zip', ''),
+                'address': address,
+                'city': city,
+                'state': state,
+                'zip': zip_code,
                 'email': contact.get('email', ''),
                 'phone': contact.get('phone', '')
             })
@@ -363,18 +460,37 @@ def hs_deals_with_addresses():
 @app.route('/hubspot/line-items/<line_item_id>', methods=['PATCH'])
 def hs_update_line_item(line_item_id):
     try:
-        data = request.get_json()
-        payload = {'properties': {}}
-        if 'unit_price' in data:
-            payload['properties']['price'] = str(data['unit_price'])
-        if 'quantity' in data:
-            payload['properties']['quantity'] = str(data['quantity'])
-        if 'name' in data:
-            payload['properties']['name'] = data['name']
-        res = requests.patch(f'{HUBSPOT_BASE}/crm/v3/objects/line_items/{line_item_id}', json=payload, headers=HUBSPOT_HEADERS())
+        data = request.get_json() or {}
+        props = {}
+        # `price` is accepted alongside `unit_price`: callers (including the
+        # assistant's tool calls) use either name.
+        for key in ('unit_price', 'price'):
+            if data.get(key) not in (None, ''):
+                props['price'] = str(data[key])
+                break
+        if data.get('quantity') not in (None, ''):
+            props['quantity'] = str(data['quantity'])
+        if data.get('name') not in (None, ''):
+            props['name'] = data['name']
+        if data.get('description') not in (None, ''):
+            props['description'] = data['description']
+
+        # A PATCH with no properties returns 200 and changes nothing, which used
+        # to be reported as success — the update appeared to do nothing.
+        if not props:
+            return jsonify({'error': 'No updatable fields provided. Send price/unit_price, quantity, name or description.'}), 400
+
+        res = requests.patch(
+            f'{HUBSPOT_BASE}/crm/v3/objects/line_items/{line_item_id}?properties=name,price,quantity,description',
+            json={'properties': props}, headers=HUBSPOT_HEADERS()
+        )
         if res.status_code not in [200, 204]:
-            return jsonify({'error': res.text}), res.status_code
-        return jsonify({'success': True, 'line_item_id': line_item_id})
+            return jsonify({'error': _hubspot_error(res)}), res.status_code
+        try:
+            updated = res.json().get('properties', {})
+        except ValueError:
+            updated = {}
+        return jsonify({'success': True, 'line_item_id': line_item_id, 'updated': props, 'properties': updated})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -397,6 +513,38 @@ def hs_update_deal(deal_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def _associate_line_item(deal_id, line_item_id):
+    """Link a line item to a deal. Returns True only if HubSpot confirms it.
+
+    Tries the v3 batch endpoint the rest of this file uses, then the v4
+    default-association endpoint, so a failure in either path is reported
+    rather than silently swallowed.
+    """
+    try:
+        res = requests.post(
+            f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create',
+            json={'inputs': [{'from': {'id': str(deal_id)}, 'to': {'id': str(line_item_id)}, 'type': 'deal_to_line_item'}]},
+            headers=HUBSPOT_HEADERS()
+        )
+        if res.status_code in (200, 201, 204):
+            return True
+        app.logger.warning('v3 line item association failed for deal %s: %s', deal_id, _hubspot_error(res))
+    except Exception as e:
+        app.logger.warning('v3 line item association failed for deal %s: %s', deal_id, e)
+
+    try:
+        res = requests.put(
+            f'{HUBSPOT_BASE}/crm/v4/objects/deals/{deal_id}/associations/default/line_items/{line_item_id}',
+            headers=HUBSPOT_HEADERS()
+        )
+        if res.status_code in (200, 201, 204):
+            return True
+        app.logger.warning('v4 line item association failed for deal %s: %s', deal_id, _hubspot_error(res))
+    except Exception as e:
+        app.logger.warning('v4 line item association failed for deal %s: %s', deal_id, e)
+    return False
+
+
 # ── HubSpot: Add line item to deal ──────────────────────────
 @app.route('/hubspot/line-items', methods=['POST'])
 def hs_create_line_item():
@@ -418,11 +566,18 @@ def hs_create_line_item():
         }
         res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=payload, headers=HUBSPOT_HEADERS())
         if res.status_code != 201:
-            return jsonify({'error': res.text}), res.status_code
+            return jsonify({'error': _hubspot_error(res)}), res.status_code
         line_item_id = res.json()['id']
-        assoc_payload = {'inputs': [{'from': {'id': deal_id}, 'to': {'id': line_item_id}, 'type': 'deal_to_line_item'}]}
-        requests.post(f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create', json=assoc_payload, headers=HUBSPOT_HEADERS())
-        return jsonify({'success': True, 'line_item_id': line_item_id})
+
+        # The association result used to be discarded, so a line item that never
+        # got linked to the deal was still reported as a success — it simply did
+        # not appear on the deal.
+        if not _associate_line_item(deal_id, line_item_id):
+            return jsonify({
+                'error': f'Line item {line_item_id} was created but could not be associated with deal {deal_id}.',
+                'line_item_id': line_item_id
+            }), 502
+        return jsonify({'success': True, 'line_item_id': line_item_id, 'deal_id': deal_id})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1315,11 +1470,7 @@ def submit_customer_form():
                 li_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=li_payload, headers=HUBSPOT_HEADERS())
                 if li_res.status_code == 201:
                     li_id = li_res.json()['id']
-                    requests.post(
-                        f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create',
-                        json={'inputs': [{'from': {'id': deal_id}, 'to': {'id': li_id}, 'type': 'deal_to_line_item'}]},
-                        headers=HUBSPOT_HEADERS()
-                    )
+                    _associate_line_item(deal_id, li_id)
                     total_line_amount += qty * float(UNIT_PRICE)
             except Exception:
                 pass
@@ -1338,11 +1489,7 @@ def submit_customer_form():
             install_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=install_payload, headers=HUBSPOT_HEADERS())
             if install_res.status_code == 201:
                 install_id = install_res.json()['id']
-                requests.post(
-                    f'{HUBSPOT_BASE}/crm/v3/associations/deals/line_items/batch/create',
-                    json={'inputs': [{'from': {'id': deal_id}, 'to': {'id': install_id}, 'type': 'deal_to_line_item'}]},
-                    headers=HUBSPOT_HEADERS()
-                )
+                _associate_line_item(deal_id, install_id)
                 total_line_amount += install_qty * install_unit_price
         except Exception:
             pass

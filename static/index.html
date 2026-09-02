@@ -52,10 +52,15 @@
     .md-table tr:hover td { background: #f4f6f9; }
     .svc-form-title { font-size: 13px; font-weight: 600; color: #3d6076; margin-bottom: 12px; }
     .svc-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-    .svc-form-label { font-size: 11px; color: #64798c; font-weight: 500; }
-    .svc-form-input { background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
+    /* Label typography matches .field label on the customer intake form so
+       every form in the app reads the same. */
+    .svc-form-label { display: block; font-size: 12px; color: #3d6076; font-weight: 600; }
+    .svc-form-input { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
     .svc-form-input:focus { border-color: #25a35a; }
-    .svc-form-select { background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-input[readonly] { background: #eef2f6; color: #3d6076; cursor: not-allowed; border-style: dashed; }
+    .svc-form-input[readonly]:focus { border-color: #dce3ea; }
+    .svc-form-select { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 7px 10px; color: #16212c; font-size: 13px; outline: none; font-family: inherit; }
+    .svc-form-select:focus { border-color: #25a35a; }
     .contact-confirm-note { background: #e9f7ef; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #1e6b3f; line-height: 1.5; margin: 10px 0; }
     .contact-yn { background: #ffffff; border: 1px solid #dce3ea; border-radius: 10px; padding: 12px 14px; }
     .contact-yn-title { font-size: 13px; margin-bottom: 8px; }
@@ -291,7 +296,14 @@
       }
       if (tool === "get_teams") return await callRailway("/hubspot/teams");
       if (tool === "update_line_item") {
-        const res = await fetch("/hubspot/line-items/" + params.line_item_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ unit_price: params.unit_price }) });
+        // Forward every field, not just unit_price — quantity/name/description
+        // updates were silently dropped, and an absent unit_price produced an
+        // empty PATCH that HubSpot accepted without changing anything.
+        var liBody = {};
+        ["unit_price", "price", "quantity", "name", "description"].forEach(function(k) {
+          if (params[k] !== undefined && params[k] !== null && params[k] !== "") liBody[k] = params[k];
+        });
+        const res = await fetch("/hubspot/line-items/" + params.line_item_id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(liBody) });
         return await res.json();
       }
       if (tool === "update_deal_amount" || tool === "update_deal") {
@@ -1437,7 +1449,7 @@
         React.createElement('div', { className: 'svc-form-row', key: 'power_company' },
           React.createElement('div', { className: 'svc-form-label' }, 'Power Company'),
           React.createElement('select', {
-            className: 'svc-form-input',
+            className: 'svc-form-select',
             value: form.power_company,
             onChange: function(e) { updatePowerCompany(e.target.value); }
           },
@@ -1451,8 +1463,7 @@
           React.createElement('div', { className: 'svc-form-label' }, 'State'),
           React.createElement('input', {
             className: 'svc-form-input', type: 'text', value: form.state, readOnly: true, tabIndex: -1,
-            placeholder: '—', title: 'Set automatically from the power company',
-            style: { background: '#eef2f6', color: '#3d6076', cursor: 'not-allowed', borderStyle: 'dashed' }
+            placeholder: '—', title: 'Set automatically from the power company'
           })
         ),
         React.createElement('div', { className: 'contact-confirm-note' }, 'By initialing below, this will send an invitation email to the customer.'),
@@ -2224,9 +2235,11 @@
                 name: p.dealname || p.gp_account_name || String(d.id),
                 amount: Number(p.amount || p.dealamount || 0) || 0,
                 stage: p.dealstage || p.stage || "",
-                total_fans: Number(p.total_fans || p.total_fans_count || p.number_of_fans || 0) || 0,
-                total_barns: Number(p.total_barns || 0) || 0,
-                operation_type: p.operation_type || p.operationType || p.farm_type || ""
+                // The server normalizes these onto the canonical names, but the
+                // intake-form spellings are kept here as a fallback.
+                total_fans: Number(p.total_fans || p.total_number_of_fans || p.total_fans_count || p.number_of_fans || 0) || 0,
+                total_barns: Number(p.total_barns || p.total_number_of_barns || p.number_of_barns || 0) || 0,
+                operation_type: p.operation_type || p.type_of_poultry_opperation || p.operationType || p.farm_type || ""
               };
             }) };
             setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "DEALS_TABLE:" + JSON.stringify(payload), display: true }]); });

@@ -74,6 +74,8 @@ Example payload for `/fill-workbook`:
 - `GET /hubspot/deals`
 - `GET /hubspot/line-items/<deal_id>`
 - `GET /hubspot/deals-with-addresses`
+  - Pages through every deal (cap 2000). A single `limit=100` read returned only the oldest 100 objects, so newer deals — including all intake submissions — never reached the Farm Map
+  - Falls back to the deal's own `farm_address` / `farm_zip` when the associated contact has no address, and plots deals with no contact at all; only deals with nothing to geocode are skipped
 - `PATCH /hubspot/line-items/<line_item_id>`
 - `PATCH /hubspot/deals/<deal_id>`
 - `POST /hubspot/line-items`
@@ -188,6 +190,8 @@ All three static pages use a single light palette. Colors are literal hex values
 | Error | `#c62828` |
 | Warning | `#a86a00` |
 
+Form controls share one set of classes across the portal — `.svc-form-row`, `.svc-form-label`, `.svc-form-input`, `.svc-form-select` — whose label typography matches `.field label` on the intake form, so every form in the app reads the same. Use `.svc-form-select` for selects and `readOnly` for derived fields (`.svc-form-input[readonly]` carries the dashed, inset treatment); prefer these classes over inline style objects so the next theme change stays a one-file edit.
+
 Two rules matter when editing:
 
 - `color: #fff` is only ever correct on a **saturated fill** — the green gradient buttons, a selected Yes/No pill, a stage pill. On a light tint it is invisible.
@@ -206,6 +210,27 @@ The page renders itself by assigning to `#app.innerHTML`. **Do not call `render(
 - `render()` is reserved for structural changes: step navigation, adding/removing fan rows, submit, and PIN verification
 
 Selected upload files live in the module-level `selectedFiles` array, deliberately outside `state`. A file input's selection cannot be restored programmatically, so a full `render()` would silently drop the user's choices; keeping the `File` objects outside the rendered DOM makes re-rendering safe. It also keeps `JSON.stringify(state)` on submit from choking on them. `addFiles`/`removeFile` repaint only the `#file-list` container via `renderFileList()`.
+
+## Deal property aliases
+
+Deals reach HubSpot from two paths that historically used **different property names for the same facts**:
+
+| Fact | Portal `create_deal` writes | Customer intake writes |
+| --- | --- | --- |
+| Fans | `total_fans` | `total_number_of_fans` |
+| Barns | `total_barns` | `total_number_of_barns` |
+| Operation type | `operation_type` | `type_of_poultry_opperation` (note the spelling) |
+
+The read endpoints requested only the left-hand names, so intake-created deals showed blank Operation/Fans/Barns everywhere. `DEAL_PROPERTY_ALIASES` in `app.py` now lists both spellings; reads request every alias and `_normalize_deal_props` collapses them onto the canonical name before the response leaves the server, so existing consumers keep working unchanged.
+
+Naming a property the portal does not have can fail an entire read, so `_known_deal_properties()` lists the deal object's real properties once per process and aliases are filtered through it. If that lookup fails, only `_ALIASES_SAFE_WITHOUT_DISCOVERY` is requested — the three names that were already being read successfully.
+
+**Adding a new alias:** add it to the alias list in `app.py`. Add it to `_ALIASES_SAFE_WITHOUT_DISCOVERY` only if you are certain the property exists in every portal.
+
+## Line items
+
+- `POST /hubspot/line-items` creates the line item then associates it with the deal. The association is attempted via the v3 batch endpoint and then the v4 default-association endpoint; **if both fail the endpoint returns 502 naming the orphaned line item.** It previously discarded the association result, so a line item that never attached to the deal was still reported as a success.
+- `PATCH /hubspot/line-items/<id>` accepts `price` or `unit_price`, plus `quantity`, `name` and `description`. A request with no updatable field is a **400** — HubSpot accepts an empty `properties` object with a 200 and changes nothing, which used to read as a successful update that did nothing.
 
 ## HubSpot service behavior
 - Service creation and update operations normalize `status` values to HubSpot-approved options
