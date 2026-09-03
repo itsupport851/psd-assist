@@ -28,7 +28,7 @@ CUSTOMER_INTAKE_PIPELINE = 'default'
 POWER_COMPANY_STATE_MAP = {
     'Georgia Power': 'GA',
     'Entergy Louisiana': 'LA',
-    'Entergy Arkansas': 'A',
+    'Entergy Arkansas': 'AR',
 }
 CUSTOMER_FORM_SENT_STAGE = os.environ.get('DEALSTAGE_CUSTOMER_FORM_SENT', 'appointmentscheduled')
 UNIT_PRICE = os.environ.get('UNIT_PRICE', '0')
