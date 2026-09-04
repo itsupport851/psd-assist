@@ -47,6 +47,33 @@ HUBSPOT_BASE = 'https://api.hubapi.com'
 HUBSPOT_HEADERS = lambda: {'Authorization': f'Bearer {HUBSPOT_API_KEY}', 'Content-Type': 'application/json'}
 PORTAL_ID = os.environ.get('PORTAL_ID', '246901747')
 SERVICE_PIPELINE_ID = os.environ.get('SERVICE_PIPELINE_ID', 'ba9cdbd6-e220-45b2-a5a2-d67ebdcbade6')
+
+# ── Projects ────────────────────────────────────────────────
+PROJECT_OBJECT_TYPE = os.environ.get('PROJECT_OBJECT_TYPE', 'projects')
+PROJECT_PIPELINE_ID = os.environ.get('PROJECT_PIPELINE_ID', '139663aa-09ee-418e-b67d-c8cfcd3e5ce3')
+PROJECT_DEFAULT_STAGE_ID = os.environ.get('PROJECT_DEFAULT_STAGE_ID', 'acc364b5-d367-49f4-a957-cc4fbf7e8e4b')
+# Stages are read live from the pipeline (see _project_stages) so the labels and
+# ids always match HubSpot. This list is only a fallback for when that read
+# fails. Execution is deliberately absent: the id supplied for it duplicated
+# Planning's, so its real id is only known from the live read.
+PROJECT_STAGE_FALLBACK = [
+    {'id': 'acc364b5-d367-49f4-a957-cc4fbf7e8e4b', 'label': 'Planning'},
+    {'id': '6480a063-31a5-4beb-bce8-12e2edb48f83', 'label': 'Review'},
+    {'id': 'd742ec1d-2e4d-4e7f-81e7-d33314c0074e', 'label': 'Completed'},
+    {'id': 'f70c1fd3-a302-4ee2-be4f-33dc703631e7', 'label': 'On Hold'},
+    {'id': '7cb8b001-0085-44a7-9ff1-9540614e98f0', 'label': 'Cancelled'},
+]
+TASK_PRIORITIES = {'low': 'LOW', 'medium': 'MEDIUM', 'high': 'HIGH'}
+# Logical field -> candidate HubSpot property names, most likely first. Resolved
+# against the object's real property list so a portal using a different
+# spelling still works. See _resolve_properties.
+PROJECT_PROPERTY_CANDIDATES = {
+    'name': ['hs_name', 'hs_project_name', 'subject', 'name'],
+    'description': ['hs_description', 'description'],
+    'priority': ['hs_priority', 'hs_project_priority', 'priority'],
+    'start_date': ['hs_start_date', 'hs_project_start_date'],
+    'due_date': ['hs_target_end_date', 'hs_target_due_date', 'hs_due_date'],
+}
 SERVICE_STAGE_MAP = {
     'new': '8e2b21d0-7a90-4968-8f8c-a8525cc49c70',
     'in_progress': '600b692d-a3fe-4052-9cd7-278b134d7941',
@@ -260,25 +287,47 @@ DEAL_PROPERTY_ALIASES = {
     'farm_zip': ['farm_zip', 'psd_zip', 'zip'],
 }
 _DEAL_PROPS_CACHE = {'names': None}
+_OBJECT_PROPS_CACHE = {}
+
+
+def _known_properties(object_type):
+    """Names of every property on `object_type`, cached per process.
+
+    Requesting a property HubSpot does not know can fail a whole read, so
+    candidate/alias lists are filtered through this before being sent. Returns
+    an empty set if the lookup fails, which callers treat as "unknown".
+    """
+    if object_type not in _OBJECT_PROPS_CACHE:
+        names = set()
+        try:
+            res = requests.get(f'{HUBSPOT_BASE}/crm/v3/properties/{object_type}', headers=HUBSPOT_HEADERS(), timeout=30)
+            if res.status_code == 200:
+                names = {p['name'] for p in res.json().get('results', [])}
+            else:
+                app.logger.warning('Could not list %s properties: %s', object_type, _hubspot_error(res))
+        except Exception as e:
+            app.logger.warning('Could not list %s properties: %s', object_type, e)
+        _OBJECT_PROPS_CACHE[object_type] = names
+    return _OBJECT_PROPS_CACHE[object_type]
+
+
+def _resolve_properties(object_type, candidates):
+    """Map each logical field to the first candidate property that exists.
+
+    Falls back to the first candidate when the property list is unavailable, so
+    behaviour degrades to "assume the conventional name" rather than breaking.
+    """
+    known = _known_properties(object_type)
+    resolved = {}
+    for logical, names in candidates.items():
+        resolved[logical] = next((n for n in names if n in known), names[0])
+    return resolved
 
 
 def _known_deal_properties():
-    """Names of every property that exists on the deal object, cached per process.
-
-    Requesting a property HubSpot does not know can fail the whole read, so the
-    alias lists above are filtered through this before being sent.
-    """
+    """Deal property names. Kept as a named wrapper for the alias filtering below."""
     if _DEAL_PROPS_CACHE['names'] is None:
-        try:
-            res = requests.get(f'{HUBSPOT_BASE}/crm/v3/properties/deals', headers=HUBSPOT_HEADERS(), timeout=30)
-            if res.status_code == 200:
-                _DEAL_PROPS_CACHE['names'] = {p['name'] for p in res.json().get('results', [])}
-            else:
-                app.logger.warning('Could not list deal properties: %s', _hubspot_error(res))
-                _DEAL_PROPS_CACHE['names'] = set()
-        except Exception as e:
-            app.logger.warning('Could not list deal properties: %s', e)
-            _DEAL_PROPS_CACHE['names'] = set()
+        _DEAL_PROPS_CACHE['names'] = _known_properties('deals')
     return _DEAL_PROPS_CACHE['names']
 
 
@@ -865,88 +914,6 @@ def _service_details_from_props(service_id, props):
     }
 
 
-@app.route('/hubspot/team-services/<team_id>', methods=['GET'])
-def hs_team_services(team_id):
-    try:
-        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_shared_team_ids,hubspot_team_id,hs_object_name,subject,hs_ticket_name,hs_ticket_category'
-        url = f'{HUBSPOT_BASE}/crm/v3/objects/services?limit=100&properties={props}'
-        res = requests.get(url, headers=HUBSPOT_HEADERS())
-        if res.status_code != 200:
-            return jsonify({'error': res.text}), res.status_code
-
-        services = []
-        for raw in res.json().get('results', []):
-            props = raw.get('properties', {})
-            team_ids = _parse_team_ids(props.get('hs_shared_team_ids') or props.get('hubspot_team_id'))
-            if str(team_id) in team_ids:
-                services.append(_service_details_from_props(raw.get('id'), props))
-
-        return jsonify({'services': services})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/hubspot/service-details/<service_id>', methods=['GET'])
-def hs_service_details(service_id):
-    try:
-        props = 'hs_name,hs_description,hs_pipeline,hs_pipeline_stage,hs_status,hs_start_date,hs_target_end_date,hs_total_cost,hs_amount_paid,hs_remaining_amount,hs_shared_team_ids,hubspot_team_id,hs_object_name,subject,hs_ticket_name,hs_ticket_category,createdate'
-        url = f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}?properties={props}'
-        res = requests.get(url, headers=HUBSPOT_HEADERS())
-        if res.status_code != 200:
-            return jsonify({'error': res.text}), res.status_code
-
-        raw = res.json()
-        svc = _service_details_from_props(service_id, raw.get('properties', {}))
-
-        contacts = []
-        for contact_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/contacts'):
-            contact_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/contacts/{contact_id}?properties=firstname,lastname,company,email,phone', headers=HUBSPOT_HEADERS())
-            if contact_res.status_code == 200:
-                cp = contact_res.json().get('properties', {})
-                contacts.append({
-                    'id': contact_id,
-                    'name': ((cp.get('firstname') or '') + ' ' + (cp.get('lastname') or '')).strip() or cp.get('company') or 'Contact',
-                    'company': cp.get('company', ''),
-                    'email': cp.get('email', ''),
-                    'phone': cp.get('phone', '')
-                })
-
-        tasks = []
-        for task_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/tasks'):
-            task_res = requests.get(
-                f'{HUBSPOT_BASE}/crm/v3/objects/tasks/{task_id}?properties=subject,hs_task_body,hs_task_status,hs_task_priority,hs_task_start_date,hs_task_due_date,createdate',
-                headers=HUBSPOT_HEADERS()
-            )
-            if task_res.status_code == 200:
-                tp = task_res.json().get('properties', {})
-                tasks.append({
-                    'id': task_id,
-                    'subject': tp.get('subject', ''),
-                    'body': tp.get('hs_task_body', ''),
-                    'status': tp.get('hs_task_status', ''),
-                    'priority': tp.get('hs_task_priority', ''),
-                    'start_date': tp.get('hs_task_start_date', tp.get('createdate', '')),
-                    'due_date': tp.get('hs_task_due_date', ''),
-                    'created_date': tp.get('createdate', '')
-                })
-
-        deals = []
-        for deal_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/services/{service_id}/associations/deals'):
-            deal_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}?properties=dealname,amount,dealstage', headers=HUBSPOT_HEADERS())
-            if deal_res.status_code == 200:
-                dp = deal_res.json().get('properties', {})
-                deals.append({
-                    'id': deal_id,
-                    'name': dp.get('dealname', ''),
-                    'amount': dp.get('amount', ''),
-                    'stage': dp.get('dealstage', '')
-                })
-
-        return jsonify({'service': svc, 'contacts': contacts, 'tasks': tasks, 'deals': deals})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/hubspot/service-stages', methods=['GET'])
 def hs_service_stages():
     try:
@@ -1335,6 +1302,19 @@ def _date_to_hs_ms(date_str):
         return None
 
 
+def _hs_ms_to_date(value):
+    """HubSpot epoch-ms (or already-ISO) timestamp -> YYYY-MM-DD. '' when unparseable."""
+    if not value:
+        return ''
+    text = str(value)
+    if not text.replace('.', '', 1).isdigit():
+        return text[:10]
+    try:
+        return datetime.fromtimestamp(float(text) / 1000, tz=timezone.utc).strftime('%Y-%m-%d')
+    except (ValueError, OSError, OverflowError):
+        return ''
+
+
 @app.route('/submit-customer-form', methods=['POST'])
 def submit_customer_form():
     try:
@@ -1647,6 +1627,247 @@ def customer_intake_upload():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ── Projects ────────────────────────────────────────────────
+_PROJECT_STAGE_CACHE = {'stages': None}
+
+
+def _project_props():
+    return _resolve_properties(PROJECT_OBJECT_TYPE, PROJECT_PROPERTY_CANDIDATES)
+
+
+def _project_stages():
+    """Stages of the project pipeline, in HubSpot's display order.
+
+    Read live so labels and ids always match the portal — this is also how the
+    Execution stage id is obtained, since the id supplied for it duplicated
+    Planning's. Falls back to PROJECT_STAGE_FALLBACK if the read fails.
+    """
+    if _PROJECT_STAGE_CACHE['stages'] is None:
+        stages = []
+        try:
+            res = requests.get(
+                f'{HUBSPOT_BASE}/crm/v3/pipelines/{PROJECT_OBJECT_TYPE}/{PROJECT_PIPELINE_ID}/stages',
+                headers=HUBSPOT_HEADERS(), timeout=30
+            )
+            if res.status_code == 200:
+                results = sorted(res.json().get('results', []), key=lambda s: s.get('displayOrder', 0))
+                stages = [{'id': s['id'], 'label': s.get('label', s['id'])} for s in results]
+            else:
+                app.logger.warning('Could not read project pipeline stages: %s', _hubspot_error(res))
+        except Exception as e:
+            app.logger.warning('Could not read project pipeline stages: %s', e)
+        _PROJECT_STAGE_CACHE['stages'] = stages or list(PROJECT_STAGE_FALLBACK)
+    return _PROJECT_STAGE_CACHE['stages']
+
+
+def _associate_default(from_type, from_id, to_type, to_id):
+    """Create HubSpot's default association between two objects. True if confirmed."""
+    try:
+        res = requests.put(
+            f'{HUBSPOT_BASE}/crm/v4/objects/{from_type}/{from_id}/associations/default/{to_type}/{to_id}',
+            headers=HUBSPOT_HEADERS(), timeout=30
+        )
+        if res.status_code in (200, 201, 204):
+            return True
+        app.logger.warning('Association %s:%s -> %s:%s failed: %s', from_type, from_id, to_type, to_id, _hubspot_error(res))
+    except Exception as e:
+        app.logger.warning('Association %s:%s -> %s:%s failed: %s', from_type, from_id, to_type, to_id, e)
+    return False
+
+
+@app.route('/hubspot/project-stages', methods=['GET'])
+def hs_project_stages():
+    return jsonify({'stages': _project_stages(), 'pipeline_id': PROJECT_PIPELINE_ID})
+
+
+@app.route('/hubspot/deal-options', methods=['GET'])
+def hs_deal_options():
+    """Every deal as {id, name}, for the searchable deal picker on the project form."""
+    try:
+        options = []
+        after = None
+        for _ in range(20):
+            url = f'{HUBSPOT_BASE}/crm/v3/objects/deals?limit=100&properties=dealname'
+            if after:
+                url += f'&after={after}'
+            res = requests.get(url, headers=HUBSPOT_HEADERS())
+            if res.status_code != 200:
+                return jsonify({'error': _hubspot_error(res)}), res.status_code
+            body = res.json()
+            for d in body.get('results', []):
+                options.append({'id': d['id'], 'name': (d.get('properties') or {}).get('dealname') or d['id']})
+            after = body.get('paging', {}).get('next', {}).get('after')
+            if not after:
+                break
+        options.sort(key=lambda o: o['name'].lower())
+        return jsonify({'deals': options})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _project_summary(obj, props):
+    p = obj.get('properties', {})
+    stage_id = p.get('hs_pipeline_stage', '')
+    labels = {s['id']: s['label'] for s in _project_stages()}
+    return {
+        'id': obj['id'],
+        'name': p.get(props['name'], ''),
+        'description': p.get(props['description'], ''),
+        'priority': p.get(props['priority'], ''),
+        'start_date': p.get(props['start_date'], ''),
+        'due_date': p.get(props['due_date'], ''),
+        'stage_id': stage_id,
+        'stage': labels.get(stage_id, stage_id),
+    }
+
+
+@app.route('/hubspot/projects', methods=['GET'])
+def hs_get_projects():
+    """Projects on the project pipeline, optionally filtered to one stage."""
+    try:
+        stage_filter = request.args.get('stage') or None
+        props = _project_props()
+        prop_list = ['hs_pipeline', 'hs_pipeline_stage'] + sorted(set(props.values()))
+
+        projects = []
+        after = None
+        for _ in range(20):
+            url = f'{HUBSPOT_BASE}/crm/v3/objects/{PROJECT_OBJECT_TYPE}?limit=100&properties={",".join(prop_list)}'
+            if after:
+                url += f'&after={after}'
+            res = requests.get(url, headers=HUBSPOT_HEADERS())
+            if res.status_code != 200:
+                return jsonify({'error': _hubspot_error(res)}), res.status_code
+            body = res.json()
+            for obj in body.get('results', []):
+                p = obj.get('properties', {})
+                if p.get('hs_pipeline') and p.get('hs_pipeline') != PROJECT_PIPELINE_ID:
+                    continue
+                if stage_filter and p.get('hs_pipeline_stage') != stage_filter:
+                    continue
+                projects.append(_project_summary(obj, props))
+            after = body.get('paging', {}).get('next', {}).get('after')
+            if not after:
+                break
+
+        return jsonify({'projects': projects, 'stage': stage_filter or '', 'stages': _project_stages()})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/hubspot/project-details/<project_id>', methods=['GET'])
+def hs_project_details(project_id):
+    """One project plus every task associated with it."""
+    try:
+        props = _project_props()
+        prop_list = ['hs_pipeline', 'hs_pipeline_stage'] + sorted(set(props.values()))
+        res = requests.get(
+            f'{HUBSPOT_BASE}/crm/v3/objects/{PROJECT_OBJECT_TYPE}/{project_id}?properties={",".join(prop_list)}',
+            headers=HUBSPOT_HEADERS()
+        )
+        if res.status_code != 200:
+            return jsonify({'error': _hubspot_error(res)}), res.status_code
+        project = _project_summary(res.json(), props)
+
+        task_props = 'hs_task_subject,subject,hs_task_body,hs_task_status,hs_task_priority,hs_timestamp,hs_task_due_date,createdate'
+        tasks = []
+        for task_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/{PROJECT_OBJECT_TYPE}/{project_id}/associations/tasks'):
+            t_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/tasks/{task_id}?properties={task_props}', headers=HUBSPOT_HEADERS())
+            if t_res.status_code != 200:
+                continue
+            tp = t_res.json().get('properties', {})
+            tasks.append({
+                'id': task_id,
+                'name': tp.get('hs_task_subject') or tp.get('subject') or '',
+                'notes': tp.get('hs_task_body', ''),
+                'status': tp.get('hs_task_status', ''),
+                'priority': (tp.get('hs_task_priority') or '').title(),
+                'due_date': _hs_ms_to_date(tp.get('hs_timestamp') or tp.get('hs_task_due_date')),
+            })
+
+        deals = []
+        for deal_id in _get_results_ids(f'{HUBSPOT_BASE}/crm/v3/objects/{PROJECT_OBJECT_TYPE}/{project_id}/associations/deals'):
+            d_res = requests.get(f'{HUBSPOT_BASE}/crm/v3/objects/deals/{deal_id}?properties=dealname', headers=HUBSPOT_HEADERS())
+            if d_res.status_code == 200:
+                deals.append({'id': deal_id, 'name': (d_res.json().get('properties') or {}).get('dealname', '')})
+
+        project['tasks'] = tasks
+        project['deals'] = deals
+        return jsonify({'project': project})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/hubspot/projects', methods=['POST'])
+def hs_create_project():
+    """Create a project, create its tasks, link tasks to it, and link it to a deal."""
+    try:
+        data = request.get_json() or {}
+        deal_id = str(data.get('deal_id', '')).strip()
+        name = str(data.get('name', '')).strip()
+        if not deal_id.isdigit():
+            return jsonify({'error': 'A deal must be selected'}), 400
+        if not name:
+            return jsonify({'error': 'Project name is required'}), 400
+
+        props = _project_props()
+        properties = {
+            'hs_pipeline': PROJECT_PIPELINE_ID,
+            'hs_pipeline_stage': data.get('stage') or PROJECT_DEFAULT_STAGE_ID,
+            props['name']: name,
+        }
+        for logical, key in (('description', 'description'), ('priority', 'priority'),
+                             ('start_date', 'start_date'), ('due_date', 'due_date')):
+            value = data.get(key)
+            if value not in (None, ''):
+                properties[props[logical]] = str(value)
+
+        res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/{PROJECT_OBJECT_TYPE}',
+                            json={'properties': properties}, headers=HUBSPOT_HEADERS())
+        if res.status_code != 201:
+            return jsonify({'error': _hubspot_error(res)}), res.status_code
+        project_id = res.json()['id']
+
+        deal_linked = _associate_default(PROJECT_OBJECT_TYPE, project_id, 'deals', deal_id)
+
+        tasks_created, task_errors = [], []
+        for row in data.get('tasks', []):
+            task_name = str(row.get('name', '')).strip()
+            if not task_name:
+                continue
+            task_props = {
+                'hs_task_subject': task_name,
+                'hs_task_status': 'NOT_STARTED',
+                'hs_task_priority': TASK_PRIORITIES.get(str(row.get('priority', '')).lower(), 'MEDIUM'),
+            }
+            if row.get('notes'):
+                task_props['hs_task_body'] = str(row['notes'])
+            due_ms = _date_to_hs_ms(row.get('due_date', ''))
+            if due_ms:
+                task_props['hs_timestamp'] = due_ms
+            t_res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/tasks',
+                                  json={'properties': task_props}, headers=HUBSPOT_HEADERS())
+            if t_res.status_code != 201:
+                task_errors.append({'name': task_name, 'reason': _hubspot_error(t_res)})
+                continue
+            task_id = t_res.json()['id']
+            if _associate_default('tasks', task_id, PROJECT_OBJECT_TYPE, project_id):
+                tasks_created.append({'id': task_id, 'name': task_name})
+            else:
+                task_errors.append({'name': task_name, 'reason': 'Task created but could not be linked to the project'})
+
+        return jsonify({
+            'success': True,
+            'project_id': project_id,
+            'deal_id': deal_id,
+            'deal_linked': deal_linked,
+            'tasks_created': tasks_created,
+            'task_errors': task_errors,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # ── Proxy to Make webhooks (intake pipeline only) ───────────
 @app.route('/proxy', methods=['POST'])

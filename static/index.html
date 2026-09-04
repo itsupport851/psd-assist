@@ -65,6 +65,22 @@
     .svc-form-input[readonly]:focus { border-color: #dce3ea; }
     .svc-form-select { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; padding: 10px 12px; color: #16212c; font-size: 14px; outline: none; font-family: inherit; }
     .svc-form-select:focus { border-color: #25a35a; }
+    /* Project task rows — same shape as the fan table on the intake form. */
+    .proj-task-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+    .proj-task-table th { text-align: left; color: #64798c; font-weight: 600; padding: 6px 4px; font-size: 11px; }
+    .proj-task-table td { padding: 4px; vertical-align: top; }
+    .proj-task-table input, .proj-task-table select { width: 100%; background: #ffffff; border: 1px solid #dce3ea; border-radius: 6px; padding: 7px 8px; color: #16212c; font-size: 12px; outline: none; font-family: inherit; }
+    .proj-task-table input:focus, .proj-task-table select:focus { border-color: #25a35a; }
+    .proj-remove-row { background: none; border: none; color: #c62828; font-size: 18px; cursor: pointer; padding: 4px 8px; line-height: 1; }
+    .proj-add-row { margin-top: 10px; background: none; border: 1px dashed #c3cedb; color: #25a35a; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; font-family: inherit; }
+    /* Searchable deal picker */
+    .combo { position: relative; }
+    .combo-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); max-height: 208px; overflow-y: auto; background: #ffffff; border: 1px solid #dce3ea; border-radius: 8px; box-shadow: 0 6px 18px rgba(20, 35, 50, .12); }
+    .combo-list button { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 13px; color: #16212c; cursor: pointer; font-family: inherit; }
+    .combo-list button:hover, .combo-list button:focus { background: #eef2f6; outline: none; }
+    .combo-empty { padding: 9px 12px; font-size: 12px; color: #64798c; }
+    .combo-chosen { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #e9f7ef; border: 1px solid #25a35a; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #16212c; }
+    .combo-chosen button { background: none; border: none; color: #1a6b3c; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .contact-confirm-note { background: #e9f7ef; border: 1px solid #1a6b3c; border-radius: 10px; padding: 14px; font-size: 12px; color: #1e6b3f; line-height: 1.5; margin: 10px 0; }
     .contact-yn { background: #ffffff; border: 1px solid #dce3ea; border-radius: 10px; padding: 12px 14px; }
     .contact-yn-title { font-size: 13px; margin-bottom: 8px; }
@@ -134,9 +150,8 @@
       { icon: "📤", label: "Submit Form",    desc: "Send customer intake form", message: null, isCustomerForm: true,          roles: ["sales","admin"] },
       { icon: "💰", label: "Update Pricing", desc: "Edit line item prices",    message: "I want to update line item pricing for a deal", roles: ["sales","admin"] },
       // ── Operations ──
-      { icon: "📈", label: "Services Summary", desc: "Filter by stage/status", message: null, isServiceStageSelector: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "🖥️", label: "Display Service", desc: "Select a team and view service details", message: null, isDisplayService: true, roles: ["analyst","admin","operations","installer"] },
-      { icon: "🔩", label: "New Service",    desc: "Create service for deal",  message: null, isNewServiceForm: true, roles: ["admin"] },
+      { icon: "📈", label: "Project Summary", desc: "Filter by pipeline stage", message: null, isProjectStageSelector: true, roles: ["analyst","admin","operations","installer"] },
+      { icon: "🔩", label: "New Project",    desc: "Create project for a deal", message: null, isNewProjectForm: true, roles: ["admin"] },
       { icon: "🗺",  label: "Farm Map",       desc: "Plot farms by stage",      message: null, isMap: true, roles: ["analyst","admin","operations"] },
     ];
 
@@ -176,8 +191,9 @@
         "- get_deals_with_addresses: fetch appointmentscheduled deals with farm addresses for map",
         "- get_services: get services for a specific deal (requires deal_id)",
         "- get_all_services: fetch ALL services across all deals (no params needed).",
-        "- get_team_services: fetch services for a specific team (requires team_id).",
-        "- get_service_details: fetch one service and its contacts, tasks, and deals (requires service_id).",
+        "- get_project_stages: fetch the stages of the project pipeline.",
+        "- get_projects: fetch projects on the project pipeline (optional stage filter).",
+        "- get_project_details: fetch one project with its associated tasks (requires project_id).",
         "- inspect_service: fetch ALL raw HubSpot properties for one service (requires service_id). Use this when name/team/status are blank to find correct field names.",
         "- get_teams: fetch all HubSpot teams",
       ];
@@ -242,18 +258,19 @@
         "When user asks for options/help/menu: respond with SHOW_OPTIONS.",
         "When user asks for deal summary by stage: respond with STAGE_SELECTOR.",
         "When user asks for open services or services summary: call get_all_services then respond with SERVICES_TABLE. If any service has a blank name, immediately call repair_service with a name derived from deal_name (e.g. 'Fan Motor Installation — {deal_name}'), then show updated table.",
-        "When user asks for service summary by stage/status: respond with SERVICE_STAGE_SELECTOR.",
+        "When user asks for a project summary by stage: respond with PROJECT_STAGE_SELECTOR.",
         "",
         "Display formats:",
         "DEALS_TABLE:{\"deals\":[{\"id\":\"123\",\"name\":\"Farm\",\"amount\":0,\"stage\":\"appointmentscheduled\",\"total_fans\":48,\"total_barns\":6,\"operation_type\":\"Broiler\"}]}",
         "LINE_ITEMS_TABLE:{\"deal_name\":\"Farm\",\"deal_id\":\"123\",\"items\":[{\"id\":\"456\",\"name\":\"Fan\",\"brand\":\"Chore-Time\",\"size\":48,\"qty\":24,\"unit_price\":0,\"line_total\":0}]}",
         "SERVICES_TABLE:{\"services\":[{\"id\":\"123\",\"name\":\"Fan Motor Installation — Farm\",\"deal_name\":\"Henderson Broiler Farm\",\"stage\":\"new\",\"status\":\"ON_TRACK\",\"team\":\"Team Name\",\"start_date\":\"2026-04-01\",\"due_date\":\"2026-04-30\",\"total_cost\":\"9600\"}]}",
-        "TEAMS_SELECTOR:{\"teams\":[{\"id\":\"123\",\"name\":\"Team Name\",\"userIds\":[]}]}",
+        "PROJECTS_TABLE:{\"projects\":[{\"id\":\"1\",\"name\":\"Smith Farms\",\"stage\":\"Planning\",\"priority\":\"High\",\"start_date\":\"2026-10-01\",\"due_date\":\"2026-11-01\"}],\"label\":\"Planning\"}",
+        "PROJECT_DETAILS: (when showing one project and its tasks — use get_project_details)",
         "SERVICE_FORM:{\"deal_id\":\"123\",\"deal_name\":\"Farm\",\"team_id\":\"456\",\"team_name\":\"Boxy Services\",\"name\":\"Fan Motor Installation — Farm\",\"description\":\"Install 48 fans across 6 barns\",\"start_date\":\"2026-04-01\",\"target_end_date\":\"2026-04-30\",\"total_cost\":\"9600\",\"stage\":\"new\",\"status\":\"ON_TRACK\"}",
         "MAP_LINK (at end of response after summarizing farms)",
         "SHOW_OPTIONS (when showing menu)",
         "STAGE_SELECTOR (when showing deal stage filter)",
-        "SERVICE_STAGE_SELECTOR (when showing service stage/status filter)",
+        "PROJECT_STAGE_SELECTOR (when showing the project pipeline stage filter)",
         "",
         "CRITICAL: When calling a tool, respond with ONLY the JSON — no text before or after:",
         "CRITICAL: In your final response after receiving tool results, NEVER repeat or show the tool call JSON, tool name, or raw tool result data. Only show the formatted display output (DEALS_TABLE, SERVICES_TABLE, etc.) or a natural language summary.",
@@ -294,8 +311,12 @@
       if (tool === "get_deals_with_addresses") return await callRailway("/hubspot/deals-with-addresses");
       if (tool === "get_services") return await callRailway("/hubspot/services/" + params.deal_id);
       if (tool === "get_all_services") return await callRailway("/hubspot/all-services");
-      if (tool === "get_team_services") return await callRailway("/hubspot/team-services/" + params.team_id);
-      if (tool === "get_service_details") return await callRailway("/hubspot/service-details/" + params.service_id);
+      if (tool === "get_project_stages") return await callRailway("/hubspot/project-stages");
+      if (tool === "get_projects") {
+        var stageQ = params && params.stage ? "?stage=" + encodeURIComponent(params.stage) : "";
+        return await callRailway("/hubspot/projects" + stageQ);
+      }
+      if (tool === "get_project_details") return await callRailway("/hubspot/project-details/" + params.project_id);
       if (tool === "inspect_service") return await callRailway("/hubspot/service-inspect/" + params.service_id);
       if (tool === "repair_service") {
         var res = await fetch("/hubspot/services/" + params.service_id + "/repair", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: params.name }) });
@@ -612,74 +633,148 @@
       );
     }
 
-    function ServiceDetails({ data }) {
-      var svc = data.service || {};
-      var contacts = data.contacts || [];
-      var tasks = data.tasks || [];
-      var deals = data.deals || [];
-      function fmtDate(d) {
-        if (!d) return '—';
-        try {
-          var val = /^\d{10,}$/.test(String(d)) ? new Date(Number(d)) : new Date(d);
-          if (isNaN(val.getTime())) return String(d).slice(0, 10) || '—';
-          return val.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        } catch(e) { return String(d).slice(0, 10) || '—'; }
-      }
-      function stripHtml(text) {
-        if (!text) return '';
-        return String(text).replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').trim();
+    // Shared date formatter for project and task tables.
+    function fmtProjectDate(d) {
+      if (!d) return '—';
+      try {
+        var val = /^\d{10,}$/.test(String(d)) ? new Date(Number(d)) : new Date(d + 'T00:00:00');
+        if (isNaN(val.getTime())) return String(d).slice(0, 10) || '—';
+        return val.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch (e) { return String(d).slice(0, 10) || '—'; }
+    }
+
+    function priorityTag(priority) {
+      var p = String(priority || '').toLowerCase();
+      var color = p === 'high' ? '#c62828' : p === 'low' ? '#64798c' : '#c77700';
+      if (!p) return React.createElement("span", { style: { color: "#64798c" } }, "—");
+      return React.createElement("span", { style: { color: color, fontWeight: 600, fontSize: 12 } },
+        p.charAt(0).toUpperCase() + p.slice(1));
+    }
+
+    // ── Project Summary: pick a pipeline stage ──────────────────
+    function ProjectStageSelector({ onAction }) {
+      const [stages, setStages] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState('');
+
+      useEffect(function() {
+        fetch('/hubspot/project-stages')
+          .then(function(r) { return r.json(); })
+          .then(function(data) { setStages(data.stages || []); })
+          .catch(function() { setError('Unable to load project pipeline stages.'); })
+          .finally(function() { setLoading(false); });
+      }, []);
+
+      function btn(key, icon, label, stageId) {
+        return React.createElement("button", { key: key, className: "qa-btn", style: { flex: "0 0 auto" },
+          onClick: function() { onAction('GET_PROJECTS:' + JSON.stringify({ stage: stageId, label: label })); } },
+          React.createElement("span", { className: "qa-icon" }, icon),
+          React.createElement("div", null,
+            React.createElement("div", { className: "qa-label" }, label),
+            React.createElement("div", { className: "qa-desc" }, stageId ? "Projects in this stage" : "Every project")
+          )
+        );
       }
 
       return React.createElement("div", null,
-        React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
-          React.createElement("div", { style: { fontSize: 14, fontWeight: 700, marginBottom: 8 } }, svc.name || 'Service Detail'),
-          svc.deal_name && React.createElement("div", { style: { fontSize: 12, color: '#3d6076', marginBottom: 4 } }, 'Deal: ' + svc.deal_name),
-          React.createElement("div", { style: { fontSize: 12, color: '#3d6076', marginBottom: 4 } }, svc.team ? 'Team: ' + svc.team : 'Team: —'),
-          React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 12 } },
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Stage'), React.createElement("div", { style: { marginTop: 4 } }, svc.stage || '—')),
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Status'), React.createElement("div", { style: { marginTop: 4 } }, svc.status || '—')),
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Start Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.start_date))),
-            React.createElement("div", null, React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Due Date'), React.createElement("div", { style: { marginTop: 4 } }, fmtDate(svc.due_date)))
-          ),
-          React.createElement("div", { style: { marginTop: 12, fontSize: 12, color: '#16212c' } }, svc.description || 'No service description available.')
-        ),
-        contacts.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
-          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Contacts"),
-          contacts.map(function(c) {
-            return React.createElement("div", { key: c.id, style: { marginBottom: 10, fontSize: 12 } },
-              React.createElement("div", { style: { fontWeight: 600 } }, c.name || '—'),
-              React.createElement("div", null, c.company || '—'),
-              React.createElement("div", null, c.email || '—'),
-              React.createElement("div", null, c.phone || '—')
-            );
-          })
-        ),
-        tasks.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
-          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Tasks"),
-          tasks.map(function(t) {
-            return React.createElement("div", { key: t.id, style: { marginBottom: 20, fontSize: 12 } },
-              React.createElement("div", { style: { fontWeight: 600, marginBottom: 6 } }, t.subject || '—'),
-              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 4 } }, 'Status: ' + (t.status || '—')),
-              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 4 } }, 'Priority: ' + (t.priority || '—')),
-              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 4 } }, 'Start: ' + (t.start_date ? fmtDate(t.start_date) : '—')),
-              React.createElement("div", { style: { fontSize: 11, color: '#3d6076', marginBottom: 8 } }, 'Due: ' + (t.due_date ? fmtDate(t.due_date) : '—')),
-              React.createElement("div", { style: { fontWeight: 600, marginBottom: 4 } }, 'Notes'),
-              React.createElement("div", { style: { marginBottom: 8, whiteSpace: 'pre-wrap', color: '#16212c' } }, stripHtml(t.body) || 'No details'),
-              React.createElement("div", { style: { fontSize: 11, color: '#64798c' } }, 'Created: ' + fmtDate(t.created_date))
-            );
-          })
-        ),
-        deals.length > 0 && React.createElement("div", { className: "svcd-card", style: { padding: 16, marginBottom: 14 } },
-          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "Associated Deals"),
-          deals.map(function(d) {
-            return React.createElement("div", { key: d.id, style: { marginBottom: 10, fontSize: 12 } },
-              React.createElement("div", { style: { fontWeight: 600 } }, d.name || '—'),
-              React.createElement("div", null, 'Stage: ' + (d.stage || '—')),
-              React.createElement("div", null, 'Amount: ' + (d.amount || '—')),
-              React.createElement("div", null, 'Close date: ' + fmtDate(d.close_date))
-            );
-          })
+        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Which project stage would you like to see?"),
+        loading && React.createElement("div", { style: { color: "#3d6076", fontSize: 12 } }, "Loading stages..."),
+        error && React.createElement("div", { className: "error-text" }, error),
+        !loading && !error && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+          [btn('all', '📈', 'All Projects', '')].concat(stages.map(function(s, i) {
+            return btn(s.id || i, '📌', s.label, s.id);
+          }))
         )
+      );
+    }
+
+    // ── Project Summary: the list for a chosen stage ────────────
+    function ProjectsTable({ data, onAction }) {
+      var projects = data.projects || [];
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 6 } },
+          projects.length + (projects.length === 1 ? " project" : " projects") + (data.label ? " — " + data.label : "")),
+        projects.length === 0
+          ? React.createElement("div", { style: { fontSize: 13, color: "#3d6076" } }, "No projects found for this stage.")
+          : React.createElement("table", { className: "deal-table" },
+              React.createElement("thead", null,
+                React.createElement("tr", null,
+                  React.createElement("th", null, "#"),
+                  React.createElement("th", null, "Project"),
+                  React.createElement("th", null, "Stage"),
+                  React.createElement("th", null, "Priority"),
+                  React.createElement("th", null, "Start"),
+                  React.createElement("th", null, "Due")
+                )
+              ),
+              React.createElement("tbody", null,
+                projects.map(function(p, i) {
+                  return React.createElement("tr", { key: p.id },
+                    React.createElement("td", { style: { color: "#64798c" } }, i + 1),
+                    React.createElement("td", null,
+                      React.createElement("button", {
+                        style: { background: "none", border: "none", padding: 0, color: "#1a6b3c", fontWeight: 600, fontSize: 13, cursor: "pointer", textAlign: "left", fontFamily: "inherit" },
+                        onClick: function() { onAction('SHOW_PROJECT_DETAILS:' + JSON.stringify({ project_id: p.id, project_name: p.name })); }
+                      }, p.name || ('Project ' + p.id))
+                    ),
+                    React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, p.stage || "—"),
+                    React.createElement("td", null, priorityTag(p.priority)),
+                    React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, fmtProjectDate(p.start_date)),
+                    React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, fmtProjectDate(p.due_date))
+                  );
+                })
+              )
+            )
+      );
+    }
+
+    // ── Project detail: summary plus every associated task ──────
+    function ProjectDetails({ data }) {
+      var p = data.project || {};
+      var tasks = p.tasks || [];
+      var deals = p.deals || [];
+
+      function row(label, value) {
+        return React.createElement("div", { style: { display: "flex", gap: 8, fontSize: 13, marginBottom: 4 } },
+          React.createElement("div", { style: { color: "#64798c", minWidth: 92 } }, label),
+          React.createElement("div", { style: { color: "#16212c", fontWeight: 500 } }, value || "—")
+        );
+      }
+
+      return React.createElement("div", null,
+        React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#16212c", marginBottom: 8 } }, p.name || "Project"),
+        React.createElement("div", { style: { background: "#f4f6f9", border: "1px solid #dce3ea", borderRadius: 10, padding: "12px 14px", marginBottom: 12 } },
+          row("Stage", p.stage),
+          row("Priority", p.priority),
+          row("Start", fmtProjectDate(p.start_date)),
+          row("Due", fmtProjectDate(p.due_date)),
+          row("Deal", deals.map(function(d) { return d.name; }).join(", ")),
+          p.description && row("Description", p.description)
+        ),
+        React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 4 } },
+          tasks.length + (tasks.length === 1 ? " task" : " tasks")),
+        tasks.length === 0
+          ? React.createElement("div", { style: { fontSize: 13, color: "#3d6076" } }, "No tasks are associated with this project.")
+          : React.createElement("table", { className: "line-table" },
+              React.createElement("thead", null,
+                React.createElement("tr", null,
+                  React.createElement("th", null, "Task"),
+                  React.createElement("th", null, "Due Date"),
+                  React.createElement("th", null, "Priority"),
+                  React.createElement("th", null, "Notes")
+                )
+              ),
+              React.createElement("tbody", null,
+                tasks.map(function(t) {
+                  return React.createElement("tr", { key: t.id },
+                    React.createElement("td", { style: { fontWeight: 500 } }, t.name || "—"),
+                    React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, fmtProjectDate(t.due_date)),
+                    React.createElement("td", null, priorityTag(t.priority)),
+                    React.createElement("td", { style: { color: "#3d6076", fontSize: 12 } }, t.notes || "—")
+                  );
+                })
+              )
+            )
       );
     }
 
@@ -701,21 +796,6 @@
               React.createElement("div", null,
                 React.createElement("div", { className: "qa-label" }, s.label)
               )
-            );
-          })
-        )
-      );
-    }
-
-    function ServiceStageSelector({ onAction }) {
-      return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Filter services by:"),
-        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-          SERVICE_STAGE_BUTTONS.map(function(s, i) {
-            var payload = { stage: s.stage || "", status: s.status || "" };
-            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('GET_SERVICES:' + JSON.stringify(payload)); } },
-              React.createElement("span", { className: "qa-icon" }, s.icon),
-              React.createElement("div", null, React.createElement("div", { className: "qa-label" }, s.label))
             );
           })
         )
@@ -984,422 +1064,6 @@
       { icon: "📄", label: "Contract",      stage: "contractsent",          color: "#06b6d4" },
     ];
 
-    function NewServiceWizard({ onDone, onCancel }) {
-      const [step, setStep]                   = React.useState(1);   // 1=stage 2=deals 3=form 4=progress
-      const [filteredDeals, setFilteredDeals] = React.useState([]);
-      const [selectedStageLabel, setSelectedStageLabel] = React.useState('');
-      const [selectedIds, setSelectedIds]     = React.useState({});   // { dealId: true }
-      const [loadingDeals, setLoadingDeals]   = React.useState(false);
-      // Shared form settings applied to all selected deals
-      const [sharedForm, setSharedForm] = React.useState({
-        team_id: '', start_date: '', target_end_date: '',
-        total_cost: '', stage: 'new', status: 'ON_TRACK', description: '',
-      });
-      const [teams, setTeams]           = React.useState([]);
-      const [lineItemsByDeal, setLineItemsByDeal] = React.useState({});  // { dealId: [items] }
-      const [loadingLineItems, setLoadingLineItems] = React.useState(false);
-      const [progress, setProgress]           = React.useState([]);  // [{deal, status, error}]
-
-      function updateShared(field, value) {
-        setSharedForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
-      }
-
-      function pickStage(stageId, stageLabel) {
-        setLoadingDeals(true);
-        setSelectedStageLabel(stageLabel);
-        setSelectedIds({});
-        Promise.all([
-          fetch("/hubspot/deals?limit=100&properties=dealname,dealstage,total_fans,total_barns,amount")
-            .then(function(r) { return r.json(); }),
-          fetch("/hubspot/teams").then(function(r) { return r.json(); })
-        ]).then(function(results) {
-          var deals = (results[0].deals || []).filter(function(d) {
-            var s = (d.properties || {}).dealstage || '';
-            if (s === 'closedwon' || s === 'closedlost') return false;
-            return stageId === '' || s === stageId;
-          });
-          setFilteredDeals(deals);
-          setTeams(results[1].teams || []);
-          setStep(2);
-        }).catch(function() { setFilteredDeals([]); setStep(2); })
-          .finally(function() { setLoadingDeals(false); });
-      }
-
-      function toggleDeal(id) {
-        setSelectedIds(function(prev) {
-          var next = Object.assign({}, prev);
-          if (next[id]) { delete next[id]; } else { next[id] = true; }
-          return next;
-        });
-      }
-
-      function toggleAll() {
-        var allSelected = filteredDeals.every(function(d) { return selectedIds[d.id]; });
-        if (allSelected) {
-          setSelectedIds({});
-        } else {
-          var next = {};
-          filteredDeals.forEach(function(d) { next[d.id] = true; });
-          setSelectedIds(next);
-        }
-      }
-
-      var selectedDeals = filteredDeals.filter(function(d) { return selectedIds[d.id]; });
-      var selectedCount = selectedDeals.length;
-
-      const STAGE_LABELS = { appointmentscheduled: "Scheduled", qualifiedtobuy: "Qualified", presentationscheduled: "Presentation", decisionmakerboughtin: "Decision", contractsent: "Contract", closedwon: "Won" };
-
-      async function goToStep3() {
-        var dealsToProcess = filteredDeals.filter(function(d) { return selectedIds[d.id]; });
-        setLoadingLineItems(true);
-        setStep(3);
-        var byDeal = {};
-        for (var i = 0; i < dealsToProcess.length; i++) {
-          try {
-            var res = await fetch("/hubspot/line-items/" + dealsToProcess[i].id);
-            var data = await res.json();
-            byDeal[dealsToProcess[i].id] = data.line_items || [];
-          } catch(e) {
-            byDeal[dealsToProcess[i].id] = [];
-          }
-        }
-        setLineItemsByDeal(byDeal);
-        setLoadingLineItems(false);
-
-        // Build shared description from all fan configs
-        var allItems = Object.values(byDeal).flat();
-        if (allItems.length > 0) {
-          var lines = allItems.map(function(li) {
-            var lp = li.properties || {};
-            var qty  = lp.quantity || lp.number_of_fans || "?";
-            var name = lp.name || ((lp.fan_brand || "") + (lp.fan_size ? " " + lp.fan_size + '"' : "")).trim() || "Fan";
-            var hp   = lp.motor_size ? " " + lp.motor_size + " HP" : "";
-            return qty + "x " + name + hp;
-          });
-          setSharedForm(function(prev) {
-            return Object.assign({}, prev, { description: "Fans to service: " + lines.join(", ") + "." });
-          });
-        }
-      }
-
-      // ── Step 1: Stage picker ──────────────────────────────────
-      if (step === 1) {
-        return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 10, fontWeight: 600 } }, "🔧 New Service — Step 1 of 3"),
-          React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 10 } }, "Which deals do you want to see?"),
-          React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-            WIZARD_STAGE_BUTTONS.map(function(s, i) {
-              return React.createElement("button", {
-                key: i, className: "qa-btn", style: { flex: "0 0 auto" },
-                disabled: loadingDeals,
-                onClick: function() { pickStage(s.stage, s.label); }
-              },
-                React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: s.color, display: "inline-block", flexShrink: 0 } }),
-                React.createElement("div", null, React.createElement("div", { className: "qa-label" }, loadingDeals ? "Loading…" : s.label))
-              );
-            })
-          ),
-          React.createElement("button", { className: "svc-form-btn-cancel", style: { marginTop: 10, width: "auto", padding: "5px 14px" }, onClick: onCancel }, "Cancel")
-        );
-      }
-
-      // ── Step 2: Multi-deal picker ─────────────────────────────
-      if (step === 2) {
-        var allChecked = filteredDeals.length > 0 && filteredDeals.every(function(d) { return selectedIds[d.id]; });
-        return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 6, fontWeight: 600 } }, "🔧 New Service — Step 2 of 3"),
-          React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 10 } },
-            filteredDeals.length + " deal" + (filteredDeals.length !== 1 ? "s" : "") + " — " + selectedStageLabel + ". Select one or more:"
-          ),
-          filteredDeals.length === 0
-            ? React.createElement("div", { style: { color: "#64798c", fontSize: 12, fontStyle: "italic", marginBottom: 10 } }, "No deals found for this stage.")
-            : React.createElement("div", null,
-                // Select all row
-                React.createElement("div", {
-                  style: { display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", marginBottom: 4, cursor: "pointer", borderRadius: 8, background: "#f4f6f9" },
-                  onClick: toggleAll
-                },
-                  React.createElement("div", {
-                    style: { width: 16, height: 16, borderRadius: 4, border: "2px solid " + (allChecked ? "#25a35a" : "#a9b8c7"), background: allChecked ? "#25a35a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }
-                  }, allChecked && React.createElement("span", { style: { color: "#fff", fontSize: 10, fontWeight: 700, lineHeight: 1 } }, "✓")),
-                  React.createElement("div", { style: { fontSize: 12, color: "#3d6076", fontWeight: 600 } }, "Select all " + filteredDeals.length + " deals")
-                ),
-                // Deal rows
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 240, overflowY: "auto" } },
-                  filteredDeals.map(function(d) {
-                    var dp = d.properties || {};
-                    var checked = !!selectedIds[d.id];
-                    var stageLabel = STAGE_LABELS[dp.dealstage] || dp.dealstage || '';
-                    return React.createElement("div", {
-                      key: d.id,
-                      style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: checked ? "#e9f7ef" : "#ffffff", border: "1px solid " + (checked ? "#25a35a" : "#dce3ea"), transition: "all 0.12s" },
-                      onClick: function() { toggleDeal(d.id); }
-                    },
-                      React.createElement("div", {
-                        style: { width: 16, height: 16, borderRadius: 4, border: "2px solid " + (checked ? "#25a35a" : "#a9b8c7"), background: checked ? "#25a35a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }
-                      }, checked && React.createElement("span", { style: { color: "#fff", fontSize: 10, fontWeight: 700, lineHeight: 1 } }, "✓")),
-                      React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#16212c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, dp.dealname || d.id),
-                        React.createElement("div", { style: { fontSize: 11, color: "#64798c", marginTop: 1 } }, (dp.total_fans || "?") + " fans · " + (dp.total_barns || "?") + " barns" + (stageLabel ? " · " + stageLabel : ""))
-                      )
-                    );
-                  })
-                )
-              ),
-          React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 10, alignItems: "center" } },
-            React.createElement("button", { className: "svc-form-btn-cancel", style: { width: "auto", padding: "5px 14px" }, onClick: function() { setStep(1); } }, "← Back"),
-            React.createElement("button", { className: "svc-form-btn-cancel", style: { width: "auto", padding: "5px 14px" }, onClick: onCancel }, "Cancel"),
-            selectedCount > 0 && React.createElement("button", {
-              className: "svc-form-btn",
-              style: { width: "auto", padding: "6px 18px", marginLeft: "auto" },
-              onClick: function() { goToStep3(); }
-            }, "Continue with " + selectedCount + " deal" + (selectedCount !== 1 ? "s" : "") + " →")
-          )
-        );
-      }
-
-      // ── Step 3: Shared service settings ──────────────────────
-      if (step === 3) {
-        // Build fan inventory display across all selected deals
-        var inventoryPanel = loadingLineItems
-          ? React.createElement("div", { style: { fontSize: 11, color: "#64798c", fontStyle: "italic", marginBottom: 10 } }, "Loading fan inventory…")
-          : Object.keys(lineItemsByDeal).length > 0
-            ? React.createElement("div", { style: { background: "#f4f6f9", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11 } },
-                React.createElement("div", { style: { color: "#64798c", marginBottom: 6, fontWeight: 600 } }, "📦 Fan Inventory"),
-                selectedDeals.map(function(d) {
-                  var dp    = d.properties || {};
-                  var items = lineItemsByDeal[d.id] || [];
-                  return React.createElement("div", { key: d.id, style: { marginBottom: 6 } },
-                    React.createElement("div", { style: { color: "#3d6076", fontWeight: 600, marginBottom: 2 } }, dp.dealname || d.id),
-                    items.length === 0
-                      ? React.createElement("div", { style: { color: "#a9b8c7", fontStyle: "italic" } }, "No line items")
-                      : items.map(function(li, j) {
-                          var lp = li.properties || {};
-                          var qty  = lp.quantity || lp.number_of_fans || "?";
-                          var name = lp.name || ((lp.fan_brand || "") + (lp.fan_size ? " " + lp.fan_size + '"' : "")).trim() || "Fan";
-                          var hp   = lp.motor_size ? " · " + lp.motor_size + " HP" : "";
-                          return React.createElement("div", { key: j, style: { color: "#16212c", paddingLeft: 8 } }, "• " + qty + "x " + name + hp);
-                        })
-                  );
-                })
-              )
-            : null;
-
-        return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 4, fontWeight: 600 } }, "🔧 New Service — Step 3 of 3"),
-          React.createElement("div", { style: { fontSize: 12, color: "#64798c", marginBottom: 10 } },
-            "Set service details for " + selectedCount + " deal" + (selectedCount !== 1 ? "s" : "") + ":"
-          ),
-          // Selected deals summary
-          React.createElement("div", { style: { background: "#f4f6f9", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#3d6076" } },
-            selectedDeals.map(function(d) { return (d.properties || {}).dealname || d.id; }).join(", ")
-          ),
-          // Fan inventory
-          inventoryPanel,
-          // Team
-          React.createElement("div", { className: "svc-form-row" },
-            React.createElement("div", { className: "svc-form-label" }, "Team"),
-            React.createElement("select", {
-              className: "svc-form-select", style: { width: "100%" },
-              value: sharedForm.team_id,
-              onChange: function(e) { updateShared("team_id", e.target.value); }
-            },
-              React.createElement("option", { value: "" }, "— unassigned —"),
-              teams.map(function(t) { return React.createElement("option", { key: t.id, value: t.id }, t.name); })
-            )
-          ),
-          // Description — pre-filled from line items, editable
-          React.createElement("div", { className: "svc-form-row" },
-            React.createElement("div", { className: "svc-form-label" }, "Description" + (loadingLineItems ? " (building…)" : "")),
-            React.createElement("textarea", {
-              className: "svc-form-input",
-              value: sharedForm.description,
-              rows: 3,
-              placeholder: "e.g. Install motors, Inspect fans…",
-              onChange: function(e) { updateShared("description", e.target.value); },
-              style: { resize: "vertical", minHeight: 60 }
-            })
-          ),
-          // Dates
-          React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
-            React.createElement("div", { className: "svc-form-row" },
-              React.createElement("div", { className: "svc-form-label" }, "Start Date"),
-              React.createElement("input", { className: "svc-form-input", type: "date", value: sharedForm.start_date, onChange: function(e) { updateShared("start_date", e.target.value); } })
-            ),
-            React.createElement("div", { className: "svc-form-row" },
-              React.createElement("div", { className: "svc-form-label" }, "Target End Date"),
-              React.createElement("input", { className: "svc-form-input", type: "date", value: sharedForm.target_end_date, onChange: function(e) { updateShared("target_end_date", e.target.value); } })
-            )
-          ),
-          // Cost + Stage + Status
-          React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
-            React.createElement("div", { className: "svc-form-row" },
-              React.createElement("div", { className: "svc-form-label" }, "Total Cost ($)"),
-              React.createElement("input", { className: "svc-form-input", type: "number", value: sharedForm.total_cost, placeholder: "0.00", onChange: function(e) { updateShared("total_cost", e.target.value); } })
-            ),
-            React.createElement("div", { className: "svc-form-row" },
-              React.createElement("div", { className: "svc-form-label" }, "Stage"),
-              React.createElement("select", { className: "svc-form-select", value: sharedForm.stage, onChange: function(e) { updateShared("stage", e.target.value); } },
-                React.createElement("option", { value: "new" }, "New"),
-                React.createElement("option", { value: "in_progress" }, "In Progress"),
-                React.createElement("option", { value: "closed" }, "Closed")
-              )
-            ),
-            React.createElement("div", { className: "svc-form-row" },
-              React.createElement("div", { className: "svc-form-label" }, "Status"),
-              React.createElement("select", { className: "svc-form-select", value: sharedForm.status, onChange: function(e) { updateShared("status", e.target.value); } },
-                React.createElement("option", { value: "ON_TRACK" }, "On Track"),
-                React.createElement("option", { value: "AT_RISK" }, "At Risk"),
-                React.createElement("option", { value: "BEHIND" }, "Behind"),
-                React.createElement("option", { value: "COMPLETE" }, "Completed")
-              )
-            )
-          ),
-          React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 10 } },
-            React.createElement("button", { className: "svc-form-btn-cancel", style: { width: "auto", padding: "5px 14px" }, onClick: function() { setStep(2); } }, "← Back"),
-            React.createElement("button", { className: "svc-form-btn-cancel", style: { width: "auto", padding: "5px 14px" }, onClick: onCancel }, "Cancel"),
-            React.createElement("button", {
-              className: "svc-form-btn", style: { width: "auto", padding: "6px 18px", marginLeft: "auto" },
-              onClick: function() { createServicesForAll(); }
-            }, "✅ Create " + selectedCount + " Service" + (selectedCount !== 1 ? "s" : ""))
-          )
-        );
-      }
-
-      // ── Step 4: Progress ──────────────────────────────────────
-      if (step === 4) {
-        var done   = progress.filter(function(p) { return p.status !== 'pending'; }).length;
-        var errors = progress.filter(function(p) { return p.status === 'error'; }).length;
-        return React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 10, fontWeight: 600 } },
-            done < progress.length ? "🔧 Creating services…" : (errors === 0 ? "✅ All services created!" : "⚠️ " + (progress.length - errors) + " created, " + errors + " failed")
-          ),
-          React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } },
-            progress.map(function(p, i) {
-              var icon = p.status === 'pending' ? "⏳" : p.status === 'ok' ? "✅" : "❌";
-              var color = p.status === 'ok' ? "#25a35a" : p.status === 'error' ? "#c62828" : "#64798c";
-              return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: color } },
-                React.createElement("span", null, icon),
-                React.createElement("span", null, (p.deal.properties || {}).dealname || p.deal.id),
-                p.status === 'error' && React.createElement("span", { style: { fontSize: 11, color: "#c62828" } }, "— " + p.error)
-              );
-            })
-          ),
-          done >= progress.length && React.createElement("button", {
-            className: "svc-form-btn", style: { width: "auto", padding: "6px 18px" },
-            onClick: function() { onDone(true, progress.length - errors, errors); }
-          }, "Done")
-        );
-      }
-
-      return null;
-
-      async function createServicesForAll() {
-        var initial = selectedDeals.map(function(d) { return { deal: d, status: 'pending', error: '' }; });
-        setProgress(initial);
-        setStep(4);
-        var updated = initial.slice();
-        for (var i = 0; i < selectedDeals.length; i++) {
-          var d  = selectedDeals[i];
-          var dp = d.properties || {};
-          var name = "Fan Motor Installation — " + (dp.dealname || d.id);
-          try {
-            var res = await fetch("/hubspot/services", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                deal_id:         d.id,
-                name:            name,
-                task_details:    sharedForm.description,
-                stage:           sharedForm.stage,
-                status:          sharedForm.status,
-                start_date:      sharedForm.start_date,
-                target_end_date: sharedForm.target_end_date,
-                total_cost:      sharedForm.total_cost,
-                team_id:         sharedForm.team_id,
-              })
-            });
-            var data = await res.json();
-            updated[i] = Object.assign({}, updated[i], { status: data.success ? 'ok' : 'error', error: data.error || '' });
-          } catch(e) {
-            updated[i] = Object.assign({}, updated[i], { status: 'error', error: e.message });
-          }
-          setProgress(updated.slice());
-        }
-      }
-    }
-
-    function TeamsSelector({ teams, onAction }) {
-      return React.createElement("div", null,
-        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-          teams.map(function(t, i) {
-            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction("Use team: " + t.name + " (ID: " + t.id + ")"); } },
-              React.createElement("span", { className: "qa-icon" }, "🏢"),
-              React.createElement("div", null,
-                React.createElement("div", { className: "qa-label" }, t.name),
-                React.createElement("div", { className: "qa-desc" }, t.userIds ? t.userIds.length + " members" : "")
-              )
-            );
-          }),
-
-        )
-      );
-    }
-
-    function TeamsSelectorWrapper({ onAction }) {
-      const [teams, setTeams] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [error, setError] = useState('');
-
-      useEffect(function() {
-        fetch('/hubspot/teams')
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            setTeams(data.teams || []);
-          })
-          .catch(function(err) {
-            setError('Unable to load teams.');
-          })
-          .finally(function() { setLoading(false); });
-      }, []);
-
-      return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Which team should I display services for?"),
-        loading && React.createElement("div", { style: { color: "#3d6076", fontSize: 12 } }, "Loading teams..."),
-        error && React.createElement("div", { style: { color: "#c62828", fontSize: 12 } }, error),
-        !loading && !error && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-          teams.map(function(t, i) {
-            return React.createElement("button", { key: i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('SHOW_TEAM_SERVICES:' + JSON.stringify({ team_id: t.id, team_name: t.name })); } },
-              React.createElement("span", { className: "qa-icon" }, "🏢"),
-              React.createElement("div", null,
-                React.createElement("div", { className: "qa-label" }, t.name),
-                React.createElement("div", { className: "qa-desc" }, t.userIds ? t.userIds.length + " members" : "")
-              )
-            );
-          })
-        )
-      );
-    }
-
-    function TeamServicesSelector({ team, services, onAction }) {
-      return React.createElement("div", null,
-        React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Select a service for " + (team.name || 'this team') + ":"),
-        services.length === 0
-          ? React.createElement("div", { style: { color: "#3d6076", fontSize: 12 } }, "No services found for this team.")
-          : React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
-              services.map(function(s, i) {
-                return React.createElement("button", { key: s.id || i, className: "qa-btn", style: { flex: "0 0 auto" }, onClick: function() { onAction('DISPLAY_SERVICE_BY_ID:' + JSON.stringify({ service_id: s.id, service_name: s.name })); } },
-                  React.createElement("span", { className: "qa-icon" }, "🔧"),
-                  React.createElement("div", null,
-                    React.createElement("div", { className: "qa-label" }, s.name || ('Service ' + (i + 1))),
-                    React.createElement("div", { className: "qa-desc" }, s.deal_name ? 'Deal: ' + s.deal_name : '')
-                  )
-                );
-              })
-            )
-      );
-    }
-
     function StageSelector({ onAction }) {
       return React.createElement("div", null,
         React.createElement("div", { style: { fontSize: 13, color: "#3d6076", marginBottom: 8 } }, "Which deals do you want to see?"),
@@ -1414,10 +1078,238 @@
       );
     }
 
+    var TASK_PRIORITY_OPTIONS = ['Low', 'Medium', 'High'];
+
+    function emptyTaskRow() { return { name: '', due_date: '', priority: 'Medium', notes: '' }; }
+
+    // Searchable deal picker. The full deal list is fetched once and filtered
+    // client-side, so typing narrows it without a round trip per keystroke.
+    function DealPicker({ deals, loading, error, value, onPick, onClear }) {
+      const [query, setQuery] = useState('');
+      const [open, setOpen] = useState(false);
+
+      if (value) {
+        return React.createElement('div', { className: 'combo-chosen' },
+          React.createElement('span', null, value.name),
+          React.createElement('button', { type: 'button', onClick: function() { setQuery(''); onClear(); } }, 'Change')
+        );
+      }
+
+      var q = query.trim().toLowerCase();
+      var matches = (q ? deals.filter(function(d) { return d.name.toLowerCase().indexOf(q) !== -1; }) : deals).slice(0, 50);
+
+      return React.createElement('div', { className: 'combo' },
+        React.createElement('input', {
+          className: 'svc-form-input', type: 'text',
+          placeholder: loading ? 'Loading deals…' : 'Type to search deals…',
+          value: query, disabled: loading,
+          onChange: function(e) { setQuery(e.target.value); setOpen(true); },
+          onFocus: function() { setOpen(true); },
+          // Delayed so a click on an option registers before the list closes.
+          onBlur: function() { setTimeout(function() { setOpen(false); }, 120); }
+        }),
+        error && React.createElement('div', { className: 'error-text' }, error),
+        open && !loading && !error && React.createElement('div', { className: 'combo-list' },
+          matches.length === 0
+            ? React.createElement('div', { className: 'combo-empty' }, 'No deals match “' + query + '”')
+            : matches.map(function(d) {
+                return React.createElement('button', {
+                  key: d.id, type: 'button',
+                  onClick: function() { onPick(d); setOpen(false); }
+                }, d.name);
+              })
+        )
+      );
+    }
+
+    function NewProjectForm({ onCancel }) {
+      const [deals, setDeals] = useState([]);
+      const [dealsLoading, setDealsLoading] = useState(true);
+      const [dealsError, setDealsError] = useState('');
+      const [deal, setDeal] = useState(null);
+      const [form, setForm] = useState({ name: '', description: '', priority: 'Medium', start_date: '', due_date: '' });
+      const [tasks, setTasks] = useState([emptyTaskRow()]);
+      const [saving, setSaving] = useState(false);
+      const [error, setError] = useState('');
+      const [done, setDone] = useState(null);
+
+      useEffect(function() {
+        fetch('/hubspot/deal-options')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.error) throw new Error(data.error);
+            setDeals(data.deals || []);
+          })
+          .catch(function() { setDealsError('Unable to load deals.'); })
+          .finally(function() { setDealsLoading(false); });
+      }, []);
+
+      function update(field, value) {
+        setError('');
+        setForm(function(prev) { return Object.assign({}, prev, { [field]: value }); });
+      }
+
+      function pickDeal(d) {
+        setError('');
+        setDeal(d);
+        // Name defaults to the deal, and stays editable.
+        setForm(function(prev) { return Object.assign({}, prev, { name: prev.name || d.name }); });
+      }
+
+      function updateTask(i, field, value) {
+        setTasks(function(prev) {
+          return prev.map(function(row, idx) { return idx === i ? Object.assign({}, row, { [field]: value }) : row; });
+        });
+      }
+      function addTask() { setTasks(function(prev) { return prev.concat([emptyTaskRow()]); }); }
+      function removeTask(i) { setTasks(function(prev) { return prev.filter(function(_, idx) { return idx !== i; }); }); }
+
+      async function submit() {
+        if (!deal) { setError('Please choose the deal this project belongs to.'); return; }
+        if (!form.name.trim()) { setError('Please enter a project name.'); return; }
+        if (form.start_date && form.due_date && form.due_date < form.start_date) {
+          setError('Target due date cannot be before the start date.'); return;
+        }
+        var filled = tasks.filter(function(t) { return t.name.trim(); });
+        setSaving(true); setError('');
+        try {
+          var res = await fetch('/hubspot/projects', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              deal_id: deal.id, name: form.name.trim(), description: form.description,
+              priority: form.priority, start_date: form.start_date, due_date: form.due_date,
+              tasks: filled
+            })
+          });
+          var result = await res.json();
+          if (!res.ok || !result.success) throw new Error(result.error || 'Unable to create project');
+          setDone(result);
+        } catch (e) { setError(e.message); }
+        setSaving(false);
+      }
+
+      if (done) {
+        var warnings = [];
+        if (!done.deal_linked) warnings.push('The project could not be linked to the deal.');
+        (done.task_errors || []).forEach(function(t) { warnings.push(t.name + ': ' + t.reason); });
+        return React.createElement('div', { className: 'svc-form' },
+          React.createElement('div', { className: 'contact-confirm-note', style: { textAlign: 'center' } },
+            'Project created' + (done.tasks_created && done.tasks_created.length
+              ? ' with ' + done.tasks_created.length + (done.tasks_created.length === 1 ? ' task' : ' tasks') : '') + '.'),
+          warnings.length > 0 && React.createElement('div', { className: 'error-text' }, warnings.join(' '))
+        );
+      }
+
+      return React.createElement('div', { className: 'svc-form' },
+        React.createElement('div', { className: 'svc-form-title' }, 'New Project'),
+
+        React.createElement('div', { className: 'svc-form-row' },
+          React.createElement('div', { className: 'svc-form-label' }, 'Deal'),
+          React.createElement(DealPicker, {
+            deals: deals, loading: dealsLoading, error: dealsError, value: deal,
+            onPick: pickDeal, onClear: function() { setDeal(null); }
+          })
+        ),
+
+        React.createElement('div', { className: 'svc-form-row' },
+          React.createElement('div', { className: 'svc-form-label' }, 'Project Name'),
+          React.createElement('input', {
+            className: 'svc-form-input', type: 'text', value: form.name,
+            placeholder: 'Defaults to the deal name',
+            onChange: function(e) { update('name', e.target.value); }
+          })
+        ),
+
+        React.createElement('div', { className: 'svc-form-row' },
+          React.createElement('div', { className: 'svc-form-label' }, 'Description'),
+          React.createElement('input', {
+            className: 'svc-form-input', type: 'text', value: form.description,
+            onChange: function(e) { update('description', e.target.value); }
+          })
+        ),
+
+        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 } },
+          React.createElement('div', { className: 'svc-form-row' },
+            React.createElement('div', { className: 'svc-form-label' }, 'Priority'),
+            React.createElement('select', {
+              className: 'svc-form-select', value: form.priority,
+              onChange: function(e) { update('priority', e.target.value); }
+            }, TASK_PRIORITY_OPTIONS.map(function(p) {
+              return React.createElement('option', { key: p, value: p }, p);
+            }))
+          ),
+          React.createElement('div', { className: 'svc-form-row' },
+            React.createElement('div', { className: 'svc-form-label' }, 'Start Date'),
+            React.createElement('input', {
+              className: 'svc-form-input', type: 'date', value: form.start_date,
+              onChange: function(e) { update('start_date', e.target.value); }
+            })
+          ),
+          React.createElement('div', { className: 'svc-form-row' },
+            React.createElement('div', { className: 'svc-form-label' }, 'Target Due Date'),
+            React.createElement('input', {
+              className: 'svc-form-input', type: 'date', value: form.due_date,
+              onChange: function(e) { update('due_date', e.target.value); }
+            })
+          )
+        ),
+
+        React.createElement('div', { className: 'svc-form-label', style: { marginTop: 6 } }, 'Tasks ',
+          React.createElement('span', { className: 'hint' }, '(optional)')),
+        React.createElement('table', { className: 'proj-task-table' },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              React.createElement('th', null, 'Task Name'),
+              React.createElement('th', null, 'Due Date'),
+              React.createElement('th', null, 'Priority'),
+              React.createElement('th', null, 'Notes'),
+              React.createElement('th', null, '')
+            )
+          ),
+          React.createElement('tbody', null,
+            tasks.map(function(row, i) {
+              return React.createElement('tr', { key: i },
+                React.createElement('td', null, React.createElement('input', {
+                  type: 'text', value: row.name,
+                  onChange: function(e) { updateTask(i, 'name', e.target.value); }
+                })),
+                React.createElement('td', null, React.createElement('input', {
+                  type: 'date', value: row.due_date,
+                  onChange: function(e) { updateTask(i, 'due_date', e.target.value); }
+                })),
+                React.createElement('td', null, React.createElement('select', {
+                  value: row.priority,
+                  onChange: function(e) { updateTask(i, 'priority', e.target.value); }
+                }, TASK_PRIORITY_OPTIONS.map(function(p) {
+                  return React.createElement('option', { key: p, value: p }, p);
+                }))),
+                React.createElement('td', null, React.createElement('input', {
+                  type: 'text', value: row.notes,
+                  onChange: function(e) { updateTask(i, 'notes', e.target.value); }
+                })),
+                React.createElement('td', null, tasks.length > 1 && React.createElement('button', {
+                  type: 'button', className: 'proj-remove-row', title: 'Remove task',
+                  onClick: function() { removeTask(i); }
+                }, '×'))
+              );
+            })
+          )
+        ),
+        React.createElement('button', { type: 'button', className: 'proj-add-row', onClick: addTask }, '+ Add task'),
+
+        error && React.createElement('div', { className: 'error-text' }, error),
+        React.createElement('div', { className: 'contact-actions' },
+          React.createElement('button', { className: 'no', onClick: onCancel }, 'Cancel'),
+          React.createElement('button', { className: 'yes', disabled: saving, onClick: submit },
+            saving ? 'Creating…' : 'Create Project')
+        )
+      );
+    }
+
     // Markers that render an interactive panel rather than chat text. These must
     // be pushed as assistant messages — the "user" role paints the green bubble.
-    var INTERACTIVE_MARKERS = ["SHOW_OPTIONS", "STAGE_SELECTOR", "SERVICE_STAGE_SELECTOR", "MAP_STAGE_SELECTOR",
-      "ADD_LINE_ITEM_FORM", "NEW_SERVICE_FORM", "NEW_CONTACT_FORM"];
+    var INTERACTIVE_MARKERS = ["SHOW_OPTIONS", "STAGE_SELECTOR", "MAP_STAGE_SELECTOR", "PROJECT_STAGE_SELECTOR",
+      "ADD_LINE_ITEM_FORM", "NEW_PROJECT_FORM", "NEW_CONTACT_FORM"];
 
     // State is derived from the power company and is not typed by hand.
     // Mirrors POWER_COMPANY_STATE_MAP in app.py.
@@ -1497,9 +1389,9 @@
       );
     }
 
-    function QuickActions({ onAction, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, onAddLineItem, role }) {
+    function QuickActions({ onAction, onStageSelector, onMapSelector, onAddLineItem, role }) {
       var SALES_LABELS = ["Deal Summary","Add Line Item","New Contact","Submit Form","Update Pricing"];
-      var OPS_LABELS   = ["Services Summary","Display Service","New Service","Farm Map"];
+      var OPS_LABELS   = ["Project Summary","New Project","Farm Map"];
 
       // Determine which sections this portal allows
       var path = window.location.pathname;
@@ -1527,13 +1419,12 @@
           onClick: function() {
             if (a.isMap)            { window.open(MAP_URL, "_blank"); return; }
             if (a.isMapSelector)    { onMapSelector(); return; }
-            if (a.isNewServiceForm) { onNewServiceForm(); return; }
+            if (a.isNewProjectForm) { onAction("NEW_PROJECT_FORM"); return; }
             if (a.isAddLineItem)   { onAddLineItem && onAddLineItem(); return; }
-            if (a.isDisplayService) { onDisplayService(); return; }
             if (a.isCustomerForm)   { window.open(CUSTOMER_INTAKE_URL, "_blank"); return; }
             if (a.isNewContact)     { onAction("NEW_CONTACT_FORM"); return; }
             if (a.isStageSelector)  { onStageSelector(); return; }
-            if (a.isServiceStageSelector) { onServiceStageSelector(); return; }
+            if (a.isProjectStageSelector) { onAction("PROJECT_STAGE_SELECTOR"); return; }
             onAction(a.message);
           }
         },
@@ -1557,20 +1448,14 @@
       );
     }
 
-    function MessageContent({ content, onAction, onStageSelector, onServiceStageSelector, onMapSelector, onNewServiceForm, onDisplayService, role }) {
-      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onStageSelector: onStageSelector, onServiceStageSelector: onServiceStageSelector, onMapSelector: onMapSelector, onNewServiceForm: onNewServiceForm, onDisplayService: onDisplayService, role: role });
-      if (content === "DISPLAY_SERVICE") return React.createElement(TeamsSelectorWrapper, { onAction: onAction });
+    function MessageContent({ content, onAction, onStageSelector, onMapSelector, role }) {
+      if (content === "SHOW_OPTIONS") return React.createElement(QuickActions, { onAction: onAction, onStageSelector: onStageSelector, onMapSelector: onMapSelector, role: role });
       if (content === "STAGE_SELECTOR") return React.createElement(StageSelector, { onAction: onAction });
-      if (content === "SERVICE_STAGE_SELECTOR") return React.createElement(ServiceStageSelector, { onAction: onAction });
       if (content === "MAP_STAGE_SELECTOR") return React.createElement(MapStageSelector, {});
-      if (content === "NEW_SERVICE_FORM") return React.createElement(NewServiceWizard, {
-        onDone: function(success, countOrErr, errors) {
-          if (!success) { onAction("Service creation failed: " + countOrErr); return; }
-          var msg = countOrErr + " service" + (countOrErr !== 1 ? "s" : "") + " created";
-          if (errors > 0) msg += " (" + errors + " failed)";
-          onAction(msg + ".");
-        },
-        onCancel: function() { onAction("Cancelled new service"); }
+      if (content === "PROJECT_STAGE_SELECTOR") return React.createElement(ProjectStageSelector, { onAction: onAction });
+
+      if (content === "NEW_PROJECT_FORM") return React.createElement(NewProjectForm, {
+        onCancel: function() { onAction("SHOW_OPTIONS"); }
       });
 
       if (content === "NEW_CONTACT_FORM") return React.createElement(NewContactForm, {
@@ -1594,14 +1479,26 @@
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
 
-      if (content.includes("SERVICE_DETAILS:")) {
-        var sdParts = content.split("SERVICE_DETAILS:");
+      if (content.includes("PROJECTS_TABLE:")) {
+        var ptParts = content.split("PROJECTS_TABLE:");
         try {
-          var sdData = JSON.parse(sdParts[1].trim().split("\n")[0]);
+          var ptData = JSON.parse(ptParts[1].trim().split("\n")[0]);
           return React.createElement("div", null,
-            sdParts[0] && MarkdownBlock(sdParts[0].trim(), { marginBottom: 8 }),
-            React.createElement(ServiceDetails, { data: sdData }),
-            sdParts[2] && MarkdownBlock(sdParts[2].trim(), { marginTop: 8 })
+            ptParts[0] && MarkdownBlock(ptParts[0].trim(), { marginBottom: 8 }),
+            React.createElement(ProjectsTable, { data: ptData, onAction: onAction }),
+            ptParts[2] && MarkdownBlock(ptParts[2].trim(), { marginTop: 8 })
+          );
+        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
+      }
+
+      if (content.includes("PROJECT_DETAILS:")) {
+        var pdParts = content.split("PROJECT_DETAILS:");
+        try {
+          var pdData = JSON.parse(pdParts[1].trim().split("\n")[0]);
+          return React.createElement("div", null,
+            pdParts[0] && MarkdownBlock(pdParts[0].trim(), { marginBottom: 8 }),
+            React.createElement(ProjectDetails, { data: pdData }),
+            pdParts[2] && MarkdownBlock(pdParts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -1619,30 +1516,6 @@
               },
               onCancel: function() { onAction("Cancel service creation"); }
             })
-          );
-        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
-      }
-
-      if (content.includes("TEAMS_SELECTOR:")) {
-        var tsParts = content.split("TEAMS_SELECTOR:");
-        try {
-          var teamsData = JSON.parse(tsParts[1].trim().split("\n")[0]);
-          return React.createElement("div", null,
-            tsParts[0] && MarkdownBlock(tsParts[0].trim(), { marginBottom: 8 }),
-            React.createElement(TeamsSelector, { teams: teamsData.teams, onAction: onAction }),
-            tsParts[2] && MarkdownBlock(tsParts[2].trim(), { marginTop: 8 })
-          );
-        } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
-      }
-
-      if (content.includes("TEAM_SERVICES_SELECTOR:")) {
-        var tsParts = content.split("TEAM_SERVICES_SELECTOR:");
-        try {
-          var payload = JSON.parse(tsParts[1].trim().split("\n")[0]);
-          return React.createElement("div", null,
-            tsParts[0] && MarkdownBlock(tsParts[0].trim(), { marginBottom: 8 }),
-            React.createElement(TeamServicesSelector, { team: payload.team, services: payload.services, onAction: onAction }),
-            tsParts[2] && MarkdownBlock(tsParts[2].trim(), { marginTop: 8 })
           );
         } catch(e) { return React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, content); }
       }
@@ -2158,29 +2031,14 @@
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "STAGE_SELECTOR", display: true }]); });
       }
 
-      function triggerServiceStageSelector() {
-        setShowActions(false);
-        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "SERVICE_STAGE_SELECTOR", display: true }]); });
-      }
-
       function triggerMapSelector() {
         setShowActions(false);
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "MAP_STAGE_SELECTOR", display: true }]); });
       }
 
-      function triggerNewServiceForm() {
-        setShowActions(false);
-        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "NEW_SERVICE_FORM", display: true }]); });
-      }
-
       function triggerAddLineItem() {
         setShowActions(false);
         setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "ADD_LINE_ITEM_FORM", display: true }]); });
-      }
-
-      function triggerDisplayService() {
-        setShowActions(false);
-        setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "DISPLAY_SERVICE", display: true }]); });
       }
 
       async function sendMessage(overrideText) {
@@ -2199,37 +2057,36 @@
           return;
         }
 
-        // Handle direct selection actions for display service flow
-        if (text.startsWith("SHOW_TEAM_SERVICES:")) {
-          var payload = JSON.parse(text.replace("SHOW_TEAM_SERVICES:", ""));
-          var userMsg = { role: "user", content: "Show services for team: " + payload.team_name, display: true };
-          setMessages(function(prev) { return prev.concat([userMsg]); });
+        // Project Summary: list the projects in a chosen pipeline stage.
+        if (text.startsWith("GET_PROJECTS:")) {
+          var pSel = JSON.parse(text.replace("GET_PROJECTS:", ""));
+          setMessages(function(prev) { return prev.concat([{ role: "user", content: pSel.stage ? ("Show " + pSel.label + " projects") : "Show all projects", display: true }]); });
           setInput("");
           setLoading(true);
           try {
-            var teamServices = await executeTool("get_team_services", { team_id: payload.team_id });
-            var services = teamServices.services || [];
-            var assistantContent = "Found " + services.length + " service" + (services.length !== 1 ? "s" : "") + " for " + payload.team_name + ". Select the service you want to display.\nTEAM_SERVICES_SELECTOR:" + JSON.stringify({ team: payload, services: services });
-            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: assistantContent, display: true }]); });
+            var pRes = await executeTool("get_projects", pSel.stage ? { stage: pSel.stage } : {});
+            if (pRes.error) throw new Error(pRes.error);
+            var pPayload = { projects: pRes.projects || [], label: pSel.stage ? pSel.label : "All stages" };
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "PROJECTS_TABLE:" + JSON.stringify(pPayload), display: true }]); });
           } catch(err) {
-            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load services for " + payload.team_name + ". " + err.message, display: true }]); });
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load projects. " + err.message, display: true }]); });
           }
           setLoading(false);
           return;
         }
 
-        if (text.startsWith("DISPLAY_SERVICE_BY_ID:")) {
-          var payload = JSON.parse(text.replace("DISPLAY_SERVICE_BY_ID:", ""));
-          var userMsg2 = { role: "user", content: "Display service: " + payload.service_name, display: true };
-          setMessages(function(prev) { return prev.concat([userMsg2]); });
+        // Project detail: the project summary plus its associated tasks.
+        if (text.startsWith("SHOW_PROJECT_DETAILS:")) {
+          var pdSel = JSON.parse(text.replace("SHOW_PROJECT_DETAILS:", ""));
+          setMessages(function(prev) { return prev.concat([{ role: "user", content: "Show project: " + (pdSel.project_name || pdSel.project_id), display: true }]); });
           setInput("");
           setLoading(true);
           try {
-            var serviceDetails = await executeTool("get_service_details", { service_id: payload.service_id });
-            var assistantContent2 = "Displaying service " + payload.service_name + ".\nSERVICE_DETAILS:" + JSON.stringify(serviceDetails);
-            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: assistantContent2, display: true }]); });
+            var pdRes = await executeTool("get_project_details", { project_id: pdSel.project_id });
+            if (pdRes.error) throw new Error(pdRes.error);
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "PROJECT_DETAILS:" + JSON.stringify(pdRes), display: true }]); });
           } catch(err) {
-            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load service details for " + payload.service_name + ". " + err.message, display: true }]); });
+            setMessages(function(prev) { return prev.concat([{ role: "assistant", content: "Unable to load that project. " + err.message, display: true }]); });
           }
           setLoading(false);
           return;
@@ -2332,11 +2189,10 @@
           return m.display
             && m.content !== "SHOW_OPTIONS"
             && m.content !== "STAGE_SELECTOR"
-            && m.content !== "SERVICE_STAGE_SELECTOR"
+            && m.content !== "PROJECT_STAGE_SELECTOR"
             && m.content !== "MAP_STAGE_SELECTOR"
-            && m.content !== "DISPLAY_SERVICE"
             && m.content !== "ADD_LINE_ITEM_FORM"
-            && m.content !== "NEW_SERVICE_FORM"
+            && m.content !== "NEW_PROJECT_FORM"
             && !m.content.startsWith("SERVICE_FORM:")
             && !m.isToolCall
             && !m.isToolResult;
@@ -2414,7 +2270,7 @@
               var stripped = stripLeadingJsonFragments(cleaned);
               // If stripping removed everything, try to recover by searching for known display markers
               if (!stripped) {
-                var markers = ["DEALS_TABLE:", "SERVICES_TABLE:", "SERVICE_DETAILS:", "LINE_ITEMS_TABLE:", "SERVICE_FORM:", "TEAMS_SELECTOR:", "TEAM_SERVICES_SELECTOR:", "MAP_LINK", "SHOW_OPTIONS", "STAGE_SELECTOR", "SERVICE_STAGE_SELECTOR"];
+                var markers = ["DEALS_TABLE:", "SERVICES_TABLE:", "PROJECTS_TABLE:", "PROJECT_DETAILS:", "LINE_ITEMS_TABLE:", "SERVICE_FORM:", "MAP_LINK", "SHOW_OPTIONS", "STAGE_SELECTOR", "PROJECT_STAGE_SELECTOR"];
                 var idx = -1;
                 for (var mi = 0; mi < markers.length; mi++) {
                   var p = cleaned.indexOf(markers[mi]);
@@ -2497,12 +2353,12 @@
               React.createElement("div", { style: { display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } },
                 msg.role === "assistant" && React.createElement("div", { style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: msg.isThinking ? "linear-gradient(135deg, #1d5f8a, #1d7fc4)" : "linear-gradient(135deg, #1a6b3c, #25a35a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginRight: 9, marginTop: 2 } }, msg.isThinking ? "⚙" : "P"),
                 React.createElement("div", { style: { maxWidth: "82%", padding: "9px 13px", borderRadius: msg.role === "user" ? "15px 15px 4px 15px" : "15px 15px 15px 4px", background: msg.role === "user" ? "#1a6b3c" : msg.isThinking ? "#eef2f6" : "#ffffff", fontSize: 13, lineHeight: 1.6, color: msg.role === "user" ? "#fff" : msg.isThinking ? "#64798c" : "#16212c", border: msg.role === "user" ? "none" : "1px solid #dce3ea", fontStyle: msg.isThinking ? "italic" : "normal" } },
-                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, onAddLineItem: triggerAddLineItem, role: auth.role })
+                  msg.isThinking ? msg.content : React.createElement(MessageContent, { content: msg.content, onAction: sendMessage, onStageSelector: triggerStageSelector, onMapSelector: triggerMapSelector, onAddLineItem: triggerAddLineItem, role: auth.role })
                 )
               ),
               msg.role === "assistant" && isLast && showActions && !msg.isThinking && !lastIsSelector &&
                 React.createElement("div", { style: { marginLeft: 35, marginTop: 8 } },
-                  React.createElement(QuickActions, { onAction: sendMessage, onStageSelector: triggerStageSelector, onServiceStageSelector: triggerServiceStageSelector, onMapSelector: triggerMapSelector, onNewServiceForm: triggerNewServiceForm, onDisplayService: triggerDisplayService, onAddLineItem: triggerAddLineItem, role: auth.role })
+                  React.createElement(QuickActions, { onAction: sendMessage, onStageSelector: triggerStageSelector, onMapSelector: triggerMapSelector, onAddLineItem: triggerAddLineItem, role: auth.role })
                 )
             );
           }),

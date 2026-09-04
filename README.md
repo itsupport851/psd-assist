@@ -40,6 +40,9 @@ Required values are typically set in Railway or your deployment environment.
 ### Customer intake form
 - `CUSTOMER_INTAKE_PIN`: PIN customers enter to unlock `/customer-intake`. If unset, the form is not PIN-gated
 - `DEALSTAGE_CUSTOMER_FORM_SENT`: deal stage applied to deals created from an intake submission (default `appointmentscheduled`)
+- `PROJECT_OBJECT_TYPE`: HubSpot object holding projects (default `projects`)
+- `PROJECT_PIPELINE_ID`: project pipeline (default `139663aa-09ee-418e-b67d-c8cfcd3e5ce3`)
+- `PROJECT_DEFAULT_STAGE_ID`: stage new projects start in (default Planning, `acc364b5-…`)
 - `HUBSPOT_FILES_URL`: HubSpot Files API endpoint for customer document uploads (default `https://api.hubapi.com/files/v3/files`). The Files API is versioned `v3`; a dated segment such as `/files/2026-03/files` appears in some doc samples as a placeholder and returns 404
 - `INTAKE_FILES_FOLDER`: root file-manager folder for uploaded documents (default `/customer-intake`); each submission gets a subfolder named after the account
 
@@ -144,9 +147,7 @@ The State field is derived from the selected power company and is not editable:
 | --- | --- |
 | Georgia Power | GA |
 | Entergy Louisiana | LA |
-| Entergy Arkansas | A |
-
-Entergy Arkansas maps to `A`, not the USPS code `AR`, as specified by the business owner.
+| Entergy Arkansas | AR |
 
 The form renders State read-only, and `POWER_COMPANY_STATE_MAP` in `app.py` re-derives it server-side so a hand-edited payload cannot override it. The portal's New Contact form (`index.html`) carries its own copy in `POWER_COMPANIES` and derives State the same way, though it does not send `power_company` to HubSpot. Adding a power company means updating all three lists.
 
@@ -240,6 +241,40 @@ The read endpoints requested only the left-hand names, so intake-created deals s
 Naming a property the portal does not have can fail an entire read, so `_known_deal_properties()` lists the deal object's real properties once per process and aliases are filtered through it. If that lookup fails, only `_ALIASES_SAFE_WITHOUT_DISCOVERY` is requested — the three names that were already being read successfully.
 
 **Adding a new alias:** add it to the alias list in `app.py`. Add it to `_ALIASES_SAFE_WITHOUT_DISCOVERY` only if you are certain the property exists in every portal.
+
+## Projects
+
+Projects live on their own HubSpot object (`PROJECT_OBJECT_TYPE`, default `projects`) on the project pipeline `PROJECT_PIPELINE_ID`. The portal exposes two actions: **Project Summary** (pick a pipeline stage, see the projects in it, click one for its detail and tasks) and **New Project**.
+
+### Stages are read live, never hardcoded
+`_project_stages()` reads `/crm/v3/pipelines/{object}/{pipeline}/stages` and caches it, so labels, ids and display order always match the portal. `PROJECT_STAGE_FALLBACK` is used only if that read fails.
+
+This matters for one specific reason: the stage ids supplied for **Planning and Execution were identical** (`acc364b5-…`). Two stages cannot share an id, so Execution's real id is only obtainable from the live read — and it is deliberately **absent from the fallback list**. If you ever see Execution missing from the stage picker, the live read is failing and the fallback is in use.
+
+### Project properties are resolved, not assumed
+Property names on the projects object are discovered via `_resolve_properties`, which maps each logical field (`name`, `description`, `priority`, `start_date`, `due_date`) to the first name in `PROJECT_PROPERTY_CANDIDATES` that actually exists on the object. If a portal spells one differently, add it to that candidate list rather than changing the read sites.
+
+### Endpoints
+- `GET /hubspot/project-stages` — the pipeline's stages, in order
+- `GET /hubspot/projects?stage=<id>` — projects on the pipeline, optionally one stage; pages to 2000
+- `GET /hubspot/project-details/<id>` — one project plus every associated task and deal
+- `POST /hubspot/projects` — see below
+- `GET /hubspot/deal-options` — every deal as `{id, name}`, for the searchable deal picker
+
+### Creating a project
+`POST /hubspot/projects` takes `deal_id`, `name`, optional `description`/`priority`/`start_date`/`due_date`, and a `tasks` array of `{name, due_date, priority, notes}`. Pipeline and stage are **not** accepted from the client — they default to `PROJECT_PIPELINE_ID` and `PROJECT_DEFAULT_STAGE_ID` (Planning). In one call it:
+
+1. Creates the project
+2. Associates it with the chosen deal
+3. Creates each task (blank rows are skipped), mapping priority to HubSpot's `LOW`/`MEDIUM`/`HIGH` and the due date to `hs_timestamp`
+4. Associates each task with the project
+
+Failures are reported rather than swallowed: the response carries `deal_linked` and a `task_errors` list, and the form surfaces both. A task that is created but cannot be linked is reported, not silently orphaned.
+
+### Removed
+The **Display Service** flow is gone — the quick action, the `DISPLAY_SERVICE` / `SHOW_TEAM_SERVICES` / `DISPLAY_SERVICE_BY_ID` handlers, the `TeamsSelector`, `TeamsSelectorWrapper`, `TeamServicesSelector` and `ServiceDetails` components, the `get_team_services` / `get_service_details` tools, and the `/hubspot/team-services/<team_id>` and `/hubspot/service-details/<service_id>` endpoints. `NewServiceWizard` and `ServiceStageSelector` went with the Project Summary and New Project rename.
+
+The services *table* (`SERVICES_TABLE:`), `ServiceForm`, the installer `ServicesDashboard` and the `/hubspot/services*` endpoints remain — they are still reachable through chat and the installer view.
 
 ## Line items
 
