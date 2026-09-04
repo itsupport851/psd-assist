@@ -72,7 +72,10 @@ PROJECT_PROPERTY_CANDIDATES = {
     'description': ['hs_description', 'description'],
     'priority': ['hs_priority', 'hs_project_priority', 'priority'],
     'start_date': ['hs_start_date', 'hs_project_start_date'],
-    'due_date': ['hs_target_end_date', 'hs_target_due_date', 'hs_due_date'],
+    # hs_target_due_date is the field that actually exists on this portal's
+    # projects object; it's listed first so a failed property-discovery call
+    # (which falls back to the first candidate) still lands on a valid name.
+    'due_date': ['hs_target_due_date', 'hs_target_end_date', 'hs_due_date'],
 }
 SERVICE_STAGE_MAP = {
     'new': '8e2b21d0-7a90-4968-8f8c-a8525cc49c70',
@@ -602,17 +605,22 @@ def hs_create_line_item():
         deal_id = data.get('deal_id')
         if not deal_id:
             return jsonify({'error': 'deal_id is required'}), 400
-        payload = {
-            'properties': {
-                'name': data.get('name', 'Fan Motor'),
-                'price': str(data.get('unit_price', 0)),
-                'quantity': str(data.get('quantity', 1)),
-                'description': data.get('description', ''),
-                'fan_brand': data.get('fan_brand', ''),
-                'fan_size': str(data.get('fan_size', '')),
-                'motor_size': str(data.get('motor_size', '')),
-            }
+        properties = {
+            'name': data.get('name', 'Fan Motor'),
+            'price': str(data.get('unit_price', 0)),
+            'quantity': str(data.get('quantity', 1)),
+            'description': data.get('description', ''),
         }
+        # Custom fan properties are only sent if they exist on this portal's
+        # line_items object — naming one that doesn't exist fails the whole
+        # create call with PROPERTY_DOESNT_EXIST, dropping the entire line item.
+        known = _known_properties('line_items')
+        for prop, value in (('fan_brand', data.get('fan_brand', '')),
+                             ('fan_size', str(data.get('fan_size', ''))),
+                             ('motor_size', str(data.get('motor_size', '')))):
+            if not known or prop in known:
+                properties[prop] = value
+        payload = {'properties': properties}
         res = requests.post(f'{HUBSPOT_BASE}/crm/v3/objects/line_items', json=payload, headers=HUBSPOT_HEADERS())
         if res.status_code != 201:
             return jsonify({'error': _hubspot_error(res)}), res.status_code

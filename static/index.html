@@ -138,7 +138,9 @@
     const { useState, useRef, useEffect } = React;
 
     const MAKE_UPDATE_WEBHOOK = "https://hook.us2.make.com/bew0u14lqrsqvc5mgil8s9bjq92an4eo";
-    const MAP_URL = "https://web-production-0b9c8.up.railway.app/map";
+    // Same-origin path: map.html is served by this same Flask app at /map.
+    // A hardcoded absolute Railway URL pointed at a stale/unprovisioned domain.
+    const MAP_URL = "/map";
     const CUSTOMER_INTAKE_URL = "/customer-intake";
 
     // Role-based quick actions
